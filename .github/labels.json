@@ -1,0 +1,47 @@
+[
+  {
+    "name": "🐛BUG",
+    "color": "#F66570",
+    "description": "Something isn't working / went wrong"
+  },
+  {
+    "name": "📚DOCS",
+    "color": "#0075CA",
+    "description": "This is for recording documentations"
+  },
+  {
+    "name": "✔️DUPLICATE",
+    "color": "#CFD3D7",
+    "description": "This content already exists"
+  },
+  {
+    "name": "✨FEAT",
+    "color": "#A2EEEF",
+    "description": "New feature in development / service"
+  },
+  {
+    "name": "⭕️FIXED",
+    "color": "#FFFFFF",
+    "description": "This problem solved"
+  },
+  {
+    "name": "🙋‍♂️HEY",
+    "color": "#008672",
+    "description": "Extra attention is needed!!"
+  },
+  {
+    "name": "🙋ASK",
+    "color": "#D876E3",
+    "description": "Further information is requested"
+  },
+  {
+    "name": "✅TEST",
+    "color": "#0C6267",
+    "description": "Only for development test"
+  },
+  {
+    "name": "♻️CLEANING",
+    "color": "#000000",
+    "description": "For cleaning / refactoring codes, change names ...etc "
+  }
+]
