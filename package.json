@@ -1,0 +1,9 @@
+{
+  "name": "pyosh-blog-be",
+  "version": "0.1.0",
+  "repository": "https://github.com/pyo-sh/pyosh-blog-be.git",
+  "license": "MIT",
+  "type": "module",
+  "author": "pyo-sh <pygosky@gmail.com>",
+  "packageManager": "yarn@3.6.4"
+}
