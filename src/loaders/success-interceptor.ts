@@ -18,9 +18,9 @@ export function loadSuccessInterceptor(app: Express) {
           success,
           data,
         });
-      } else {
-        return originSend.call(res, { success, message: data.message });
       }
+
+      return originSend.call(res, { success, message: data.message });
     };
 
     next();

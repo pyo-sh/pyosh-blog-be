@@ -1,9 +1,9 @@
+import type { RouterData } from "@src/core/RouteContainer";
 import { RouterMethod, RouterParam } from "@src/core/enum";
 import {
   PipeTransform,
   PipeValidation,
 } from "@src/core/interface/param-pipe.interface";
-import type { RouterData } from "@src/core/RouteContainer";
 
 type ParamData = object | string | number;
 type ParamPipes = Partial<PipeTransform> & Partial<PipeValidation>;

@@ -15,10 +15,10 @@ export function loadErrorHandler(app: Express) {
       return res
         .status(error.statusCode)
         .json({ success: false, message: error.message });
-    } else {
-      return res
-        .status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .send({ success: false, message: "Internal Server Error" });
     }
+
+    return res
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .send({ success: false, message: "Internal Server Error" });
   });
 }
