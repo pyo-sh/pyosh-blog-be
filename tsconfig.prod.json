@@ -3,5 +3,5 @@
   "compilerOptions": {
     "outDir": "./build/src"
   },
-  "exclude": ["node_modules", "**/*.test.ts", "./test/*"]
+  "exclude": ["**/*.test.ts", "./test/*"]
 }
