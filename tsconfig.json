@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "lib": ["es5", "es6"],
+    "target": "es6",
+    "esModuleInterop": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "sourceMap": true,
+    "removeComments": true,
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+    "baseUrl": "./",
+    "paths": {
+      "@src/*": ["./src/*"],
+      "@test/*": ["./test/*"],
+      "@stub/*": ["./stub/*"]
+    }
+  },
+  "include": ["src", "test", "stub"],
+  "exclude": ["node_modules"]
+}
