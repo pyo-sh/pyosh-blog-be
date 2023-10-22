@@ -8,6 +8,7 @@ import {
   DeleteDateColumn,
 } from "typeorm";
 import { PostEntity } from "@src/entities/post.entity";
+import { UserEntity } from "@src/entities/user.entity";
 
 @Entity("post_comment_tb")
 export class PostCommentEntity {
@@ -34,4 +35,13 @@ export class PostCommentEntity {
     onDelete: "CASCADE",
   })
   post?: PostEntity;
+
+  @Column({ type: "int" })
+  userId: number;
+
+  @ManyToOne(() => UserEntity, (user) => user.postComments, {
+    cascade: true,
+    onDelete: "CASCADE",
+  })
+  user?: UserEntity;
 }

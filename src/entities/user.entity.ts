@@ -11,6 +11,7 @@ import {
 } from "typeorm";
 import { GuestbookEntity } from "@src/entities/guestbook.entity";
 import { ImageEntity } from "@src/entities/image.entity";
+import { PostCommentEntity } from "@src/entities/post-comment.entity";
 import { PostEntity } from "@src/entities/post.entity";
 
 @Entity("user_tb")
@@ -55,4 +56,7 @@ export class UserEntity {
 
   @OneToMany(() => PostEntity, (post) => post.user)
   posts?: PostEntity[];
+
+  @OneToMany(() => PostCommentEntity, (postComment) => postComment.user)
+  postComments?: PostCommentEntity[];
 }
