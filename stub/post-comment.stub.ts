@@ -1,7 +1,7 @@
 import { faker } from "@faker-js/faker";
+import type PostStub from "@stub/post.stub";
 import { PostCommentEntity } from "@src/entities/post-comment.entity";
 import DefaultStub, { StubDateInputType } from "@stub/default.stub";
-import type PostStub from "@stub/post.stub";
 
 interface PostCommentFrame extends Omit<PostCommentEntity, "post"> {
   post?: PostStub;
@@ -73,7 +73,7 @@ export default class PostCommentStub
   setUpdatedAt(updatedAt?: PostCommentStubInput["updatedAt"]) {
     this.updatedAt = this.selectValidDate(
       updatedAt,
-      faker.date.recent({ refDate: this.createdAt }),
+      faker.date.soon({ refDate: this.createdAt }),
     );
 
     return this;
@@ -85,7 +85,7 @@ export default class PostCommentStub
     } else {
       this.deletedAt = this.selectValidDate(
         deletedAt,
-        faker.date.recent({ refDate: this.updatedAt }),
+        faker.date.soon({ refDate: this.updatedAt }),
       );
     }
 

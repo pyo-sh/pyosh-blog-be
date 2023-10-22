@@ -1,9 +1,9 @@
 import { faker } from "@faker-js/faker";
-import { UserEntity } from "@src/entities/user.entity";
-import DefaultStub, { StubDateInputType } from "@stub/default.stub";
 import type GuestbookStub from "@stub/guestbook.stub";
 import type ImageStub from "@stub/image.stub";
 import type PostStub from "@stub/post.stub";
+import { UserEntity } from "@src/entities/user.entity";
+import DefaultStub, { StubDateInputType } from "@stub/default.stub";
 
 interface UserFrame extends Omit<UserEntity, "guestbooks" | "image" | "posts"> {
   image?: ImageStub;
@@ -89,7 +89,7 @@ export default class UserStub extends DefaultStub implements UserFrame {
   setUpdatedAt(updatedAt?: UserStubInput["updatedAt"]) {
     this.updatedAt = this.selectValidDate(
       updatedAt,
-      faker.date.recent({ refDate: this.createdAt }),
+      faker.date.soon({ refDate: this.createdAt }),
     );
 
     return this;
@@ -101,7 +101,7 @@ export default class UserStub extends DefaultStub implements UserFrame {
     } else {
       this.deletedAt = this.selectValidDate(
         deletedAt,
-        faker.date.recent({ refDate: this.updatedAt }),
+        faker.date.soon({ refDate: this.updatedAt }),
       );
     }
 

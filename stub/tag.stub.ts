@@ -1,7 +1,7 @@
 import { faker } from "@faker-js/faker";
+import type PostStub from "@stub/post.stub";
 import { TagEntity } from "@src/entities/tag.entity";
 import DefaultStub, { StubDateInputType } from "@stub/default.stub";
-import type PostStub from "@stub/post.stub";
 
 interface TagFrame extends Omit<TagEntity, "posts"> {
   posts?: PostStub[];

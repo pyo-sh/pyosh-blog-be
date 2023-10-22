@@ -1,7 +1,7 @@
 import { faker } from "@faker-js/faker";
+import type UserStub from "@stub/user.stub";
 import { GuestbookEntity } from "@src/entities/guestbook.entity";
 import DefaultStub, { StubDateInputType } from "@stub/default.stub";
-import type UserStub from "@stub/user.stub";
 
 interface GuestbookFrame extends Omit<GuestbookEntity, "user"> {
   user?: UserStub;
@@ -74,7 +74,7 @@ export default class GuestbookStub
   setUpdatedAt(updatedAt?: GuestbookStubInput["updatedAt"]) {
     this.updatedAt = this.selectValidDate(
       updatedAt,
-      faker.date.recent({ refDate: this.createdAt }),
+      faker.date.soon({ refDate: this.createdAt }),
     );
 
     return this;
@@ -86,7 +86,7 @@ export default class GuestbookStub
     } else {
       this.deletedAt = this.selectValidDate(
         deletedAt,
-        faker.date.recent({ refDate: this.updatedAt }),
+        faker.date.soon({ refDate: this.updatedAt }),
       );
     }
 

@@ -1,9 +1,9 @@
 import { faker } from "@faker-js/faker";
-import { ImageEntity } from "@src/entities/image.entity";
-import DefaultStub, { StubDateInputType } from "@stub/default.stub";
 import type PostStub from "@stub/post.stub";
 import type ProjectStub from "@stub/project.stub";
 import type UserStub from "@stub/user.stub";
+import { ImageEntity } from "@src/entities/image.entity";
+import DefaultStub, { StubDateInputType } from "@stub/default.stub";
 
 interface ImageFrame extends Omit<ImageEntity, "projects" | "users" | "posts"> {
   projects?: ProjectStub[];
@@ -67,7 +67,7 @@ export default class ImageStub extends DefaultStub implements ImageFrame {
     } else {
       this.deletedAt = this.selectValidDate(
         deletedAt,
-        faker.date.recent({ refDate: this.createdAt }),
+        faker.date.soon({ refDate: this.createdAt }),
       );
     }
 

@@ -1,7 +1,7 @@
 import { faker } from "@faker-js/faker";
+import type ImageStub from "@stub/image.stub";
 import { ProjectEntity } from "@src/entities/project.entity";
 import DefaultStub, { StubDateInputType } from "@stub/default.stub";
-import type ImageStub from "@stub/image.stub";
 
 interface ProjectFrame extends Omit<ProjectEntity, "thumbnail"> {
   thumbnail?: ImageStub;
@@ -65,7 +65,7 @@ export default class ProjectStub extends DefaultStub implements ProjectFrame {
   setUpdatedAt(updatedAt?: ProjectStubInput["updatedAt"]) {
     this.updatedAt = this.selectValidDate(
       updatedAt,
-      faker.date.recent({ refDate: this.createdAt }),
+      faker.date.soon({ refDate: this.createdAt }),
     );
 
     return this;
@@ -77,7 +77,7 @@ export default class ProjectStub extends DefaultStub implements ProjectFrame {
     } else {
       this.deletedAt = this.selectValidDate(
         deletedAt,
-        faker.date.recent({ refDate: this.updatedAt }),
+        faker.date.soon({ refDate: this.updatedAt }),
       );
     }
 

@@ -11,7 +11,7 @@
     "start": "NODE_ENV=development yarn build && TS_NODE_BASEURL=./build node -r tsconfig-paths/register ./build/src/app.js",
     "test": "NODE_ENV=test ts-mocha --paths -file ./test/setups/index.ts ./test/**/*.test.ts --exit",
     "devTest": "NODE_ENV=test ts-mocha --paths -file ./test/setups/index.ts test/**/*.test.ts -w --watch-files '**/*.ts'",
-    "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
+    "lint": "eslint --ext .js,.jsx,.ts,.tsx .",
     "compile:types": "tsc --noEmit"
   },
   "dependencies": {

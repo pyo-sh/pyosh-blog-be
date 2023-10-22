@@ -1,10 +1,10 @@
 import { faker } from "@faker-js/faker";
-import { PostEntity } from "@src/entities/post.entity";
-import DefaultStub, { StubDateInputType } from "@stub/default.stub";
 import type ImageStub from "@stub/image.stub";
 import type PostCommentStub from "@stub/post-comment.stub";
 import type TagStub from "@stub/tag.stub";
 import type UserStub from "@stub/user.stub";
+import { PostEntity } from "@src/entities/post.entity";
+import DefaultStub, { StubDateInputType } from "@stub/default.stub";
 
 interface PostFrame
   extends Omit<PostEntity, "user" | "tags" | "comments" | "thumbnail"> {
@@ -100,7 +100,7 @@ export default class PostStub extends DefaultStub implements PostFrame {
   setUpdatedAt(updatedAt?: PostStubInput["updatedAt"]) {
     this.updatedAt = this.selectValidDate(
       updatedAt,
-      faker.date.recent({ refDate: this.createdAt }),
+      faker.date.soon({ refDate: this.createdAt }),
     );
 
     return this;
@@ -112,7 +112,7 @@ export default class PostStub extends DefaultStub implements PostFrame {
     } else {
       this.deletedAt = this.selectValidDate(
         deletedAt,
-        faker.date.recent({ refDate: this.updatedAt }),
+        faker.date.soon({ refDate: this.updatedAt }),
       );
     }
 
