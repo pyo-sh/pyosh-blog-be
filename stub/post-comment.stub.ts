@@ -1,10 +1,12 @@
 import { faker } from "@faker-js/faker";
 import type PostStub from "@stub/post.stub";
+import type UserStub from "@stub/user.stub";
 import { PostCommentEntity } from "@src/entities/post-comment.entity";
 import DefaultStub, { StubDateInputType } from "@stub/default.stub";
 
-interface PostCommentFrame extends Omit<PostCommentEntity, "post"> {
+interface PostCommentFrame extends Omit<PostCommentEntity, "post" | "user"> {
   post?: PostStub;
+  user?: UserStub;
 }
 interface PostCommentStubInput
   extends Omit<PostCommentFrame, "createdAt" | "updatedAt" | "deletedAt"> {
@@ -23,8 +25,10 @@ export default class PostCommentStub
   updatedAt: Date;
   deletedAt: Date | null;
   postId: number;
+  userId: number;
   // *: Typeorm Entity
   post?: PostStub;
+  user?: UserStub;
 
   constructor(
     postCommentData?: Partial<PostCommentStubInput> & {
@@ -41,8 +45,17 @@ export default class PostCommentStub
   constructor(postCommentData) {
     super();
 
-    const { id, content, createdAt, updatedAt, deletedAt, post, postId } =
-      postCommentData ?? {};
+    const {
+      id,
+      content,
+      createdAt,
+      updatedAt,
+      deletedAt,
+      post,
+      postId,
+      user,
+      userId,
+    } = postCommentData ?? {};
 
     this.setId(id);
     this.setContent(content);
@@ -55,6 +68,12 @@ export default class PostCommentStub
       this.setPost(post);
     } else {
       this.setPostId(postId);
+    }
+
+    if (user) {
+      this.setUser(user);
+    } else {
+      this.setUserId(userId);
     }
   }
 
@@ -101,6 +120,19 @@ export default class PostCommentStub
   setPost(post: PostCommentStubInput["post"]) {
     this.setPostId(post.id);
     this.post = post;
+
+    return this;
+  }
+
+  setUserId(userId: PostCommentStubInput["userId"]) {
+    this.userId = userId;
+
+    return this;
+  }
+
+  setUser(user: PostCommentStubInput["user"]) {
+    this.setUserId(user.id);
+    this.user = user;
 
     return this;
   }

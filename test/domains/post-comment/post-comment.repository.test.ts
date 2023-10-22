@@ -16,7 +16,10 @@ describe("PostComment Repository Test", () => {
     const userStub = new UserStub();
     const newUser = await userRepository.save(userStub);
     const postStub = new PostStub({ user: newUser });
-    const postCommentStub = new PostCommentStub({ post: postStub });
+    const postCommentStub = new PostCommentStub({
+      post: postStub,
+      user: userStub,
+    });
 
     const newPost = await postRepository.save(postStub);
     const newPostComment = await postCommentRepository.save(postCommentStub);
