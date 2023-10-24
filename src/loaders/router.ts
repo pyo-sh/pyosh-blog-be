@@ -1,13 +1,11 @@
 import express, { Express } from "express";
 import path from "path";
 import { globSync } from "glob";
-import { loadSuccessInterceptor } from "./success-interceptor";
 import Logger, { devLog, prodLog } from "@src/constants/console";
 import RouteContainer from "@src/core/RouteContainer";
 
 export function loadRouters(app: Express) {
   const router = express.Router();
-  loadSuccessInterceptor(router as Express);
 
   const queryPaths = new Set();
   const pattern = path.join(__dirname, "../domains", "./**/*.controller.ts");
