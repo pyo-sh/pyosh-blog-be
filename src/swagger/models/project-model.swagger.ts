@@ -8,6 +8,7 @@ const { project } = swaggerExamples;
   name: "Project",
   description: "프로젝트 정보",
 })
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 class SwaggerProjectModel implements ProjectEntity {
   @ApiModelProperty({
     required: true,
@@ -43,5 +44,3 @@ class SwaggerProjectModel implements ProjectEntity {
   })
   thumbnailId: number | null;
 }
-
-export default SwaggerProjectModel;

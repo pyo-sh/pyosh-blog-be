@@ -8,6 +8,7 @@ const { tag } = swaggerExamples;
   name: "Tag",
   description: "블로그 글의 태그",
 })
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 class SwaggerTagModel implements TagEntity {
   @ApiModelProperty({
     required: true,
@@ -27,5 +28,3 @@ class SwaggerTagModel implements TagEntity {
   })
   createdAt: Date;
 }
-
-export default SwaggerTagModel;

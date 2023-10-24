@@ -8,6 +8,7 @@ const { post } = swaggerExamples;
   name: "Post",
   description: "블로그 글",
 })
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 class SwaggerPostModel implements PostEntity {
   @ApiModelProperty({
     required: true,
@@ -49,5 +50,3 @@ class SwaggerPostModel implements PostEntity {
   })
   userId: number;
 }
-
-export default SwaggerPostModel;

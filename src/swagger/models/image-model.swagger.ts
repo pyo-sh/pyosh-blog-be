@@ -8,6 +8,7 @@ const { image } = swaggerExamples;
   name: "Image",
   description: "이미지 URL",
 })
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 class SwaggerImageModel implements ImageEntity {
   @ApiModelProperty({
     required: true,
@@ -32,5 +33,3 @@ class SwaggerImageModel implements ImageEntity {
   })
   deletedAt: Date | null;
 }
-
-export default SwaggerImageModel;

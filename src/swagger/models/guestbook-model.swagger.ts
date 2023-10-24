@@ -8,6 +8,7 @@ const { guestbook } = swaggerExamples;
   name: "Guestbook",
   description: "유저가 남긴 방문록",
 })
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 class SwaggerGuestbookModel implements GuestbookEntity {
   @ApiModelProperty({
     required: true,
@@ -42,5 +43,3 @@ class SwaggerGuestbookModel implements GuestbookEntity {
   })
   userId: number;
 }
-
-export default SwaggerGuestbookModel;

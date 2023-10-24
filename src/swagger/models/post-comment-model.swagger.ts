@@ -8,6 +8,7 @@ const { postComment } = swaggerExamples;
   name: "PostComment",
   description: "블로그 글의 댓글",
 })
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 class SwaggerPostCommentModel implements PostCommentEntity {
   @ApiModelProperty({
     required: true,
@@ -50,5 +51,3 @@ class SwaggerPostCommentModel implements PostCommentEntity {
   })
   userId: number;
 }
-
-export default SwaggerPostCommentModel;

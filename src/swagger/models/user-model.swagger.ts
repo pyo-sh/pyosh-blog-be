@@ -8,6 +8,7 @@ const { user } = swaggerExamples;
   name: "User",
   description: "사용자",
 })
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 class SwaggerUserModel implements UserEntity {
   @ApiModelProperty({
     required: true,
@@ -59,5 +60,3 @@ class SwaggerUserModel implements UserEntity {
   })
   imageId: number | null;
 }
-
-export default SwaggerUserModel;
