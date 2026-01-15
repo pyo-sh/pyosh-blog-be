@@ -5,7 +5,6 @@
   "license": "MIT",
   "author": "pyo-sh <pygosky@gmail.com>",
   "scripts": {
-    "initVscode": "yarn dlx @yarnpkg/sdks vscode",
     "dev": "NODE_ENV=development nodemon --exec ts-node -r tsconfig-paths/register ./src/app.ts",
     "build": "NODE_ENV=production rm -rf ./build && yarn tsc --project tsconfig.prod.json",
     "start": "NODE_ENV=development yarn build && TS_NODE_BASEURL=./build node -r tsconfig-paths/register ./build/src/app.js",
@@ -73,6 +72,5 @@
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^3.14.2",
     "typescript": "^4.9.5"
-  },
-  "packageManager": "yarn@3.6.4"
+  }
 }
