@@ -14,7 +14,7 @@ export function loadRouters(app: Express) {
   routerFiles.forEach((fileName) => {
     try {
       // *: need to load Controllers (automatically)
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const RouterClass = require(fileName)?.default;
 
       if (!RouterClass || !RouterClass?.prototype?.constructor) {

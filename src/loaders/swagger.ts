@@ -13,7 +13,7 @@ export function loadSwagger(app: Express) {
     const swaggerFiles = globSync(pattern);
 
     swaggerFiles.forEach((fileName) => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unused-expressions
       require(fileName)?.default;
     });
 

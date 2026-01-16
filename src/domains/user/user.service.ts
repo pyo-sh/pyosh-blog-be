@@ -57,7 +57,7 @@ class UserService {
     }
 
     // TODO : image findOrCreate
-    image;
+    void image;
     const userData = this.userRepository.create({ id, name });
 
     return await this.userRepository.save(userData);
