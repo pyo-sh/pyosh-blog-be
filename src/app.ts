@@ -1,45 +1,69 @@
-import express from "express";
-import type { Express } from "express";
-import http from "http";
-import { loadErrorHandler } from "./loaders/error-handler";
-import { loadSwagger } from "./loaders/swagger";
-import { prodLog } from "@src/constants/console";
+import Fastify, { FastifyInstance, FastifyError } from "fastify";
+import { ZodTypeProvider } from "fastify-type-provider-zod";
 import envs from "@src/constants/env";
-import { loadBase } from "@src/loaders/base";
-import { loadPassport } from "@src/loaders/passport";
-import { loadRouters } from "@src/loaders/router";
-import { loadSession } from "@src/loaders/session";
-import { loadTypeorm } from "@src/loaders/typeorm";
-import "express-async-errors";
+import { NodeEnv } from "@src/constants/node-env";
+import { HttpError } from "@src/errors/http-error";
+import typeormPlugin from "@src/plugins/typeorm";
+import corsPlugin from "@src/plugins/cors";
+import sessionPlugin from "@src/plugins/session";
 
-const app = (function listenServer() {
-  const app = express();
-  const server = http.createServer(app);
-  app.set("port", envs.SERVER_PORT);
+export async function buildApp(): Promise<FastifyInstance> {
+  // Fastify 인스턴스 생성
+  const fastify = Fastify({
+    logger: {
+      level: envs.NODE_ENV === NodeEnv.DEV ? "info" : "warn",
+      transport:
+        envs.NODE_ENV === NodeEnv.DEV
+          ? {
+              target: "pino-pretty",
+              options: {
+                translateTime: "HH:MM:ss Z",
+                ignore: "pid,hostname",
+              },
+            }
+          : undefined,
+    },
+  }).withTypeProvider<ZodTypeProvider>();
 
-  const loaders: Array<(app: Express) => Promise<void> | void> = [
-    loadBase,
-    loadTypeorm,
-    loadSession,
-    loadPassport,
-    loadRouters,
-    loadErrorHandler,
-    loadSwagger,
-  ];
+  // 플러그인 등록 (순서 중요: typeorm → session → cors)
+  await fastify.register(typeormPlugin);
+  await fastify.register(sessionPlugin);
+  await fastify.register(corsPlugin);
 
-  loaders.reduce(async (promise, loader) => {
-    return promise.then(() => loader(app));
-  }, Promise.resolve());
+  // 에러 핸들러 등록
+  fastify.setErrorHandler((error, _request, reply) => {
+    if (error instanceof HttpError) {
+      return reply.status(error.statusCode).send({
+        statusCode: error.statusCode,
+        error: error.name,
+        message: error.message,
+      });
+    }
 
-  server.listen(envs.SERVER_PORT);
-  server.on("listening", () => {
-    const addr = server.address();
-    const bind =
-      typeof addr === "string" ? `pipe ${addr}` : `port ${addr.port}`;
-    prodLog.cyan(`[Express] Listening on ${bind}`);
+    // Fastify/Zod validation error
+    const fastifyError = error as FastifyError;
+    if (fastifyError.validation) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Validation Error",
+        message: fastifyError.message,
+        details: fastifyError.validation,
+      });
+    }
+
+    // 기타 에러
+    fastify.log.error(error);
+    return reply.status(500).send({
+      statusCode: 500,
+      error: "Internal Server Error",
+      message: "An unexpected error occurred",
+    });
   });
 
-  return app;
-})();
+  // Health check 엔드포인트
+  fastify.get("/health", async () => {
+    return { status: "ok", timestamp: new Date().toISOString() };
+  });
 
-export default app;
+  return fastify;
+}
