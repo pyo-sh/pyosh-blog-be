@@ -6,6 +6,8 @@ import { HttpError } from "@src/errors/http-error";
 import typeormPlugin from "@src/plugins/typeorm";
 import corsPlugin from "@src/plugins/cors";
 import sessionPlugin from "@src/plugins/session";
+import passportPlugin from "@src/plugins/passport";
+import authRoute from "@src/routes/auth/auth.route";
 
 export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
@@ -25,9 +27,10 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   }).withTypeProvider<ZodTypeProvider>();
 
-  // 플러그인 등록 (순서 중요: typeorm → session → cors)
+  // 플러그인 등록 (순서 중요: typeorm → session → passport → cors)
   await fastify.register(typeormPlugin);
   await fastify.register(sessionPlugin);
+  await fastify.register(passportPlugin);
   await fastify.register(corsPlugin);
 
   // 에러 핸들러 등록
@@ -64,6 +67,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   fastify.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
   });
+
+  // 라우트 등록
+  await fastify.register(authRoute, { prefix: "/api/auth" });
 
   return fastify;
 }
