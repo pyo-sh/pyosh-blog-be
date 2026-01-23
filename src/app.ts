@@ -8,6 +8,9 @@ import corsPlugin from "@src/plugins/cors";
 import sessionPlugin from "@src/plugins/session";
 import passportPlugin from "@src/plugins/passport";
 import authRoute from "@src/routes/auth/auth.route";
+import { createUserRoute } from "@src/routes/user/user.route";
+import { UserService } from "@src/services/user.service";
+import { UserEntity } from "@src/entities/user.entity";
 
 export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
@@ -68,8 +71,13 @@ export async function buildApp(): Promise<FastifyInstance> {
     return { status: "ok", timestamp: new Date().toISOString() };
   });
 
+  // 서비스 인스턴스 생성 (수동 DI)
+  const userRepository = fastify.typeorm.getRepository(UserEntity);
+  const userService = new UserService(userRepository);
+
   // 라우트 등록
   await fastify.register(authRoute, { prefix: "/api/auth" });
+  await fastify.register(createUserRoute(userService), { prefix: "/api/user" });
 
   return fastify;
 }
