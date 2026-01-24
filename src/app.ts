@@ -7,6 +7,7 @@ import typeormPlugin from "@src/plugins/typeorm";
 import corsPlugin from "@src/plugins/cors";
 import sessionPlugin from "@src/plugins/session";
 import passportPlugin from "@src/plugins/passport";
+import swaggerPlugin from "@src/plugins/swagger";
 import authRoute from "@src/routes/auth/auth.route";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { UserService } from "@src/services/user.service";
@@ -30,10 +31,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   }).withTypeProvider<ZodTypeProvider>();
 
-  // 플러그인 등록 (순서 중요: typeorm → session → passport → cors)
+  // 플러그인 등록 (순서 중요: typeorm → session → passport → swagger → cors)
   await fastify.register(typeormPlugin);
   await fastify.register(sessionPlugin);
   await fastify.register(passportPlugin);
+  await fastify.register(swaggerPlugin);
   await fastify.register(corsPlugin);
 
   // 에러 핸들러 등록
