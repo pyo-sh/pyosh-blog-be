@@ -1,11 +1,11 @@
+import fastifyPassport from "@fastify/passport";
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-import fastifyPassport from "@fastify/passport";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { Strategy as GitHubStrategy } from "passport-github";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import envs from "@src/constants/env";
-import { UserEntity } from "@src/entities/user.entity";
 import { ImageEntity } from "@src/entities/image.entity";
+import { UserEntity } from "@src/entities/user.entity";
 
 const passportPlugin: FastifyPluginAsync = async (fastify) => {
   // @fastify/passport 초기화 (secureSession 제거 - @fastify/session 사용)
@@ -23,6 +23,7 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
   // User deserialization (세션에서 복원)
   fastifyPassport.registerUserDeserializer(async (id: number) => {
     const user = await userRepository.findOneBy({ id });
+
     return user || null;
   });
 
@@ -37,7 +38,11 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
       },
       async (_accessToken, _refreshToken, profile, done) => {
         try {
-          const { name, email: googleEmail, picture } = profile._json as {
+          const {
+            name,
+            email: googleEmail,
+            picture,
+          } = profile._json as {
             name: string;
             email: string;
             picture: string;
@@ -61,8 +66,8 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
         } catch (error) {
           return done(error as Error);
         }
-      }
-    )
+      },
+    ),
   );
 
   // GitHub OAuth Strategy
@@ -104,8 +109,8 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
         } catch (error) {
           return done(error as Error);
         }
-      }
-    )
+      },
+    ),
   );
 
   fastify.log.info("[Passport] Plugin registered");

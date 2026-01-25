@@ -2,16 +2,16 @@ import Fastify, { FastifyInstance, FastifyError } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import envs from "@src/constants/env";
 import { NodeEnv } from "@src/constants/node-env";
+import { UserEntity } from "@src/entities/user.entity";
 import { HttpError } from "@src/errors/http-error";
-import typeormPlugin from "@src/plugins/typeorm";
 import corsPlugin from "@src/plugins/cors";
-import sessionPlugin from "@src/plugins/session";
 import passportPlugin from "@src/plugins/passport";
+import sessionPlugin from "@src/plugins/session";
 import swaggerPlugin from "@src/plugins/swagger";
+import typeormPlugin from "@src/plugins/typeorm";
 import authRoute from "@src/routes/auth/auth.route";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { UserService } from "@src/services/user.service";
-import { UserEntity } from "@src/entities/user.entity";
 
 export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
@@ -61,6 +61,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
     // 기타 에러
     fastify.log.error(error);
+
     return reply.status(500).send({
       statusCode: 500,
       error: "Internal Server Error",

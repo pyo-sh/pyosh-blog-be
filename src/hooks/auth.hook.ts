@@ -7,7 +7,7 @@ import { HttpError } from "@src/errors/http-error";
  */
 export async function requireAuth(
   request: FastifyRequest,
-  reply: FastifyReply
+  _reply: FastifyReply,
 ) {
   if (!request.user) {
     throw HttpError.unauthorized("Authentication required");
@@ -20,10 +20,10 @@ export async function requireAuth(
  */
 export async function optionalAuth(
   request: FastifyRequest,
-  _reply: FastifyReply
+  _reply: FastifyReply,
 ) {
   // request.user가 있으면 인증된 상태, 없어도 통과
   request.log.debug(
-    request.user ? "Authenticated request" : "Unauthenticated request"
+    request.user ? "Authenticated request" : "Unauthenticated request",
   );
 }

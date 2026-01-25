@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/no-unresolved
 import "reflect-metadata";
 import { buildApp } from "@src/app";
 import envs from "@src/constants/env";

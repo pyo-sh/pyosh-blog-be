@@ -1,5 +1,5 @@
 import { faker } from "@faker-js/faker";
-import { omitObject, pickObject } from "@test/utils/object";
+import { omitObject, pickObject } from "@stub/utils/object";
 
 const MAX_ID_ITERATOR = 100;
 const idSet = new Set<number>();

@@ -1,7 +1,7 @@
-import { FastifyPluginAsync } from "fastify";
-import fp from "fastify-plugin";
 import cookie from "@fastify/cookie";
 import session from "@fastify/session";
+import { FastifyPluginAsync } from "fastify";
+import fp from "fastify-plugin";
 import { TypeormStore } from "typeorm-store";
 import envs from "@src/constants/env";
 import { SessionEntity } from "@src/entities/session.entity";

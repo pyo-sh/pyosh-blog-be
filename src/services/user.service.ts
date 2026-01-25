@@ -1,6 +1,6 @@
 import { Repository } from "typeorm";
-import { HttpError } from "@src/errors/http-error";
 import { UserEntity } from "@src/entities/user.entity";
+import { HttpError } from "@src/errors/http-error";
 
 export interface UserCreateArgs {
   name: string;
@@ -23,6 +23,7 @@ export class UserService {
 
   async createUser(args: UserCreateArgs): Promise<UserEntity> {
     const userData = this.userRepository.create(args);
+
     return await this.userRepository.save(userData);
   }
 
@@ -58,9 +59,7 @@ export class UserService {
     const { affected } = await this.userRepository.softDelete(id);
 
     if (!affected || affected === 0) {
-      throw HttpError.notFound(
-        "유저 정보를 삭제할 수 없거나 없는 정보입니다."
-      );
+      throw HttpError.notFound("유저 정보를 삭제할 수 없거나 없는 정보입니다.");
     }
   }
 }

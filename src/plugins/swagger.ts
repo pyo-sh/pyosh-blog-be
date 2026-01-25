@@ -1,7 +1,7 @@
-import { FastifyPluginAsync } from "fastify";
-import fp from "fastify-plugin";
 import swagger from "@fastify/swagger";
 import swaggerUI from "@fastify/swagger-ui";
+import { FastifyPluginAsync } from "fastify";
+import fp from "fastify-plugin";
 import envs from "@src/constants/env";
 
 const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
