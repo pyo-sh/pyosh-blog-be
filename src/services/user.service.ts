@@ -1,5 +1,7 @@
-import { Repository } from "typeorm";
-import { UserEntity } from "@src/entities/user.entity";
+import { eq } from "drizzle-orm";
+import { MySql2Database } from "drizzle-orm/mysql2";
+import * as schema from "@src/db/schema";
+import { User, userTable } from "@src/db/schema";
 import { HttpError } from "@src/errors/http-error";
 
 export interface UserCreateArgs {
@@ -16,19 +18,32 @@ export interface UserUpdateArgs {
 }
 
 /**
- * User 서비스 (순수 클래스, DI 제거)
+ * User 서비스 (Drizzle ORM 기반)
  */
 export class UserService {
-  constructor(private readonly userRepository: Repository<UserEntity>) {}
+  constructor(private readonly db: MySql2Database<typeof schema>) {}
 
-  async createUser(args: UserCreateArgs): Promise<UserEntity> {
-    const userData = this.userRepository.create(args);
+  async createUser(args: UserCreateArgs): Promise<User> {
+    const [result] = await this.db.insert(userTable).values(args);
+    const [user] = await this.db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, Number(result.insertId)))
+      .limit(1);
 
-    return await this.userRepository.save(userData);
+    if (!user) {
+      throw HttpError.internal("유저 생성에 실패했습니다.");
+    }
+
+    return user;
   }
 
-  async getUser(id: number): Promise<UserEntity> {
-    const user = await this.userRepository.findOneBy({ id });
+  async getUser(id: number): Promise<User> {
+    const [user] = await this.db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, id))
+      .limit(1);
 
     if (!user) {
       throw HttpError.notFound("유효한 유저 정보가 없습니다.");
@@ -37,28 +52,57 @@ export class UserService {
     return user;
   }
 
-  async updateUser({ id, name, imageId }: UserUpdateArgs): Promise<UserEntity> {
-    const user = await this.userRepository.findOneBy({ id });
+  async updateUser({ id, name, imageId }: UserUpdateArgs): Promise<User> {
+    const [user] = await this.db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, id))
+      .limit(1);
 
     if (!user) {
       throw HttpError.notFound("유효한 유저 정보가 없습니다.");
     }
 
     // 변경사항만 적용
+    const updates: Partial<User> = {};
     if (name !== undefined) {
-      user.name = name;
+      updates.name = name;
     }
     if (imageId !== undefined) {
-      user.imageId = imageId;
+      updates.imageId = imageId;
     }
 
-    return await this.userRepository.save(user);
+    await this.db.update(userTable).set(updates).where(eq(userTable.id, id));
+
+    // 업데이트된 유저 조회
+    const [updatedUser] = await this.db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, id))
+      .limit(1);
+
+    if (!updatedUser) {
+      throw HttpError.internal("유저 업데이트에 실패했습니다.");
+    }
+
+    return updatedUser;
   }
 
   async deleteUser(id: number): Promise<void> {
-    const { affected } = await this.userRepository.softDelete(id);
+    // Soft delete: deletedAt 업데이트
+    await this.db
+      .update(userTable)
+      .set({ deletedAt: new Date() })
+      .where(eq(userTable.id, id));
 
-    if (!affected || affected === 0) {
+    // 삭제 확인
+    const [user] = await this.db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, id))
+      .limit(1);
+
+    if (!user || !user.deletedAt) {
       throw HttpError.notFound("유저 정보를 삭제할 수 없거나 없는 정보입니다.");
     }
   }

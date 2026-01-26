@@ -2,13 +2,12 @@ import Fastify, { FastifyInstance, FastifyError } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import envs from "@src/constants/env";
 import { NodeEnv } from "@src/constants/node-env";
-import { UserEntity } from "@src/entities/user.entity";
 import { HttpError } from "@src/errors/http-error";
 import corsPlugin from "@src/plugins/cors";
+import drizzlePlugin from "@src/plugins/drizzle";
 import passportPlugin from "@src/plugins/passport";
 import sessionPlugin from "@src/plugins/session";
 import swaggerPlugin from "@src/plugins/swagger";
-import typeormPlugin from "@src/plugins/typeorm";
 import authRoute from "@src/routes/auth/auth.route";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { UserService } from "@src/services/user.service";
@@ -31,8 +30,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   }).withTypeProvider<ZodTypeProvider>();
 
-  // 플러그인 등록 (순서 중요: typeorm → session → passport → swagger → cors)
-  await fastify.register(typeormPlugin);
+  // 플러그인 등록 (순서 중요: drizzle → session → passport → swagger → cors)
+  await fastify.register(drizzlePlugin);
   await fastify.register(sessionPlugin);
   await fastify.register(passportPlugin);
   await fastify.register(swaggerPlugin);
@@ -75,8 +74,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // 서비스 인스턴스 생성 (수동 DI)
-  const userRepository = fastify.typeorm.getRepository(UserEntity);
-  const userService = new UserService(userRepository);
+  const userService = new UserService(fastify.db);
 
   // 라우트 등록
   await fastify.register(authRoute, { prefix: "/api/auth" });

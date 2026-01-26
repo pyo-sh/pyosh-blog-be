@@ -1,12 +1,12 @@
 import { faker } from "@faker-js/faker";
-import { SessionEntity } from "@src/entities/session.entity";
+import { Session } from "@src/db/schema";
 
-export default class SessionStub implements SessionEntity {
+export default class SessionStub implements Session {
   id: string;
   data: string;
   expiresAt: number;
 
-  constructor(sessionData?: Partial<SessionEntity>) {
+  constructor(sessionData?: Partial<Session>) {
     const { id, data, expiresAt } = sessionData ?? {};
 
     this.setId(id);
@@ -14,20 +14,20 @@ export default class SessionStub implements SessionEntity {
     this.setExpiresAt(expiresAt);
   }
 
-  setId(id?: SessionEntity["id"]) {
+  setId(id?: Session["id"]) {
     this.id = id ?? faker.string.uuid();
 
     return this;
   }
 
-  setData(data?: SessionEntity["data"]) {
+  setData(data?: Session["data"]) {
     this.data = data ?? JSON.stringify({});
 
     return this;
   }
 
-  setExpiresAt(expiresAt?: SessionEntity["expiresAt"]) {
-    this.expiresAt = expiresAt ?? faker.date.recent().getTime();
+  setExpiresAt(expiresAt?: Session["expiresAt"]) {
+    this.expiresAt = expiresAt ?? Math.floor(faker.date.future().getTime() / 1000);
 
     return this;
   }

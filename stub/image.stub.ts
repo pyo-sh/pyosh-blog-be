@@ -1,14 +1,10 @@
 import { faker } from "@faker-js/faker";
-import type PostStub from "@stub/post.stub";
-import type ProjectStub from "@stub/project.stub";
 import type UserStub from "@stub/user.stub";
-import { ImageEntity } from "@src/entities/image.entity";
+import { Image } from "@src/db/schema";
 import DefaultStub, { StubDateInputType } from "@stub/default.stub";
 
-interface ImageFrame extends Omit<ImageEntity, "projects" | "users" | "posts"> {
-  projects?: ProjectStub[];
+interface ImageFrame extends Omit<Image, "users"> {
   users?: UserStub[];
-  posts?: PostStub[];
 }
 
 interface ImageStubInput extends Omit<ImageFrame, "createdAt" | "deletedAt"> {
@@ -21,16 +17,12 @@ export default class ImageStub extends DefaultStub implements ImageFrame {
   url: string;
   createdAt: Date;
   deletedAt: Date | null;
-  // *: Typeorm Entity
-  projects?: ProjectStub[];
   users?: UserStub[];
-  posts?: PostStub[];
 
   constructor(imageData?: Partial<ImageStubInput>) {
     super();
 
-    const { id, url, createdAt, deletedAt, projects, users, posts } =
-      imageData ?? {};
+    const { id, url, createdAt, deletedAt, users } = imageData ?? {};
 
     this.setId(id);
     this.setURL(url);
@@ -38,14 +30,8 @@ export default class ImageStub extends DefaultStub implements ImageFrame {
 
     this.setDeletedAt(deletedAt ?? null);
 
-    if (projects) {
-      this.setProjects(projects);
-    }
     if (users) {
       this.setUsers(users);
-    }
-    if (posts) {
-      this.setPosts(posts);
     }
   }
 
@@ -74,20 +60,8 @@ export default class ImageStub extends DefaultStub implements ImageFrame {
     return this;
   }
 
-  setProjects(projects: ImageStubInput["projects"]) {
-    this.projects = projects;
-
-    return this;
-  }
-
   setUsers(users: ImageStubInput["users"]) {
     this.users = users;
-
-    return this;
-  }
-
-  setPosts(posts: ImageStubInput["posts"]) {
-    this.posts = posts;
 
     return this;
   }

@@ -1,28 +1,30 @@
 import fastifyPassport from "@fastify/passport";
+import { eq } from "drizzle-orm";
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { Strategy as GitHubStrategy } from "passport-github";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import envs from "@src/constants/env";
-import { ImageEntity } from "@src/entities/image.entity";
-import { UserEntity } from "@src/entities/user.entity";
+import { imageTable, userTable, User } from "@src/db/schema";
 
 const passportPlugin: FastifyPluginAsync = async (fastify) => {
   // @fastify/passport 초기화 (secureSession 제거 - @fastify/session 사용)
   await fastify.register(fastifyPassport.initialize());
 
-  // Repository 가져오기
-  const userRepository = fastify.typeorm.getRepository(UserEntity);
-  const imageRepository = fastify.typeorm.getRepository(ImageEntity);
+  const { db } = fastify;
 
   // User serialization (세션에 저장)
-  fastifyPassport.registerUserSerializer(async (user: UserEntity) => {
+  fastifyPassport.registerUserSerializer(async (user: User) => {
     return user.id;
   });
 
   // User deserialization (세션에서 복원)
   fastifyPassport.registerUserDeserializer(async (id: number) => {
-    const user = await userRepository.findOneBy({ id });
+    const [user] = await db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, id))
+      .limit(1);
 
     return user || null;
   });
@@ -49,20 +51,30 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
           };
 
           // 기존 유저 찾기
-          let user = await userRepository.findOneBy({ googleEmail });
+          const [existingUser] = await db
+            .select()
+            .from(userTable)
+            .where(eq(userTable.googleEmail, googleEmail))
+            .limit(1);
 
-          if (!user) {
-            // 새 유저 생성
-            const imageData = imageRepository.create({ url: picture });
-            const userData = userRepository.create({
-              name,
-              googleEmail,
-              image: imageData,
-            });
-            user = await userRepository.save(userData);
+          if (existingUser) {
+            return done(null, existingUser);
           }
 
-          return done(null, user);
+          // 새 유저 생성 (이미지 포함)
+          const [image] = await db.insert(imageTable).values({ url: picture });
+          const [user] = await db
+            .insert(userTable)
+            .values({ name, googleEmail, imageId: Number(image.insertId) });
+
+          // 생성된 유저 조회
+          const [newUser] = await db
+            .select()
+            .from(userTable)
+            .where(eq(userTable.id, Number(user.insertId)))
+            .limit(1);
+
+          return done(null, newUser);
         } catch (error) {
           return done(error as Error);
         }
@@ -92,20 +104,30 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
           };
 
           // 기존 유저 찾기
-          let user = await userRepository.findOneBy({ githubId });
+          const [existingUser] = await db
+            .select()
+            .from(userTable)
+            .where(eq(userTable.githubId, githubId))
+            .limit(1);
 
-          if (!user) {
-            // 새 유저 생성
-            const imageData = imageRepository.create({ url });
-            const userData = userRepository.create({
-              name,
-              githubId,
-              image: imageData,
-            });
-            user = await userRepository.save(userData);
+          if (existingUser) {
+            return done(null, existingUser);
           }
 
-          return done(null, user);
+          // 새 유저 생성 (이미지 포함)
+          const [image] = await db.insert(imageTable).values({ url });
+          const [user] = await db
+            .insert(userTable)
+            .values({ name, githubId, imageId: Number(image.insertId) });
+
+          // 생성된 유저 조회
+          const [newUser] = await db
+            .select()
+            .from(userTable)
+            .where(eq(userTable.id, Number(user.insertId)))
+            .limit(1);
+
+          return done(null, newUser);
         } catch (error) {
           return done(error as Error);
         }
@@ -118,5 +140,5 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
 
 export default fp(passportPlugin, {
   name: "passport-plugin",
-  dependencies: ["typeorm-plugin", "session-plugin"],
+  dependencies: ["drizzle-plugin", "session-plugin"],
 });

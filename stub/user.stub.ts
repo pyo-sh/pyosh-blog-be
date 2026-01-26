@@ -1,14 +1,10 @@
 import { faker } from "@faker-js/faker";
-import type GuestbookStub from "@stub/guestbook.stub";
 import type ImageStub from "@stub/image.stub";
-import type PostStub from "@stub/post.stub";
-import { UserEntity } from "@src/entities/user.entity";
+import { User } from "@src/db/schema";
 import DefaultStub, { StubDateInputType } from "@stub/default.stub";
 
-interface UserFrame extends Omit<UserEntity, "guestbooks" | "image" | "posts"> {
+interface UserFrame extends Omit<User, "image"> {
   image?: ImageStub;
-  guestbooks?: GuestbookStub[];
-  posts?: PostStub[];
 }
 
 interface UserStubInput
@@ -28,10 +24,7 @@ export default class UserStub extends DefaultStub implements UserFrame {
   updatedAt: Date;
   deletedAt: Date | null;
   imageId: number | null;
-  // *: Typeorm Entity
   image?: ImageStub;
-  guestbooks?: GuestbookStub[];
-  posts?: PostStub[];
 
   constructor(userData?: Partial<UserStubInput>) {
     super();
@@ -47,8 +40,6 @@ export default class UserStub extends DefaultStub implements UserFrame {
       deletedAt,
       imageId,
       image,
-      guestbooks,
-      posts,
     } = userData ?? {};
 
     this.setId(id);
@@ -65,12 +56,6 @@ export default class UserStub extends DefaultStub implements UserFrame {
       this.setImage(image);
     } else {
       this.setImageId(imageId ?? null);
-    }
-    if (guestbooks) {
-      this.setGuestBooks(guestbooks);
-    }
-    if (posts) {
-      this.setPosts(posts);
     }
   }
 
@@ -143,18 +128,6 @@ export default class UserStub extends DefaultStub implements UserFrame {
   setImage(image: UserStubInput["image"]) {
     this.setImageId(image.id);
     this.image = image;
-
-    return this;
-  }
-
-  setGuestBooks(guestbooks: UserStubInput["guestbooks"]) {
-    this.guestbooks = guestbooks;
-
-    return this;
-  }
-
-  setPosts(posts: UserStubInput["posts"]) {
-    this.posts = posts;
 
     return this;
   }
