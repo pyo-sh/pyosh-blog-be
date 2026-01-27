@@ -1,7 +1,7 @@
 import { SessionStore } from "@fastify/session";
 import { eq } from "drizzle-orm";
 import { db } from "@src/db/client";
-import { sessionTable } from "@src/db/schema";
+import { sessionTable } from "@src/db/schema/index";
 
 /**
  * Drizzle 기반 SessionStore 구현

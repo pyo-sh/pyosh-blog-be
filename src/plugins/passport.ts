@@ -5,7 +5,7 @@ import fp from "fastify-plugin";
 import { Strategy as GitHubStrategy } from "passport-github";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import envs from "@src/constants/env";
-import { imageTable, userTable, User } from "@src/db/schema";
+import { imageTable, userTable, User } from "@src/db/schema/index";
 
 const passportPlugin: FastifyPluginAsync = async (fastify) => {
   // @fastify/passport 초기화 (secureSession 제거 - @fastify/session 사용)

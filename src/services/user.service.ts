@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
-import * as schema from "@src/db/schema";
-import { User, userTable } from "@src/db/schema";
+import * as schema from "@src/db/schema/index";
+import { User, userTable } from "@src/db/schema/index";
 import { HttpError } from "@src/errors/http-error";
 
 export interface UserCreateArgs {
