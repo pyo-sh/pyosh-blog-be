@@ -17,6 +17,7 @@ export * from "./comments";
 export * from "./guestbook";
 export * from "./stats";
 
-// Relations (추후 추가 예정)
+// Relations
+export * from "../relations/index";
 
 // Types (각 테이블에서 export됨)
