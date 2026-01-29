@@ -1,6 +1,6 @@
 import fastifyPassport from "@fastify/passport";
 import { FastifyPluginAsync } from "fastify";
-import envs from "@src/constants/env";
+import { env } from "@src/shared/env";
 
 const authRoute: FastifyPluginAsync = async (fastify) => {
   // Google OAuth
@@ -14,8 +14,8 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/google/callback",
     fastifyPassport.authenticate("google", {
-      successRedirect: new URL(envs.LOGIN_SUCCESS_PATH, envs.CLIENT_URL).href,
-      failureRedirect: new URL(envs.LOGIN_FAILURE_PATH, envs.CLIENT_URL).href,
+      successRedirect: new URL(env.LOGIN_SUCCESS_PATH, env.CLIENT_URL).href,
+      failureRedirect: new URL(env.LOGIN_FAILURE_PATH, env.CLIENT_URL).href,
     }),
   );
 
@@ -30,8 +30,8 @@ const authRoute: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/github/callback",
     fastifyPassport.authenticate("github", {
-      successRedirect: new URL(envs.LOGIN_SUCCESS_PATH, envs.CLIENT_URL).href,
-      failureRedirect: new URL(envs.LOGIN_FAILURE_PATH, envs.CLIENT_URL).href,
+      successRedirect: new URL(env.LOGIN_SUCCESS_PATH, env.CLIENT_URL).href,
+      failureRedirect: new URL(env.LOGIN_FAILURE_PATH, env.CLIENT_URL).href,
     }),
   );
 

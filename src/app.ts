@@ -1,24 +1,29 @@
 import Fastify, { FastifyInstance, FastifyError } from "fastify";
-import { ZodTypeProvider } from "fastify-type-provider-zod";
-import envs from "@src/constants/env";
+import {
+  ZodTypeProvider,
+  serializerCompiler,
+  validatorCompiler,
+} from "fastify-type-provider-zod";
 import { NodeEnv } from "@src/constants/node-env";
 import { HttpError } from "@src/errors/http-error";
 import corsPlugin from "@src/plugins/cors";
 import drizzlePlugin from "@src/plugins/drizzle";
+import helmetPlugin from "@src/plugins/helmet";
 import passportPlugin from "@src/plugins/passport";
 import sessionPlugin from "@src/plugins/session";
 import swaggerPlugin from "@src/plugins/swagger";
 import authRoute from "@src/routes/auth/auth.route";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { UserService } from "@src/services/user.service";
+import { env } from "@src/shared/env";
 
 export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
   const fastify = Fastify({
     logger: {
-      level: envs.NODE_ENV === NodeEnv.DEV ? "info" : "warn",
+      level: env.NODE_ENV === NodeEnv.DEV ? "info" : "warn",
       transport:
-        envs.NODE_ENV === NodeEnv.DEV
+        env.NODE_ENV === NodeEnv.DEV
           ? {
               target: "pino-pretty",
               options: {
@@ -30,7 +35,12 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   }).withTypeProvider<ZodTypeProvider>();
 
-  // 플러그인 등록 (순서 중요: drizzle → session → passport → swagger → cors)
+  // Zod validator & serializer 설정
+  fastify.setValidatorCompiler(validatorCompiler);
+  fastify.setSerializerCompiler(serializerCompiler);
+
+  // 플러그인 등록 (순서 중요: helmet → drizzle → session → passport → swagger → cors)
+  await fastify.register(helmetPlugin);
   await fastify.register(drizzlePlugin);
   await fastify.register(sessionPlugin);
   await fastify.register(passportPlugin);

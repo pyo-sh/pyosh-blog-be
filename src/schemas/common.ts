@@ -53,3 +53,21 @@ export const IdParamSchema = z.object({
 });
 
 export type IdParam = z.infer<typeof IdParamSchema>;
+
+/**
+ * Slug 파라미터 스키마
+ */
+export const SlugParamSchema = z.object({
+  slug: z.string().min(1).max(255),
+});
+
+export type SlugParam = z.infer<typeof SlugParamSchema>;
+
+/**
+ * 성공 응답 스키마
+ */
+export const SuccessResponseSchema = z.object({
+  success: z.literal(true),
+});
+
+export type SuccessResponse = z.infer<typeof SuccessResponseSchema>;

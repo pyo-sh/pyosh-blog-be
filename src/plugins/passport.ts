@@ -4,8 +4,8 @@ import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { Strategy as GitHubStrategy } from "passport-github";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import envs from "@src/constants/env";
 import { imageTable, userTable, User } from "@src/db/schema/index";
+import { env } from "@src/shared/env";
 
 const passportPlugin: FastifyPluginAsync = async (fastify) => {
   // @fastify/passport 초기화 (secureSession 제거 - @fastify/session 사용)
@@ -34,8 +34,8 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
     "google",
     new GoogleStrategy(
       {
-        clientID: envs.GOOGLE_CLIENT_ID,
-        clientSecret: envs.GOOGLE_CLIENT_SECRET,
+        clientID: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
         callbackURL: "/api/auth/google/callback",
       },
       async (_accessToken, _refreshToken, profile, done) => {
@@ -87,8 +87,8 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
     "github",
     new GitHubStrategy(
       {
-        clientID: envs.GITHUB_CLIENT_ID,
-        clientSecret: envs.GITHUB_CLIENT_SECRET,
+        clientID: env.GITHUB_CLIENT_ID,
+        clientSecret: env.GITHUB_CLIENT_SECRET,
         callbackURL: "/api/auth/github/callback",
       },
       async (_accessToken, _refreshToken, profile, done) => {

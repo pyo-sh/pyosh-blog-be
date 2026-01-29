@@ -2,7 +2,7 @@ import swagger from "@fastify/swagger";
 import swaggerUI from "@fastify/swagger-ui";
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-import envs from "@src/constants/env";
+import { env } from "@src/shared/env";
 
 const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
   // @fastify/swagger 등록 (OpenAPI 스펙 생성)
@@ -16,7 +16,7 @@ const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
       },
       servers: [
         {
-          url: `${envs.CLIENT_PROTOCOL}://localhost:${envs.SERVER_PORT}`,
+          url: `${env.CLIENT_PROTOCOL}://localhost:${env.SERVER_PORT}`,
           description: "Development server",
         },
       ],

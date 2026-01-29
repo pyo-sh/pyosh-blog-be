@@ -3,7 +3,7 @@ import session from "@fastify/session";
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { DrizzleSessionStore } from "./drizzle-session-store";
-import envs from "@src/constants/env";
+import { env } from "@src/shared/env";
 
 const sessionPlugin: FastifyPluginAsync = async (fastify) => {
   // @fastify/cookie 등록 (session의 의존성)
@@ -11,10 +11,10 @@ const sessionPlugin: FastifyPluginAsync = async (fastify) => {
 
   // @fastify/session 등록 (Drizzle SessionStore 사용)
   await fastify.register(session, {
-    secret: envs.SESSION_SECRET,
+    secret: env.SESSION_SECRET,
     saveUninitialized: false,
     cookie: {
-      secure: envs.CLIENT_PROTOCOL === "https",
+      secure: env.CLIENT_PROTOCOL === "https",
       maxAge: 24 * 60 * 60 * 1000, // 24시간
     },
     store: new DrizzleSessionStore(),

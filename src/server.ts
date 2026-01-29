@@ -1,7 +1,7 @@
 // eslint-disable-next-line import/no-unresolved
 import "reflect-metadata";
 import { buildApp } from "@src/app";
-import envs from "@src/constants/env";
+import { env } from "@src/shared/env";
 
 async function start() {
   try {
@@ -9,11 +9,11 @@ async function start() {
 
     // 서버 시작
     await app.listen({
-      port: envs.SERVER_PORT,
+      port: env.SERVER_PORT,
       host: "0.0.0.0",
     });
 
-    app.log.info(`[Fastify] Server listening on port ${envs.SERVER_PORT}`);
+    app.log.info(`[Fastify] Server listening on port ${env.SERVER_PORT}`);
   } catch (err) {
     console.error("[Server] Failed to start:", err);
     process.exit(1);

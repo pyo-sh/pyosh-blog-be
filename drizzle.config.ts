@@ -1,15 +1,15 @@
 import type { Config } from "drizzle-kit";
-import envs from "./src/constants/env";
+import { env } from "./src/shared/env";
 
 export default {
   schema: "./src/db/schema/index.ts",
   out: "./drizzle",
   dialect: "mysql",
   dbCredentials: {
-    host: envs.DB_HOST,
-    port: envs.DB_PORT,
-    user: envs.DB_USER,
-    password: envs.DB_PSWD,
-    database: envs.DB_DTBS,
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    user: env.DB_USER,
+    password: env.DB_PSWD,
+    database: env.DB_DTBS,
   },
 } satisfies Config;

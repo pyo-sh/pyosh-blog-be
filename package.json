@@ -18,6 +18,7 @@
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^10.1.0",
+    "@fastify/helmet": "^13.0.2",
     "@fastify/multipart": "^9.4.0",
     "@fastify/passport": "^3.0.2",
     "@fastify/session": "^11.1.1",
