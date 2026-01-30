@@ -12,8 +12,9 @@ import helmetPlugin from "@src/plugins/helmet";
 import passportPlugin from "@src/plugins/passport";
 import sessionPlugin from "@src/plugins/session";
 import swaggerPlugin from "@src/plugins/swagger";
-import authRoute from "@src/routes/auth/auth.route";
+import { createAuthRoute } from "@src/routes/auth/auth.route";
 import { createUserRoute } from "@src/routes/user/user.route";
+import { AdminService } from "@src/services/admin.service";
 import { UserService } from "@src/services/user.service";
 import { env } from "@src/shared/env";
 
@@ -84,10 +85,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // 서비스 인스턴스 생성 (수동 DI)
+  const adminService = new AdminService(fastify.db);
   const userService = new UserService(fastify.db);
 
   // 라우트 등록
-  await fastify.register(authRoute, { prefix: "/api/auth" });
+  await fastify.register(createAuthRoute(adminService), {
+    prefix: "/api/auth",
+  });
   await fastify.register(createUserRoute(userService), { prefix: "/api/user" });
 
   return fastify;

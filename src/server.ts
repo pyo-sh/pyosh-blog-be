@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-unresolved
-import "reflect-metadata";
+// import "reflect-metadata"; // Not needed for current stack
 import { buildApp } from "@src/app";
 import { env } from "@src/shared/env";
 

@@ -1,8 +1,9 @@
 import { FastifyRequest } from "fastify";
 import { HttpError } from "@src/errors/http-error";
+import { AdminService } from "@src/services/admin.service";
 
 /**
- * 세션 기반 인증 확인 preHandler 훅
+ * OAuth 세션 기반 인증 확인 preHandler 훅
  * request.user가 없으면 401 Unauthorized 반환
  */
 export async function requireAuth(request: FastifyRequest) {
@@ -20,4 +21,26 @@ export async function optionalAuth(request: FastifyRequest) {
   request.log.debug(
     request.user ? "Authenticated request" : "Unauthenticated request",
   );
+}
+
+/**
+ * 관리자 인증 확인 preHandler 훅 (Factory)
+ * 세션에서 adminId를 확인하고, admin 정보를 request.admin에 설정
+ * @param adminService AdminService 인스턴스
+ * @returns preHandler 훅 함수
+ */
+export function requireAdmin(adminService: AdminService) {
+  return async (request: FastifyRequest) => {
+    const adminId = request.session.get("adminId") as number | undefined;
+
+    if (!adminId) {
+      throw HttpError.forbidden("관리자 권한이 필요합니다");
+    }
+
+    // Admin 정보 조회
+    const admin = await adminService.getAdminById(adminId);
+
+    // request.admin에 어태치
+    request.admin = admin;
+  };
 }
