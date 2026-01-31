@@ -13,8 +13,12 @@ import passportPlugin from "@src/plugins/passport";
 import sessionPlugin from "@src/plugins/session";
 import swaggerPlugin from "@src/plugins/swagger";
 import { createAuthRoute } from "@src/routes/auth/auth.route";
+import { createCategoryRoute } from "@src/routes/categories/category.route";
+import { createTagRoute } from "@src/routes/tags/tag.route";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { AdminService } from "@src/services/admin.service";
+import { CategoryService } from "@src/services/category.service";
+import { TagService } from "@src/services/tag.service";
 import { UserService } from "@src/services/user.service";
 import { env } from "@src/shared/env";
 
@@ -87,12 +91,20 @@ export async function buildApp(): Promise<FastifyInstance> {
   // 서비스 인스턴스 생성 (수동 DI)
   const adminService = new AdminService(fastify.db);
   const userService = new UserService(fastify.db);
+  const categoryService = new CategoryService(fastify.db);
+  const tagService = new TagService(fastify.db);
 
   // 라우트 등록
   await fastify.register(createAuthRoute(adminService), {
     prefix: "/api/auth",
   });
   await fastify.register(createUserRoute(userService), { prefix: "/api/user" });
+  await fastify.register(createCategoryRoute(categoryService, adminService), {
+    prefix: "/api/categories",
+  });
+  await fastify.register(createTagRoute(tagService, adminService), {
+    prefix: "/api/tags",
+  });
 
   return fastify;
 }
