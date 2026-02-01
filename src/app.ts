@@ -9,15 +9,25 @@ import { HttpError } from "@src/errors/http-error";
 import corsPlugin from "@src/plugins/cors";
 import drizzlePlugin from "@src/plugins/drizzle";
 import helmetPlugin from "@src/plugins/helmet";
+import multipartPlugin from "@src/plugins/multipart";
 import passportPlugin from "@src/plugins/passport";
 import sessionPlugin from "@src/plugins/session";
+import staticPlugin from "@src/plugins/static";
 import swaggerPlugin from "@src/plugins/swagger";
+import { createAssetRoute } from "@src/routes/assets/asset.route";
 import { createAuthRoute } from "@src/routes/auth/auth.route";
 import { createCategoryRoute } from "@src/routes/categories/category.route";
+import {
+  createPostRoute,
+  createAdminPostRoute,
+} from "@src/routes/posts/post.route";
 import { createTagRoute } from "@src/routes/tags/tag.route";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { AdminService } from "@src/services/admin.service";
+import { AssetService } from "@src/services/asset.service";
 import { CategoryService } from "@src/services/category.service";
+import { FileStorageService } from "@src/services/file-storage.service";
+import { PostService } from "@src/services/post.service";
 import { TagService } from "@src/services/tag.service";
 import { UserService } from "@src/services/user.service";
 import { env } from "@src/shared/env";
@@ -44,11 +54,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   fastify.setValidatorCompiler(validatorCompiler);
   fastify.setSerializerCompiler(serializerCompiler);
 
-  // 플러그인 등록 (순서 중요: helmet → drizzle → session → passport → swagger → cors)
+  // 플러그인 등록 (순서 중요: helmet → drizzle → session → passport → multipart → static → swagger → cors)
   await fastify.register(helmetPlugin);
   await fastify.register(drizzlePlugin);
   await fastify.register(sessionPlugin);
   await fastify.register(passportPlugin);
+  await fastify.register(multipartPlugin);
+  await fastify.register(staticPlugin);
   await fastify.register(swaggerPlugin);
   await fastify.register(corsPlugin);
 
@@ -93,6 +105,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   const userService = new UserService(fastify.db);
   const categoryService = new CategoryService(fastify.db);
   const tagService = new TagService(fastify.db);
+  const fileStorageService = new FileStorageService();
+  const assetService = new AssetService(fastify.db, fileStorageService);
+  const postService = new PostService(fastify.db, tagService);
+
+  // 업로드 디렉토리 생성
+  await fileStorageService.ensureUploadDir();
 
   // 라우트 등록
   await fastify.register(createAuthRoute(adminService), {
@@ -104,6 +122,15 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
   await fastify.register(createTagRoute(tagService, adminService), {
     prefix: "/api/tags",
+  });
+  await fastify.register(createAssetRoute(assetService, adminService), {
+    prefix: "/api/assets",
+  });
+  await fastify.register(createPostRoute(postService), {
+    prefix: "/api/posts",
+  });
+  await fastify.register(createAdminPostRoute(postService, adminService), {
+    prefix: "/api/admin/posts",
   });
 
   return fastify;
