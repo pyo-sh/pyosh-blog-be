@@ -11,9 +11,9 @@ import {
   PostDetailResponseSchema,
   PostDetailWithNavigationResponseSchema,
 } from "./post.schema";
+import { PostService } from "./post.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
-import { AdminService } from "@src/services/admin.service";
-import { PostService } from "@src/services/post.service";
+import { AdminService } from "@src/routes/auth/admin.service";
 
 /**
  * Post 라우트 플러그인 (Public)

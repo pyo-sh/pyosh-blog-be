@@ -41,6 +41,14 @@ export function buildPaginationMeta(
 }
 
 /**
+ * 페이지네이션 응답 타입
+ */
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: PaginationMeta;
+}
+
+/**
  * 페이지네이션 응답 생성
  * @param data 데이터 배열
  * @param page 현재 페이지
@@ -50,10 +58,10 @@ export function buildPaginationMeta(
  */
 export function buildPaginatedResponse<T>(
   data: T[],
+  total: number,
   page: number,
   limit: number,
-  total: number,
-) {
+): PaginatedResponse<T> {
   return {
     data,
     meta: buildPaginationMeta(page, limit, total),

@@ -1,7 +1,7 @@
 import { FastifyPluginAsync, FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { UserIdParamSchema, UserUpdateBodySchema } from "./user.schema";
-import { UserService } from "@src/services/user.service";
+import { UserService } from "./user.service";
 
 /**
  * User 라우트 플러그인

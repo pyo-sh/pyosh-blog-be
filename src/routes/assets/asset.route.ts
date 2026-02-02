@@ -6,10 +6,10 @@ import {
   assetResponseSchema,
   errorResponseSchema,
 } from "./asset.schema";
+import { AssetService } from "./asset.service";
 import { HttpError } from "@src/errors/http-error";
 import { requireAdmin } from "@src/hooks/auth.hook";
-import { AdminService } from "@src/services/admin.service";
-import { AssetService } from "@src/services/asset.service";
+import { AdminService } from "@src/routes/auth/admin.service";
 
 /**
  * Asset 라우트 플러그인

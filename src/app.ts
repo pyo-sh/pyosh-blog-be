@@ -15,21 +15,31 @@ import sessionPlugin from "@src/plugins/session";
 import staticPlugin from "@src/plugins/static";
 import swaggerPlugin from "@src/plugins/swagger";
 import { createAssetRoute } from "@src/routes/assets/asset.route";
+import { AssetService } from "@src/routes/assets/asset.service";
+import { AdminService } from "@src/routes/auth/admin.service";
 import { createAuthRoute } from "@src/routes/auth/auth.route";
 import { createCategoryRoute } from "@src/routes/categories/category.route";
+import { CategoryService } from "@src/routes/categories/category.service";
+import {
+  createCommentRoute,
+  createAdminCommentRoute,
+} from "@src/routes/comments/comment.route";
+import { CommentService } from "@src/routes/comments/comment.service";
+import {
+  createGuestbookRoute,
+  createAdminGuestbookRoute,
+} from "@src/routes/guestbook/guestbook.route";
+import { GuestbookService } from "@src/routes/guestbook/guestbook.service";
 import {
   createPostRoute,
   createAdminPostRoute,
 } from "@src/routes/posts/post.route";
+import { PostService } from "@src/routes/posts/post.service";
 import { createTagRoute } from "@src/routes/tags/tag.route";
+import { TagService } from "@src/routes/tags/tag.service";
 import { createUserRoute } from "@src/routes/user/user.route";
-import { AdminService } from "@src/services/admin.service";
-import { AssetService } from "@src/services/asset.service";
-import { CategoryService } from "@src/services/category.service";
+import { UserService } from "@src/routes/user/user.service";
 import { FileStorageService } from "@src/services/file-storage.service";
-import { PostService } from "@src/services/post.service";
-import { TagService } from "@src/services/tag.service";
-import { UserService } from "@src/services/user.service";
 import { env } from "@src/shared/env";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -108,6 +118,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   const fileStorageService = new FileStorageService();
   const assetService = new AssetService(fastify.db, fileStorageService);
   const postService = new PostService(fastify.db, tagService);
+  const commentService = new CommentService(fastify.db);
+  const guestbookService = new GuestbookService(fastify.db);
 
   // 업로드 디렉토리 생성
   await fileStorageService.ensureUploadDir();
@@ -132,6 +144,28 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(createAdminPostRoute(postService, adminService), {
     prefix: "/api/admin/posts",
   });
+
+  // Comment routes
+  await fastify.register(createCommentRoute(commentService), {
+    prefix: "/api",
+  });
+  await fastify.register(
+    createAdminCommentRoute(commentService, adminService),
+    {
+      prefix: "/api/admin",
+    },
+  );
+
+  // Guestbook routes
+  await fastify.register(createGuestbookRoute(guestbookService), {
+    prefix: "/api",
+  });
+  await fastify.register(
+    createAdminGuestbookRoute(guestbookService, adminService),
+    {
+      prefix: "/api/admin",
+    },
+  );
 
   return fastify;
 }

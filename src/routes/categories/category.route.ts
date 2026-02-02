@@ -13,9 +13,9 @@ import {
   CategoryUpdateResponseSchema,
   CategoryOrderUpdateResponseSchema,
 } from "./category.schema";
+import { CategoryService } from "./category.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
-import { AdminService } from "@src/services/admin.service";
-import { CategoryService } from "@src/services/category.service";
+import { AdminService } from "@src/routes/auth/admin.service";
 
 /**
  * Category 라우트 플러그인

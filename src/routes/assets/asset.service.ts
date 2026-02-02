@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
-import { FileStorageService } from "./file-storage.service";
 import type { MultipartFile } from "@fastify/multipart";
 import { assetTable, type Asset } from "@src/db/schema/assets";
 import * as schema from "@src/db/schema/index";
 import { HttpError } from "@src/errors/http-error";
+import { FileStorageService } from "@src/services/file-storage.service";
 
 /**
  * 업로드된 Asset 응답

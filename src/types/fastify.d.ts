@@ -1,6 +1,6 @@
 import "fastify";
 import { User } from "@src/db/schema/users";
-import { AdminResponse } from "@src/services/admin.service";
+import { AdminResponse } from "@src/routes/auth/admin.service";
 
 declare module "fastify" {
   interface FastifyRequest {

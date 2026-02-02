@@ -2,8 +2,8 @@ import fastifyPassport from "@fastify/passport";
 import { FastifyPluginAsync, FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { AdminService } from "./admin.service";
 import { HttpError } from "@src/errors/http-error";
-import { AdminService } from "@src/services/admin.service";
 import { env } from "@src/shared/env";
 
 // Zod 스키마 정의

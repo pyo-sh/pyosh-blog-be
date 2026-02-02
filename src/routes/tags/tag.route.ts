@@ -7,9 +7,9 @@ import {
   TagListResponseSchema,
   TagCreateResponseSchema,
 } from "./tag.schema";
+import { TagService } from "./tag.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
-import { AdminService } from "@src/services/admin.service";
-import { TagService } from "@src/services/tag.service";
+import { AdminService } from "@src/routes/auth/admin.service";
 
 /**
  * Tag 라우트 플러그인

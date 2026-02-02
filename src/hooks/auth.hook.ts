@@ -1,6 +1,6 @@
 import { FastifyRequest } from "fastify";
 import { HttpError } from "@src/errors/http-error";
-import { AdminService } from "@src/services/admin.service";
+import { AdminService } from "@src/routes/auth/admin.service";
 
 /**
  * OAuth 세션 기반 인증 확인 preHandler 훅

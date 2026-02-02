@@ -7,7 +7,7 @@ import { postTagTable } from "@src/db/schema/post-tags";
 import { Post, postTable, NewPost } from "@src/db/schema/posts";
 import { tagTable } from "@src/db/schema/tags";
 import { HttpError } from "@src/errors/http-error";
-import { TagService } from "@src/services/tag.service";
+import { TagService } from "@src/routes/tags/tag.service";
 import {
   buildPaginatedResponse,
   calculateOffset,
