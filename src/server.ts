@@ -6,6 +6,25 @@ async function start() {
   try {
     const app = await buildApp();
 
+    await app.ready();
+
+    const signals = ["SIGINT", "SIGTERM"] as const;
+    signals.forEach((signal) => {
+      process.on(signal, async () => {
+        console.log(
+          `\n[Server] Received ${signal}, shutting down gracefully...`,
+        );
+        await app.close();
+        process.exit(0);
+      });
+    });
+
+    process.once("SIGUSR2", async () => {
+      console.log(`\n[Server] Received SIGUSR2, shutting down gracefully...`);
+      await app.close();
+      process.kill(process.pid, "SIGUSR2");
+    });
+
     // 서버 시작
     await app.listen({
       port: env.SERVER_PORT,
@@ -18,14 +37,5 @@ async function start() {
     process.exit(1);
   }
 }
-
-// Graceful shutdown
-const signals = ["SIGINT", "SIGTERM"] as const;
-signals.forEach((signal) => {
-  process.on(signal, async () => {
-    console.log(`\n[Server] Received ${signal}, shutting down gracefully...`);
-    process.exit(0);
-  });
-});
 
 start();

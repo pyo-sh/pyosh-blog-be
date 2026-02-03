@@ -5,7 +5,7 @@
   "license": "MIT",
   "author": "pyo-sh <pygosky@gmail.com>",
   "scripts": {
-    "dev": "NODE_ENV=development nodemon --exec ts-node -r tsconfig-paths/register ./src/server.ts",
+    "dev": "NODE_ENV=development nodemon --spawn --exec ts-node -r tsconfig-paths/register ./src/server.ts",
     "build": "NODE_ENV=production rm -rf ./build && pnpm tsc --project tsconfig.prod.json",
     "start": "NODE_ENV=production node -r tsconfig-paths/register ./build/src/server.js",
     "test": "NODE_ENV=test vitest run",

@@ -2,6 +2,10 @@ import swagger from "@fastify/swagger";
 import swaggerUI from "@fastify/swagger-ui";
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
+import {
+  jsonSchemaTransform,
+  createJsonSchemaTransformObject,
+} from "fastify-type-provider-zod";
 import { env } from "@src/shared/env";
 
 const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
@@ -35,6 +39,8 @@ const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
         },
       },
     },
+    transform: jsonSchemaTransform,
+    transformObject: createJsonSchemaTransformObject({ schemas: {} }),
   });
 
   // @fastify/swagger-ui 등록 (Swagger UI 제공)

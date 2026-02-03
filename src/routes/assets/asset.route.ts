@@ -1,5 +1,6 @@
 import { FastifyPluginAsync, FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
+import { z } from "zod";
 import {
   assetIdParamSchema,
   uploadAssetsResponseSchema,
@@ -100,7 +101,7 @@ export function createAssetRoute(
             "Asset을 삭제합니다. Admin 권한이 필요합니다. DB 레코드와 실제 파일 모두 삭제됩니다.",
           params: assetIdParamSchema,
           response: {
-            204: { type: "null", description: "No Content" },
+            204: z.void(),
             403: errorResponseSchema,
             404: errorResponseSchema,
           },

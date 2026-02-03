@@ -12,6 +12,7 @@
     "removeComments": true,
     "skipLibCheck": true,
     "noImplicitAny": false,
+    "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src", "test", "stub"],
   "exclude": ["node_modules"]
