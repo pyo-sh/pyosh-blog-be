@@ -35,11 +35,16 @@ import {
   createAdminPostRoute,
 } from "@src/routes/posts/post.route";
 import { PostService } from "@src/routes/posts/post.service";
+import {
+  createStatsRoute,
+  createAdminStatsRoute,
+} from "@src/routes/stats/stats.route";
 import { createTagRoute } from "@src/routes/tags/tag.route";
 import { TagService } from "@src/routes/tags/tag.service";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { UserService } from "@src/routes/user/user.service";
 import { FileStorageService } from "@src/services/file-storage.service";
+import { StatsService } from "@src/services/stats.service";
 import { env } from "@src/shared/env";
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -120,6 +125,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   const postService = new PostService(fastify.db, tagService);
   const commentService = new CommentService(fastify.db);
   const guestbookService = new GuestbookService(fastify.db);
+  const statsService = new StatsService(fastify.db);
 
   // 업로드 디렉토리 생성
   await fileStorageService.ensureUploadDir();
@@ -166,6 +172,14 @@ export async function buildApp(): Promise<FastifyInstance> {
       prefix: "/api/admin",
     },
   );
+
+  // Stats routes
+  await fastify.register(createStatsRoute(statsService), {
+    prefix: "/api/stats",
+  });
+  await fastify.register(createAdminStatsRoute(statsService, adminService), {
+    prefix: "/api/admin/stats",
+  });
 
   return fastify;
 }
