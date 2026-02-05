@@ -27,6 +27,12 @@ const envSchema = z
     CLIENT_PROTOCOL: z.string().min(1),
     CLIENT_HOST: z.string().min(1),
     CLIENT_PORT: z.coerce.number().int().nonnegative().default(0),
+    BASE_URL: z.string().url().optional(),
+    BLOG_TITLE: z.string().min(1).default("pyosh blog"),
+    BLOG_DESCRIPTION: z
+      .string()
+      .min(1)
+      .default("Pyosh 개발 블로그의 최신 글을 제공합니다."),
 
     // 데이터베이스 설정
     DB_HOST: z.string().min(1),
@@ -56,10 +62,12 @@ const envSchema = z
     const host = data.CLIENT_HOST;
     const port = data.CLIENT_PORT ? `:${data.CLIENT_PORT}` : "";
     const CLIENT_URL = new URL(protocol + host + port).origin;
+    const BASE_URL = data.BASE_URL ? new URL(data.BASE_URL).origin : CLIENT_URL;
 
     return {
       ...data,
       CLIENT_URL,
+      BASE_URL,
     };
   });
 

@@ -35,6 +35,7 @@ import {
   createAdminPostRoute,
 } from "@src/routes/posts/post.route";
 import { PostService } from "@src/routes/posts/post.service";
+import { createSeoRoute } from "@src/routes/seo/seo.route";
 import {
   createStatsRoute,
   createAdminStatsRoute,
@@ -180,6 +181,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(createAdminStatsRoute(statsService, adminService), {
     prefix: "/api/admin/stats",
   });
+  await fastify.register(createSeoRoute());
 
   return fastify;
 }
