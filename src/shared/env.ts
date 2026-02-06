@@ -4,11 +4,18 @@ import { z } from "zod";
 // 환경변수 로드 (서버 시작 시 즉시 실행)
 (function initEnvs() {
   const NODE_ENV = process.env.NODE_ENV;
-  const ENV_TARGET = NODE_ENV === "production" ? NODE_ENV : "development";
+  const ENV_TARGET =
+    NODE_ENV === "production"
+      ? "production"
+      : NODE_ENV === "test"
+        ? "test"
+        : "development";
 
   config();
   if (NODE_ENV) {
-    config({ path: `.env.${ENV_TARGET}.local`, override: true });
+    const envPath =
+      NODE_ENV === "test" ? `.env.test` : `.env.${ENV_TARGET}.local`;
+    config({ path: envPath, override: true });
   }
 })();
 

@@ -12,6 +12,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    globalSetup: ["./test/setup.ts"],
+    testTimeout: 10000,
+    env: {
+      NODE_ENV: "test",
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -23,7 +28,6 @@ export default defineConfig({
         "**/*.d.ts",
       ],
     },
-    // Phase S-0: smoke test만 실행 (기존 Mocha 테스트는 test:mocha 사용)
-    include: ["test/smoke.test.ts"],
+    include: ["test/**/*.test.ts"],
   },
 });
