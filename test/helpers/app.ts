@@ -11,6 +11,7 @@ export const TEST_ADMIN_PASSWORD = "Test12345!";
 export async function createTestApp(): Promise<FastifyInstance> {
   const app = await buildApp();
   await app.ready();
+
   return app;
 }
 
@@ -22,6 +23,7 @@ export async function createTestApp(): Promise<FastifyInstance> {
  */
 export async function injectAuth(
   app: FastifyInstance,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _adminId?: number,
 ): Promise<string> {
   const response = await app.inject({

@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from "./app";
 import { db } from "@src/db/client";
 import {
   adminTable,
@@ -10,7 +11,6 @@ import {
   tagTable,
 } from "@src/db/schema";
 import { hashPassword } from "@src/shared/password";
-import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from "./app";
 
 /** 테스트 실행 순서대로 TRUNCATE할 테이블 목록 (FK 의존성 역순) */
 const ALL_TABLES = [

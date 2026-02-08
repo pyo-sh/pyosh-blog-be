@@ -50,14 +50,19 @@ export async function setup(): Promise<void> {
     console.log(`[Test Setup] Database "${DB_DTBS}" ready`);
   } catch (err: unknown) {
     const code = (err as { code?: string }).code;
-    if (code === "ER_DBACCESS_DENIED_ERROR" || code === "ER_ACCESS_DENIED_ERROR") {
+    if (
+      code === "ER_DBACCESS_DENIED_ERROR" ||
+      code === "ER_ACCESS_DENIED_ERROR"
+    ) {
       // DB가 이미 존재하는 경우 계속 진행, 없으면 안내 출력 후 종료
       try {
         await rootConn.execute(`USE \`${DB_DTBS}\``);
         console.log(`[Test Setup] Using existing database "${DB_DTBS}"`);
       } catch {
         console.error(SETUP_GUIDE);
-        throw new Error(`[Test Setup] Cannot access database "${DB_DTBS}". See instructions above.`);
+        throw new Error(
+          `[Test Setup] Cannot access database "${DB_DTBS}". See instructions above.`,
+        );
       }
     } else {
       throw err;
