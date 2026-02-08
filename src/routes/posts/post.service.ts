@@ -1,4 +1,4 @@
-import { eq, and, isNull, sql, inArray } from "drizzle-orm";
+import { eq, and, isNull, sql, inArray, lt, gt, desc, asc } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import { assetTable } from "@src/db/schema/assets";
 import { categoryTable } from "@src/db/schema/categories";
@@ -123,6 +123,12 @@ export class PostService {
    * 게시글 생성 (트랜잭션)
    */
   async createPost(input: CreatePostInput): Promise<PostDetail> {
+    // MySQL REPEATABLE READ isolation 회피: 트랜잭션 시작 전에 태그 조회/생성
+    const tagIds: number[] =
+      input.tags && input.tags.length > 0
+        ? await this.tagService.getOrCreateTags(input.tags)
+        : [];
+
     return await this.db.transaction(async (tx) => {
       // 1. slug 생성 및 중복 확인
       const baseSlug = generateSlug(input.title);
@@ -158,8 +164,7 @@ export class PostService {
       const postId = result.insertId;
 
       // 4. 태그 연결
-      if (input.tags && input.tags.length > 0) {
-        const tagIds = await this.tagService.getOrCreateTags(input.tags);
+      if (tagIds.length > 0) {
         await tx
           .insert(postTagTable)
           .values(tagIds.map((tagId) => ({ postId, tagId })));
@@ -174,6 +179,12 @@ export class PostService {
    * 게시글 수정 (트랜잭션)
    */
   async updatePost(id: number, input: UpdatePostInput): Promise<PostDetail> {
+    // MySQL REPEATABLE READ isolation 회피: 트랜잭션 시작 전에 태그 조회/생성
+    const newTagIds: number[] | undefined =
+      input.tags !== undefined
+        ? await this.tagService.getOrCreateTags(input.tags)
+        : undefined;
+
     return await this.db.transaction(async (tx) => {
       // 1. 게시글 존재 확인
       const existing = await tx
@@ -195,16 +206,15 @@ export class PostService {
       await tx.update(postTable).set(updateData).where(eq(postTable.id, id));
 
       // 3. 태그 갱신 (undefined vs 빈 배열 구분)
-      if (input.tags !== undefined) {
+      if (newTagIds !== undefined) {
         // 기존 태그 연결 삭제
         await tx.delete(postTagTable).where(eq(postTagTable.postId, id));
 
         // 새 태그 연결
-        if (input.tags.length > 0) {
-          const tagIds = await this.tagService.getOrCreateTags(input.tags);
+        if (newTagIds.length > 0) {
           await tx
             .insert(postTagTable)
-            .values(tagIds.map((tagId) => ({ postId: id, tagId })));
+            .values(newTagIds.map((tagId) => ({ postId: id, tagId })));
         }
       }
 
@@ -320,12 +330,12 @@ export class PostService {
       .from(postTable)
       .where(
         and(
-          sql`${postTable.publishedAt} < ${post.publishedAt}`,
+          lt(postTable.publishedAt, post.publishedAt),
           eq(postTable.status, "published"),
           isNull(postTable.deletedAt),
         ),
       )
-      .orderBy(sql`${postTable.publishedAt} DESC`)
+      .orderBy(desc(postTable.publishedAt))
       .limit(1);
 
     // 3. 다음 글 조회 (published_at > current, status = 'published', ORDER BY published_at ASC)
@@ -337,12 +347,12 @@ export class PostService {
       .from(postTable)
       .where(
         and(
-          sql`${postTable.publishedAt} > ${post.publishedAt}`,
+          gt(postTable.publishedAt, post.publishedAt),
           eq(postTable.status, "published"),
           isNull(postTable.deletedAt),
         ),
       )
-      .orderBy(sql`${postTable.publishedAt} ASC`)
+      .orderBy(asc(postTable.publishedAt))
       .limit(1);
 
     return {
