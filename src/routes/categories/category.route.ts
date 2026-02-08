@@ -13,9 +13,21 @@ import {
   CategoryUpdateResponseSchema,
   CategoryOrderUpdateResponseSchema,
 } from "./category.schema";
-import { CategoryService } from "./category.service";
+import { CategoryService, CategoryTree } from "./category.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
+
+/**
+ * CategoryTree의 Date 필드를 ISO 문자열로 재귀 변환
+ */
+function serializeCategoryTree(cat: CategoryTree): unknown {
+  return {
+    ...cat,
+    createdAt: cat.createdAt.toISOString(),
+    updatedAt: cat.updatedAt.toISOString(),
+    children: cat.children.map(serializeCategoryTree),
+  };
+}
 
 /**
  * Category 라우트 플러그인
@@ -58,7 +70,7 @@ export function createCategoryRoute(
         return reply
           .status(200)
           .header("Cache-Control", "public, max-age=300")
-          .send({ categories });
+          .send({ categories: categories.map(serializeCategoryTree) });
       },
     );
 
@@ -81,7 +93,9 @@ export function createCategoryRoute(
         const { slug } = request.params;
         const category = await categoryService.getCategoryBySlug(slug);
 
-        return reply.status(200).send({ category });
+        return reply
+          .status(200)
+          .send({ category: serializeCategoryTree(category) });
       },
     );
 
