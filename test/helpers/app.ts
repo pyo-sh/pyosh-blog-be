@@ -1,5 +1,9 @@
+import crypto from "node:crypto";
 import { FastifyInstance } from "fastify";
 import { buildApp } from "@src/app";
+import { db } from "@src/db/client";
+import { sessionTable } from "@src/db/schema";
+import { env } from "@src/shared/env";
 
 /** 테스트용 Admin 기본 자격증명 */
 export const TEST_ADMIN_EMAIL = "admin@test.pyosh.dev";
@@ -50,6 +54,46 @@ export async function injectAuth(
 
   // "sessionId=value; Path=/; ..." → "sessionId=value"
   return raw.split(";")[0];
+}
+
+/**
+ * OAuth 유저 세션 쿠키 생성
+ *
+ * seedUser()로 유저가 생성된 이후에 호출해야 함.
+ * @fastify/passport + @fastify/session 방식으로 세션을 DB에 직접 삽입한다.
+ * @param userId - 세션을 생성할 유저 ID
+ */
+export async function injectOAuthUser(userId: number): Promise<string> {
+  // @fastify/session 형식의 세션 ID (24바이트 base64url)
+  const sessionId = crypto.randomBytes(24).toString("base64url");
+
+  // @fastify/passport 세션 데이터 형식: { passport: userId, cookie: {...} }
+  const expiresDate = new Date(Date.now() + 86400 * 1000);
+  const sessionData = JSON.stringify({
+    passport: userId,
+    cookie: {
+      originalMaxAge: 86400000,
+      expires: expiresDate.toISOString(),
+      secure: false,
+      httpOnly: true,
+      path: "/",
+    },
+  });
+
+  await db.insert(sessionTable).values({
+    id: sessionId,
+    data: sessionData,
+    expiresAt: Math.floor(expiresDate.getTime() / 1000),
+  });
+
+  // @fastify/cookie Signer 방식 서명: value + '.' + hmac_sha256_base64_no_padding
+  const signature = crypto
+    .createHmac("sha256", env.SESSION_SECRET)
+    .update(sessionId)
+    .digest("base64")
+    .replace(/=/g, "");
+
+  return `sessionId=${sessionId}.${signature}`;
 }
 
 /**

@@ -70,8 +70,8 @@ export function createGuestbookRoute(
           description:
             "OAuth 로그인 사용자 또는 게스트가 방명록을 작성합니다. 게스트는 이름, 이메일, 비밀번호를 함께 전달해야 합니다.",
           body: z.union([
-            CreateGuestbookOAuthBodySchema,
             CreateGuestbookGuestBodySchema,
+            CreateGuestbookOAuthBodySchema,
           ]),
           response: {
             201: GuestbookEntryResponseSchema,
@@ -137,7 +137,7 @@ export function createGuestbookRoute(
           description:
             "본인이 작성한 방명록을 삭제합니다. 게스트 방명록의 경우 비밀번호를 함께 전달해야 합니다.",
           params: GuestbookIdParamSchema,
-          body: DeleteGuestbookGuestBodySchema.optional(),
+          body: DeleteGuestbookGuestBodySchema.nullish(),
           response: {
             204: z.void(),
           },

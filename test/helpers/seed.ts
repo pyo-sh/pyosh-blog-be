@@ -7,8 +7,10 @@ import {
   NewCategory,
   NewPost,
   NewTag,
+  NewUser,
   postTable,
   tagTable,
+  userTable,
 } from "@src/db/schema";
 import { hashPassword } from "@src/shared/password";
 
@@ -101,6 +103,29 @@ export async function seedTag(
     .where(eq(tagTable.id, Number(result.insertId)));
 
   return tag!;
+}
+
+/**
+ * 테스트 OAuth User 생성
+ */
+export async function seedUser(
+  overrides?: Partial<NewUser>,
+): Promise<typeof userTable.$inferSelect> {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const values: NewUser = {
+    name: "Test User",
+    githubId: `test-github-${suffix}`,
+    writable: true,
+    ...overrides,
+  };
+
+  const [result] = await db.insert(userTable).values(values);
+  const [user] = await db
+    .select()
+    .from(userTable)
+    .where(eq(userTable.id, Number(result.insertId)));
+
+  return user!;
 }
 
 /**

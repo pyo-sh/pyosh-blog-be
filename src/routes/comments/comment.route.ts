@@ -72,8 +72,8 @@ export function createCommentRoute(
             "OAuth 로그인 사용자 또는 게스트가 댓글을 작성합니다. 게스트는 이름, 이메일, 비밀번호를 함께 전달해야 합니다.",
           params: PostIdParamSchema,
           body: z.union([
-            CreateCommentOAuthBodySchema,
             CreateCommentGuestBodySchema,
+            CreateCommentOAuthBodySchema,
           ]),
           response: {
             201: CommentResponseSchema,
@@ -148,7 +148,7 @@ export function createCommentRoute(
           description:
             "본인이 작성한 댓글을 삭제합니다. 게스트 댓글의 경우 비밀번호를 함께 전달해야 합니다.",
           params: CommentIdParamSchema,
-          body: DeleteCommentGuestBodySchema.optional(),
+          body: DeleteCommentGuestBodySchema.nullish(),
           response: {
             204: z.void(),
           },

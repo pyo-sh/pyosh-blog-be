@@ -8,8 +8,9 @@ import { imageTable, userTable, User } from "@src/db/schema/index";
 import { env } from "@src/shared/env";
 
 const passportPlugin: FastifyPluginAsync = async (fastify) => {
-  // @fastify/passport 초기화 (secureSession 제거 - @fastify/session 사용)
+  // @fastify/passport 초기화 (@fastify/session 기반 세션 복원)
   await fastify.register(fastifyPassport.initialize());
+  await fastify.register(fastifyPassport.secureSession());
 
   const { db } = fastify;
 
