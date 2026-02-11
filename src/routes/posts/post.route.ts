@@ -20,7 +20,7 @@ import { AdminService } from "@src/routes/auth/admin.service";
  */
 export function createPostRoute(postService: PostService): FastifyPluginAsync {
   const postRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
@@ -114,7 +114,7 @@ export function createAdminPostRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const adminPostRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

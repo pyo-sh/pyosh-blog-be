@@ -326,7 +326,7 @@ export class CommentService {
           type: "oauth",
           id: user.id,
           name: user.name,
-          avatarUrl: undefined, // TODO: imageId로 아바타 URL 조회
+          avatarUrl: undefined, // imageId 기반 아바타 URL 조회는 미구현
         };
       } else {
         // 사용자를 찾을 수 없으면 기본값

@@ -30,7 +30,7 @@ export async function verifyPassword(
 ): Promise<boolean> {
   try {
     return await argon2.verify(hash, plain);
-  } catch (error) {
+  } catch {
     // 해시 형식이 잘못된 경우 false 반환
     return false;
   }

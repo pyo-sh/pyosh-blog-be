@@ -21,7 +21,7 @@ export function createAssetRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const assetRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

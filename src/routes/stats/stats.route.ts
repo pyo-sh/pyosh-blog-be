@@ -19,7 +19,7 @@ export function createStatsRoute(
   statsService: StatsService,
 ): FastifyPluginAsync {
   const statsRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
@@ -90,7 +90,7 @@ export function createAdminStatsRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const adminStatsRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

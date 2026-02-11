@@ -60,11 +60,24 @@ export const CategoryResponseSchema = z.object({
   updatedAt: z.string(), // ISO datetime string
 });
 
-export const CategoryTreeResponseSchema: z.ZodType<any> = z.lazy(() =>
-  CategoryResponseSchema.extend({
-    children: z.array(CategoryTreeResponseSchema),
-  }),
-);
+type CategoryTreeResponse = {
+  id: number;
+  parentId: number | null;
+  name: string;
+  slug: string;
+  sortOrder: number;
+  isVisible: boolean;
+  createdAt: string;
+  updatedAt: string;
+  children: CategoryTreeResponse[];
+};
+
+export const CategoryTreeResponseSchema: z.ZodType<CategoryTreeResponse> =
+  z.lazy(() =>
+    CategoryResponseSchema.extend({
+      children: z.array(CategoryTreeResponseSchema),
+    }),
+  );
 
 export const CategoryListResponseSchema = z.object({
   categories: z.array(CategoryTreeResponseSchema),

@@ -38,7 +38,7 @@ export function createCategoryRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const categoryRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

@@ -63,7 +63,7 @@ export async function ensureUniqueSlug(
  * @example
  * generateSlugWithKorean("안녕하세요 Hello World") // "hello-world"
  *
- * TODO: 한글 → 로마자 변환 라이브러리 추가 고려
+ * NOTE: 한글 → 로마자 변환 라이브러리 추가 고려
  * - 예: "안녕하세요" → "annyeonghaseyo"
  * - 추천 라이브러리: korean-romanization, hangul-romanization 등
  */

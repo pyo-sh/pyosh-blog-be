@@ -9,7 +9,7 @@ import { UserService } from "./user.service";
  */
 export function createUserRoute(userService: UserService): FastifyPluginAsync {
   const userRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
     // GET /:id - 유저 조회

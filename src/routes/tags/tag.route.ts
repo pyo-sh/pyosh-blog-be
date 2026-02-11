@@ -20,7 +20,7 @@ export function createTagRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const tagRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

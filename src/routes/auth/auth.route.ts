@@ -25,7 +25,7 @@ export function createAuthRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const authRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

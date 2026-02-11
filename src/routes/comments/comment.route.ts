@@ -23,7 +23,7 @@ export function createCommentRoute(
   commentService: CommentService,
 ): FastifyPluginAsync {
   const commentRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
@@ -189,7 +189,7 @@ export function createAdminCommentRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const adminCommentRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: <T>() => FastifyInstance },
+    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
