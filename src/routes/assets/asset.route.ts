@@ -20,9 +20,7 @@ export function createAssetRoute(
   assetService: AssetService,
   adminService: AdminService,
 ): FastifyPluginAsync {
-  const assetRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
-  ) => {
+  const assetRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
     // POST /api/assets/upload - 파일 업로드 (Admin)
@@ -54,7 +52,7 @@ export function createAssetRoute(
         }
 
         if (uploadedFiles.length === 0) {
-          throw HttpError.badRequest("업로드할 파일이 없습니다.");
+          throw HttpError.badRequest("No file to upload.");
         }
 
         // 파일 업로드 처리

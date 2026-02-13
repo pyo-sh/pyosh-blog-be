@@ -70,7 +70,7 @@ export class CommentService {
         .limit(1);
 
       if (!post) {
-        throw HttpError.notFound("게시글을 찾을 수 없습니다");
+        throw HttpError.notFound("Post not found.");
       }
 
       // 2. parentId가 있으면 부모 댓글 검증
@@ -83,17 +83,21 @@ export class CommentService {
           .limit(1);
 
         if (!parent) {
-          throw HttpError.notFound("부모 댓글을 찾을 수 없습니다");
+          throw HttpError.notFound("Parent comment not found.");
         }
 
         // 같은 게시글의 댓글인지 확인
         if (parent.postId !== postId) {
-          throw HttpError.badRequest("부모 댓글이 다른 게시글에 속해 있습니다");
+          throw HttpError.badRequest(
+            "Parent comment belongs to a different post.",
+          );
         }
 
         // depth 확인 (부모가 depth 1이면 대댓글 불가)
         if (parent.depth >= 1) {
-          throw HttpError.badRequest("대댓글까지만 작성 가능합니다");
+          throw HttpError.badRequest(
+            "Replies can only be nested one level deep.",
+          );
         }
 
         depth = parent.depth + 1;
@@ -109,13 +113,13 @@ export class CommentService {
           .limit(1);
 
         if (!replyTo) {
-          throw HttpError.notFound("답장 대상 댓글을 찾을 수 없습니다");
+          throw HttpError.notFound("Reply target comment not found.");
         }
 
         // 같은 게시글의 댓글인지 확인
         if (replyTo.postId !== postId) {
           throw HttpError.badRequest(
-            "답장 대상 댓글이 다른 게시글에 속해 있습니다",
+            "Reply target comment belongs to a different post.",
           );
         }
 
@@ -185,7 +189,7 @@ export class CommentService {
         .limit(1);
 
       if (!comment) {
-        throw HttpError.internal("댓글 생성 후 조회 실패");
+        throw HttpError.internal("Failed to retrieve comment after creation.");
       }
 
       // CommentDetail 타입으로 직접 변환
@@ -261,7 +265,7 @@ export class CommentService {
       .limit(1);
 
     if (!comment) {
-      throw HttpError.notFound("댓글을 찾을 수 없습니다");
+      throw HttpError.notFound("Comment not found.");
     }
 
     // 2. 삭제 권한 확인

@@ -22,9 +22,7 @@ import { resolveAuthorFromRequest, Author } from "@src/shared/interaction";
 export function createCommentRoute(
   commentService: CommentService,
 ): FastifyPluginAsync {
-  const commentRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
-  ) => {
+  const commentRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
     // GET /api/posts/:postId/comments - 댓글 목록 조회 (Public)
@@ -189,7 +187,7 @@ export function createAdminCommentRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const adminCommentRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
+    fastify: FastifyInstance,
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

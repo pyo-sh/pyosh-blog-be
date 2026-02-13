@@ -8,9 +8,7 @@ import { UserService } from "./user.service";
  * UserService를 의존성으로 받아 라우트 핸들러에서 사용
  */
 export function createUserRoute(userService: UserService): FastifyPluginAsync {
-  const userRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
-  ) => {
+  const userRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
     // GET /:id - 유저 조회
     typedFastify.get(

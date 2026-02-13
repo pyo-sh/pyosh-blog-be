@@ -19,9 +19,7 @@ export function createTagRoute(
   tagService: TagService,
   adminService: AdminService,
 ): FastifyPluginAsync {
-  const tagRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
-  ) => {
+  const tagRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
     // GET /api/tags - 태그 목록 조회 (Public)

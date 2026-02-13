@@ -263,7 +263,7 @@ describe("Comment Routes", () => {
 
       expect(publicResponse.statusCode).toBe(200);
       const publicBody = publicResponse.json();
-      expect(publicBody.data[0].body).toBe("비밀 댓글입니다");
+      expect(publicBody.data[0].body).toBe("This comment is secret.");
 
       // 작성자 조회 → 원본
       const authorResponse = await app.inject({

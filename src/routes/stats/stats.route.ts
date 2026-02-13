@@ -18,9 +18,7 @@ import { StatsService } from "@src/services/stats.service";
 export function createStatsRoute(
   statsService: StatsService,
 ): FastifyPluginAsync {
-  const statsRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
-  ) => {
+  const statsRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
     // POST /api/stats/view - 페이지 조회수 기록
@@ -90,7 +88,7 @@ export function createAdminStatsRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const adminStatsRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
+    fastify: FastifyInstance,
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

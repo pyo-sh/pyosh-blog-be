@@ -78,7 +78,7 @@ export class GuestbookService {
           .limit(1);
 
         if (!parent) {
-          throw HttpError.notFound("부모 엔트리를 찾을 수 없습니다");
+          throw HttpError.notFound("Parent entry not found.");
         }
       }
 
@@ -126,7 +126,9 @@ export class GuestbookService {
         .limit(1);
 
       if (!entry) {
-        throw HttpError.internal("방명록 생성 후 조회 실패");
+        throw HttpError.internal(
+          "Failed to retrieve guestbook entry after creation.",
+        );
       }
 
       // GuestbookEntryDetail 타입으로 직접 변환
@@ -220,7 +222,7 @@ export class GuestbookService {
       .limit(1);
 
     if (!entry) {
-      throw HttpError.notFound("방명록 엔트리를 찾을 수 없습니다");
+      throw HttpError.notFound("Guestbook entry not found.");
     }
 
     // 2. 삭제 권한 확인

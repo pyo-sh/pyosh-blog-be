@@ -23,7 +23,7 @@ export function createGuestbookRoute(
   guestbookService: GuestbookService,
 ): FastifyPluginAsync {
   const guestbookRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
+    fastify: FastifyInstance,
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
@@ -178,7 +178,7 @@ export function createAdminGuestbookRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const adminGuestbookRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
+    fastify: FastifyInstance,
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

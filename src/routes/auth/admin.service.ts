@@ -39,7 +39,7 @@ export class AdminService {
       .limit(1);
 
     if (existing) {
-      throw HttpError.conflict("이미 존재하는 이메일입니다.");
+      throw HttpError.conflict("Email already in use.");
     }
 
     // 비밀번호 해싱
@@ -58,7 +58,7 @@ export class AdminService {
       .limit(1);
 
     if (!admin) {
-      throw HttpError.internal("관리자 생성에 실패했습니다.");
+      throw HttpError.internal("Failed to create admin.");
     }
 
     // password_hash 제외하고 반환
@@ -85,13 +85,13 @@ export class AdminService {
       .limit(1);
 
     if (!admin) {
-      throw HttpError.unauthorized("잘못된 이메일 또는 비밀번호입니다.");
+      throw HttpError.unauthorized("Invalid email or password.");
     }
 
     // 비밀번호 검증
     const isValid = await verifyPassword(admin.passwordHash, password);
     if (!isValid) {
-      throw HttpError.unauthorized("잘못된 이메일 또는 비밀번호입니다.");
+      throw HttpError.unauthorized("Invalid email or password.");
     }
 
     // last_login_at 업데이트
@@ -119,7 +119,7 @@ export class AdminService {
       .limit(1);
 
     if (!admin) {
-      throw HttpError.notFound("관리자 정보를 찾을 수 없습니다.");
+      throw HttpError.notFound("Admin not found.");
     }
 
     // password_hash 제외하고 반환

@@ -32,7 +32,7 @@ export class UserService {
       .limit(1);
 
     if (!user) {
-      throw HttpError.internal("유저 생성에 실패했습니다.");
+      throw HttpError.internal("Failed to create user.");
     }
 
     return user;
@@ -46,7 +46,7 @@ export class UserService {
       .limit(1);
 
     if (!user) {
-      throw HttpError.notFound("유효한 유저 정보가 없습니다.");
+      throw HttpError.notFound("User not found.");
     }
 
     return user;
@@ -60,7 +60,7 @@ export class UserService {
       .limit(1);
 
     if (!user) {
-      throw HttpError.notFound("유효한 유저 정보가 없습니다.");
+      throw HttpError.notFound("User not found.");
     }
 
     // 변경사항만 적용
@@ -82,7 +82,7 @@ export class UserService {
       .limit(1);
 
     if (!updatedUser) {
-      throw HttpError.internal("유저 업데이트에 실패했습니다.");
+      throw HttpError.internal("Failed to update user.");
     }
 
     return updatedUser;
@@ -103,7 +103,7 @@ export class UserService {
       .limit(1);
 
     if (!user || !user.deletedAt) {
-      throw HttpError.notFound("유저 정보를 삭제할 수 없거나 없는 정보입니다.");
+      throw HttpError.notFound("Failed to delete user.");
     }
   }
 }

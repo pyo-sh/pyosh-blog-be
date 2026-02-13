@@ -34,7 +34,7 @@ export function requireAdmin(adminService: AdminService) {
     const adminId = request.session.get("adminId") as number | undefined;
 
     if (!adminId) {
-      throw HttpError.forbidden("관리자 권한이 필요합니다");
+      throw HttpError.forbidden("Admin privileges required.");
     }
 
     // Admin 정보 조회

@@ -77,7 +77,9 @@ export const CategoryTreeResponseSchema: z.ZodType<CategoryTreeResponse> =
     CategoryResponseSchema.extend({
       children: z.array(CategoryTreeResponseSchema),
     }),
-  );
+  ) as z.ZodType<CategoryTreeResponse>;
+
+export type { CategoryTreeResponse };
 
 export const CategoryListResponseSchema = z.object({
   categories: z.array(CategoryTreeResponseSchema),

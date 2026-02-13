@@ -148,7 +148,7 @@ export function maskSecretContent<T extends SecretItem>(
   // 권한이 없으면 마스킹
   return {
     ...item,
-    body: "비밀 댓글입니다",
+    body: "This comment is secret.",
   };
 }
 
@@ -175,7 +175,7 @@ export async function verifyDeletePermission(
 
   // author가 없으면 권한 없음
   if (!author) {
-    throw HttpError.forbidden("삭제 권한이 없습니다");
+    throw HttpError.forbidden("Insufficient permissions.");
   }
 
   // OAuth 사용자
@@ -184,14 +184,14 @@ export async function verifyDeletePermission(
     if (item.authorType === "oauth" && item.oauthAccountId === author.userId) {
       return;
     }
-    throw HttpError.forbidden("본인이 작성한 항목만 삭제할 수 있습니다");
+    throw HttpError.forbidden("You can only delete your own items.");
   }
 
   // 게스트 사용자
   if (author.type === "guest") {
     // 게스트 항목인지 확인
     if (item.authorType !== "guest" || !item.guestPasswordHash) {
-      throw HttpError.forbidden("게스트가 작성한 항목이 아닙니다");
+      throw HttpError.forbidden("This item was not written by a guest.");
     }
 
     // 비밀번호 검증
@@ -200,11 +200,11 @@ export async function verifyDeletePermission(
       author.password,
     );
     if (!isValid) {
-      throw HttpError.forbidden("비밀번호가 일치하지 않습니다");
+      throw HttpError.forbidden("Incorrect password.");
     }
 
     return;
   }
 
-  throw HttpError.forbidden("삭제 권한이 없습니다");
+  throw HttpError.forbidden("Insufficient permissions.");
 }

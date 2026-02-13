@@ -19,9 +19,7 @@ import { AdminService } from "@src/routes/auth/admin.service";
  * Post 라우트 플러그인 (Public)
  */
 export function createPostRoute(postService: PostService): FastifyPluginAsync {
-  const postRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
-  ) => {
+  const postRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
     // GET /api/posts - 게시글 목록 조회 (Public)
@@ -114,7 +112,7 @@ export function createAdminPostRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const adminPostRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
+    fastify: FastifyInstance,
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

@@ -24,9 +24,7 @@ const AdminSetupSchema = z.object({
 export function createAuthRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
-  const authRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
-  ) => {
+  const authRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
     // ===== OAuth Routes =====
@@ -184,7 +182,7 @@ export function createAuthRoute(
         }
 
         // 둘 다 없으면 401
-        throw HttpError.unauthorized("로그인이 필요합니다");
+        throw HttpError.unauthorized("Login required.");
       },
     );
 
@@ -222,7 +220,7 @@ export function createAuthRoute(
         // 이미 관리자가 존재하면 409 반환
         const hasAdmin = await adminService.hasAnyAdmin();
         if (hasAdmin) {
-          throw HttpError.conflict("이미 관리자 계정이 존재합니다");
+          throw HttpError.conflict("Admin account already exists.");
         }
 
         // 관리자 생성

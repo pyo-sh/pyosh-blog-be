@@ -12,6 +12,7 @@ import {
   CategoryCreateResponseSchema,
   CategoryUpdateResponseSchema,
   CategoryOrderUpdateResponseSchema,
+  CategoryTreeResponse,
 } from "./category.schema";
 import { CategoryService, CategoryTree } from "./category.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
@@ -20,7 +21,7 @@ import { AdminService } from "@src/routes/auth/admin.service";
 /**
  * CategoryTree의 Date 필드를 ISO 문자열로 재귀 변환
  */
-function serializeCategoryTree(cat: CategoryTree): unknown {
+function serializeCategoryTree(cat: CategoryTree): CategoryTreeResponse {
   return {
     ...cat,
     createdAt: cat.createdAt.toISOString(),
@@ -38,7 +39,7 @@ export function createCategoryRoute(
   adminService: AdminService,
 ): FastifyPluginAsync {
   const categoryRoute: FastifyPluginAsync = async (
-    fastify: FastifyInstance & { withTypeProvider: () => FastifyInstance },
+    fastify: FastifyInstance,
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 

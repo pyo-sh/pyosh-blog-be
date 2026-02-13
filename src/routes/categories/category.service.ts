@@ -81,7 +81,7 @@ export class CategoryService {
         .limit(1);
 
       if (!parent) {
-        throw HttpError.badRequest("부모 카테고리가 존재하지 않습니다.");
+        throw HttpError.badRequest("Parent category not found.");
       }
     }
 
@@ -118,7 +118,7 @@ export class CategoryService {
       .limit(1);
 
     if (!category) {
-      throw HttpError.internal("카테고리 생성에 실패했습니다.");
+      throw HttpError.internal("Failed to create category.");
     }
 
     return category;
@@ -182,7 +182,7 @@ export class CategoryService {
       .limit(1);
 
     if (!category) {
-      throw HttpError.notFound("카테고리를 찾을 수 없습니다.");
+      throw HttpError.notFound("Category not found.");
     }
 
     // 2. 하위 카테고리 목록 조회
@@ -214,23 +214,21 @@ export class CategoryService {
       .limit(1);
 
     if (!existing) {
-      throw HttpError.notFound("카테고리를 찾을 수 없습니다.");
+      throw HttpError.notFound("Category not found.");
     }
 
     // 2. parent_id 변경 시 순환 참조 방지 체크
     if (parentId !== undefined && parentId !== null) {
       // 자기 자신을 부모로 설정하는 경우
       if (parentId === id) {
-        throw HttpError.badRequest(
-          "자기 자신을 부모 카테고리로 설정할 수 없습니다.",
-        );
+        throw HttpError.badRequest("A category cannot be its own parent.");
       }
 
       // 자신의 하위 카테고리를 부모로 설정하는 경우 체크
       const isDescendant = await this.isDescendantOf(id, parentId);
       if (isDescendant) {
         throw HttpError.badRequest(
-          "하위 카테고리를 부모로 설정할 수 없습니다.",
+          "Cannot set a descendant category as parent.",
         );
       }
 
@@ -242,7 +240,7 @@ export class CategoryService {
         .limit(1);
 
       if (!parent) {
-        throw HttpError.badRequest("부모 카테고리가 존재하지 않습니다.");
+        throw HttpError.badRequest("Parent category not found.");
       }
     }
 
@@ -275,7 +273,7 @@ export class CategoryService {
       .limit(1);
 
     if (!updated) {
-      throw HttpError.internal("카테고리 수정에 실패했습니다.");
+      throw HttpError.internal("Failed to update category.");
     }
 
     return updated;
@@ -308,7 +306,7 @@ export class CategoryService {
       .where(eq(categoryTable.parentId, id));
 
     if (childCount && childCount.count > 0) {
-      throw HttpError.conflict("하위 카테고리가 존재하여 삭제할 수 없습니다.");
+      throw HttpError.conflict("Cannot delete category with subcategories.");
     }
 
     // 2. 게시글 존재 여부 확인
@@ -318,9 +316,7 @@ export class CategoryService {
       .where(eq(postTable.categoryId, id));
 
     if (postCount && postCount.count > 0) {
-      throw HttpError.conflict(
-        "해당 카테고리에 게시글이 존재하여 삭제할 수 없습니다.",
-      );
+      throw HttpError.conflict("Cannot delete category with existing posts.");
     }
 
     // 3. 카테고리 삭제

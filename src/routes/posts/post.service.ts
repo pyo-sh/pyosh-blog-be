@@ -194,7 +194,7 @@ export class PostService {
         .limit(1);
 
       if (existing.length === 0) {
-        throw HttpError.notFound("게시글을 찾을 수 없습니다");
+        throw HttpError.notFound("Post not found.");
       }
 
       // 2. 게시글 수정
@@ -439,7 +439,7 @@ export class PostService {
         .limit(1);
 
       if (!post) {
-        throw HttpError.notFound("게시글을 찾을 수 없습니다");
+        throw HttpError.notFound("Post not found.");
       }
 
       // 2. post_tag_tb 연결 삭제
