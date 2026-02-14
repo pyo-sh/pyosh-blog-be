@@ -23,43 +23,6 @@ describe("Auth Routes", () => {
     await truncateAll();
   });
 
-  // ===== POST /api/auth/admin/setup =====
-
-  describe("POST /api/auth/admin/setup", () => {
-    it("초기 관리자 생성 성공 → 201", async () => {
-      const response = await app.inject({
-        method: "POST",
-        url: "/api/auth/admin/setup",
-        payload: {
-          email: TEST_ADMIN_EMAIL,
-          password: TEST_ADMIN_PASSWORD,
-        },
-      });
-
-      expect(response.statusCode).toBe(201);
-
-      const body = response.json();
-      expect(body.admin).toBeDefined();
-      expect(body.admin.email).toBe(TEST_ADMIN_EMAIL);
-      expect(body.admin).not.toHaveProperty("passwordHash");
-    });
-
-    it("이미 관리자 존재 시 → 409", async () => {
-      await seedAdmin();
-
-      const response = await app.inject({
-        method: "POST",
-        url: "/api/auth/admin/setup",
-        payload: {
-          email: "other@test.pyosh.dev",
-          password: TEST_ADMIN_PASSWORD,
-        },
-      });
-
-      expect(response.statusCode).toBe(409);
-    });
-  });
-
   // ===== POST /api/auth/admin/login =====
 
   describe("POST /api/auth/admin/login", () => {
@@ -112,6 +75,24 @@ describe("Auth Routes", () => {
       });
 
       expect(response.statusCode).toBe(401);
+    });
+
+    it("DB에 admin이 없을 때 로그인 → 401 + 에러 메시지", async () => {
+      await truncateAll();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/admin/login",
+        payload: {
+          email: TEST_ADMIN_EMAIL,
+          password: TEST_ADMIN_PASSWORD,
+        },
+      });
+
+      expect(response.statusCode).toBe(401);
+
+      const body = response.json();
+      expect(body.message).toBeDefined();
     });
   });
 

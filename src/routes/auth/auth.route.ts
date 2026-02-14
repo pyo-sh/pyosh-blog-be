@@ -12,11 +12,6 @@ const AdminLoginSchema = z.object({
   password: z.string().min(8, "비밀번호는 최소 8자 이상이어야 합니다"),
 });
 
-const AdminSetupSchema = z.object({
-  email: z.string().email("유효한 이메일 주소를 입력하세요"),
-  password: z.string().min(8, "비밀번호는 최소 8자 이상이어야 합니다"),
-});
-
 /**
  * Auth 라우트 플러그인
  * AdminService를 의존성으로 받아 Admin 인증 처리
@@ -183,50 +178,6 @@ export function createAuthRoute(
 
         // 둘 다 없으면 401
         throw HttpError.unauthorized("Login required.");
-      },
-    );
-
-    // POST /admin/setup - 초기 관리자 계정 생성
-    typedFastify.post(
-      "/admin/setup",
-      {
-        schema: {
-          tags: ["auth"],
-          summary: "Setup initial admin",
-          description:
-            "초기 관리자 계정을 생성합니다 (관리자가 없을 때만 가능)",
-          body: AdminSetupSchema,
-          response: {
-            201: z.object({
-              admin: z.object({
-                id: z.number(),
-                email: z.string(),
-                createdAt: z.date(),
-                updatedAt: z.date(),
-                lastLoginAt: z.date().nullable(),
-              }),
-            }),
-            409: z.object({
-              statusCode: z.number(),
-              error: z.string(),
-              message: z.string(),
-            }),
-          },
-        },
-      },
-      async (request, reply) => {
-        const { email, password } = request.body;
-
-        // 이미 관리자가 존재하면 409 반환
-        const hasAdmin = await adminService.hasAnyAdmin();
-        if (hasAdmin) {
-          throw HttpError.conflict("Admin account already exists.");
-        }
-
-        // 관리자 생성
-        const admin = await adminService.createAdmin({ email, password });
-
-        return reply.status(201).send({ admin });
       },
     );
 

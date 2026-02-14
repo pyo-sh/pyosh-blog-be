@@ -1,14 +1,9 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import { Admin, adminTable } from "@src/db/schema/admins";
 import * as schema from "@src/db/schema/index";
 import { HttpError } from "@src/errors/http-error";
-import { hashPassword, verifyPassword } from "@src/shared/password";
-
-export interface AdminCreateArgs {
-  email: string;
-  password: string;
-}
+import { verifyPassword } from "@src/shared/password";
 
 /**
  * Admin 계정 반환 타입 (password_hash 제외)
@@ -20,52 +15,6 @@ export type AdminResponse = Omit<Admin, "passwordHash">;
  */
 export class AdminService {
   constructor(private readonly db: MySql2Database<typeof schema>) {}
-
-  /**
-   * 관리자 계정 생성
-   * @param email 이메일 주소
-   * @param password 평문 비밀번호
-   * @returns 생성된 관리자 정보 (password_hash 제외)
-   */
-  async createAdmin({
-    email,
-    password,
-  }: AdminCreateArgs): Promise<AdminResponse> {
-    // 이메일 중복 체크
-    const [existing] = await this.db
-      .select()
-      .from(adminTable)
-      .where(eq(adminTable.email, email))
-      .limit(1);
-
-    if (existing) {
-      throw HttpError.conflict("Email already in use.");
-    }
-
-    // 비밀번호 해싱
-    const passwordHash = await hashPassword(password);
-
-    // 관리자 생성
-    const [result] = await this.db.insert(adminTable).values({
-      email,
-      passwordHash,
-    });
-
-    const [admin] = await this.db
-      .select()
-      .from(adminTable)
-      .where(eq(adminTable.id, Number(result.insertId)))
-      .limit(1);
-
-    if (!admin) {
-      throw HttpError.internal("Failed to create admin.");
-    }
-
-    // password_hash 제외하고 반환
-    const { passwordHash: _, ...adminResponse } = admin;
-
-    return adminResponse;
-  }
 
   /**
    * 이메일/비밀번호 검증
@@ -126,18 +75,5 @@ export class AdminService {
     const { passwordHash: _, ...adminResponse } = admin;
 
     return adminResponse;
-  }
-
-  /**
-   * 관리자 계정 존재 여부 확인
-   * @returns 관리자가 1명 이상 존재하면 true
-   */
-  async hasAnyAdmin(): Promise<boolean> {
-    const [result] = await this.db
-      .select({ count: sql<number>`count(*)` })
-      .from(adminTable)
-      .limit(1);
-
-    return result ? result.count > 0 : false;
   }
 }
