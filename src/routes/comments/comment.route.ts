@@ -11,7 +11,7 @@ import {
   CommentResponseSchema,
 } from "./comment.schema";
 import { CommentService } from "./comment.service";
-import { User } from "@src/db/schema/users";
+import { OAuthAccount } from "@src/db/schema/oauth-accounts";
 import { optionalAuth, requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
 import { resolveAuthorFromRequest, Author } from "@src/shared/interaction";
@@ -45,7 +45,7 @@ export function createCommentRoute(
         const { postId } = request.params;
 
         // 현재 사용자 정보 추출
-        const viewerUserId = (request.user as User | undefined)?.id ?? null;
+        const viewerUserId = (request.user as OAuthAccount | undefined)?.id ?? null;
         const viewerIsAdmin = Boolean(request.admin);
 
         const comments = await commentService.getCommentsByPostId(postId, {
@@ -95,7 +95,7 @@ export function createCommentRoute(
           // OAuth 사용자
           author = {
             type: "oauth",
-            userId: (request.user as User).id,
+            userId: (request.user as OAuthAccount).id,
           };
 
           const body = CreateCommentOAuthBodySchema.parse(request.body);

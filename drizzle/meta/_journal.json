@@ -8,6 +8,13 @@
       "when": 1770705291634,
       "tag": "0000_rainy_grim_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1771743360178,
+      "tag": "0001_chubby_chamber",
+      "breakpoints": true
     }
   ]
 }

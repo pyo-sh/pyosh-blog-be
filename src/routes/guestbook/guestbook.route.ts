@@ -11,7 +11,7 @@ import {
   GuestbookEntryResponseSchema,
 } from "./guestbook.schema";
 import { GuestbookService } from "./guestbook.service";
-import { User } from "@src/db/schema/users";
+import { OAuthAccount } from "@src/db/schema/oauth-accounts";
 import { optionalAuth, requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
 import { resolveAuthorFromRequest, Author } from "@src/shared/interaction";
@@ -47,7 +47,7 @@ export function createGuestbookRoute(
         const query = request.query;
 
         // 현재 사용자 정보 추출
-        const viewerUserId = (request.user as User | undefined)?.id ?? null;
+        const viewerUserId = (request.user as OAuthAccount | undefined)?.id ?? null;
         const viewerIsAdmin = Boolean(request.admin);
 
         const result = await guestbookService.getEntries({
@@ -92,7 +92,7 @@ export function createGuestbookRoute(
           // OAuth 사용자
           author = {
             type: "oauth",
-            userId: (request.user as User).id,
+            userId: (request.user as OAuthAccount).id,
           };
 
           const body = CreateGuestbookOAuthBodySchema.parse(request.body);

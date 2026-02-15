@@ -26,7 +26,6 @@ const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
       ],
       tags: [
         { name: "auth", description: "Authentication endpoints" },
-        { name: "user", description: "User management endpoints" },
         { name: "health", description: "Health check endpoints" },
       ],
       components: {

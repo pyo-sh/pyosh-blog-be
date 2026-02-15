@@ -1,6 +1,6 @@
 import { relations } from "drizzle-orm";
 import { guestbookEntryTable } from "../schema/guestbook";
-import { userTable } from "../schema/users";
+import { oauthAccountTable } from "../schema/oauth-accounts";
 
 /**
  * Guestbook Entry Relations
@@ -16,9 +16,9 @@ export const guestbookEntriesRelations = relations(
     children: many(guestbookEntryTable, {
       relationName: "guestbookHierarchy",
     }),
-    user: one(userTable, {
+    user: one(oauthAccountTable, {
       fields: [guestbookEntryTable.oauthAccountId],
-      references: [userTable.id],
+      references: [oauthAccountTable.id],
     }),
   }),
 );

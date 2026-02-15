@@ -9,8 +9,8 @@ import {
 import {
   seedAdmin,
   seedCategory,
+  seedOAuthUser,
   seedPost,
-  seedUser,
   truncateAll,
 } from "@test/helpers/seed";
 
@@ -61,7 +61,7 @@ describe("Comment Routes", () => {
     });
 
     it("OAuth 사용자 댓글 작성 → 201", async () => {
-      const user = await seedUser({ name: "OAuth User" });
+      const user = await seedOAuthUser({ displayName:"OAuth User" });
       const cookie = await injectOAuthUser(user.id);
 
       const category = await seedCategory();
@@ -235,7 +235,7 @@ describe("Comment Routes", () => {
     });
 
     it("비밀 댓글 마스킹 확인", async () => {
-      const user = await seedUser({ name: "Secret Author" });
+      const user = await seedOAuthUser({ displayName:"Secret Author" });
       const cookie = await injectOAuthUser(user.id);
 
       const category = await seedCategory();
@@ -319,10 +319,10 @@ describe("Comment Routes", () => {
     });
 
     it("다른 사용자의 댓글 삭제 시도 → 403", async () => {
-      const userA = await seedUser({ name: "User A" });
+      const userA = await seedOAuthUser({ displayName:"User A" });
       const cookieA = await injectOAuthUser(userA.id);
 
-      const userB = await seedUser({ name: "User B" });
+      const userB = await seedOAuthUser({ displayName:"User B" });
       const cookieB = await injectOAuthUser(userB.id);
 
       const category = await seedCategory();

@@ -42,8 +42,6 @@ import {
 } from "@src/routes/stats/stats.route";
 import { createTagRoute } from "@src/routes/tags/tag.route";
 import { TagService } from "@src/routes/tags/tag.service";
-import { createUserRoute } from "@src/routes/user/user.route";
-import { UserService } from "@src/routes/user/user.service";
 import { FileStorageService } from "@src/services/file-storage.service";
 import { StatsService } from "@src/services/stats.service";
 import { env } from "@src/shared/env";
@@ -118,7 +116,6 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // 서비스 인스턴스 생성 (수동 DI)
   const adminService = new AdminService(fastify.db);
-  const userService = new UserService(fastify.db);
   const categoryService = new CategoryService(fastify.db);
   const tagService = new TagService(fastify.db);
   const fileStorageService = new FileStorageService();
@@ -135,7 +132,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(createAuthRoute(adminService), {
     prefix: "/api/auth",
   });
-  await fastify.register(createUserRoute(userService), { prefix: "/api/user" });
   await fastify.register(createCategoryRoute(categoryService, adminService), {
     prefix: "/api/categories",
   });

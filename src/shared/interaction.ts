@@ -1,6 +1,6 @@
 import { FastifyRequest } from "fastify";
 import { verifyPassword } from "./password";
-import { User } from "@src/db/schema/users";
+import { OAuthAccount } from "@src/db/schema/oauth-accounts";
 import { HttpError } from "@src/errors/http-error";
 
 /**
@@ -67,7 +67,7 @@ export function resolveAuthorFromRequest(
   if (request.user) {
     return {
       type: "oauth",
-      userId: (request.user as User).id,
+      userId: (request.user as OAuthAccount).id,
     };
   }
 

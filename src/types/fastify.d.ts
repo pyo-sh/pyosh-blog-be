@@ -1,5 +1,5 @@
 import "fastify";
-import { User } from "@src/db/schema/users";
+import { OAuthAccount } from "@src/db/schema/oauth-accounts";
 import { AdminResponse } from "@src/routes/auth/admin.service";
 
 declare module "fastify" {
@@ -12,6 +12,6 @@ declare module "fastify" {
     /**
      * OAuth 로그인 사용자 정보 (Passport에서 설정)
      */
-    user?: User;
+    user?: OAuthAccount;
   }
 }

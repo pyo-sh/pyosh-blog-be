@@ -1,10 +1,10 @@
 import fastifyPassport from "@fastify/passport";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { Strategy as GitHubStrategy } from "passport-github";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { imageTable, userTable, User } from "@src/db/schema/index";
+import { oauthAccountTable, OAuthAccount } from "@src/db/schema/index";
 import { env } from "@src/shared/env";
 
 const passportPlugin: FastifyPluginAsync = async (fastify) => {
@@ -14,20 +14,20 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
 
   const { db } = fastify;
 
-  // User serialization (세션에 저장)
-  fastifyPassport.registerUserSerializer(async (user: User) => {
-    return user.id;
+  // OAuthAccount serialization (세션에 저장)
+  fastifyPassport.registerUserSerializer(async (account: OAuthAccount) => {
+    return account.id;
   });
 
-  // User deserialization (세션에서 복원)
+  // OAuthAccount deserialization (세션에서 복원)
   fastifyPassport.registerUserDeserializer(async (id: number) => {
-    const [user] = await db
+    const [account] = await db
       .select()
-      .from(userTable)
-      .where(eq(userTable.id, id))
+      .from(oauthAccountTable)
+      .where(eq(oauthAccountTable.id, id))
       .limit(1);
 
-    return user || null;
+    return account || null;
   });
 
   // Google OAuth Strategy
@@ -51,31 +51,40 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
             picture: string;
           };
 
-          // 기존 유저 찾기
-          const [existingUser] = await db
+          const googleId = profile.id;
+
+          // 기존 계정 찾기
+          const [existingAccount] = await db
             .select()
-            .from(userTable)
-            .where(eq(userTable.googleEmail, googleEmail))
+            .from(oauthAccountTable)
+            .where(
+              and(
+                eq(oauthAccountTable.provider, "google"),
+                eq(oauthAccountTable.providerUserId, googleId),
+              ),
+            )
             .limit(1);
 
-          if (existingUser) {
-            return done(null, existingUser);
+          if (existingAccount) {
+            return done(null, existingAccount);
           }
 
-          // 새 유저 생성 (이미지 포함)
-          const [image] = await db.insert(imageTable).values({ url: picture });
-          const [user] = await db
-            .insert(userTable)
-            .values({ name, googleEmail, imageId: Number(image.insertId) });
+          // 새 계정 생성
+          const [result] = await db.insert(oauthAccountTable).values({
+            provider: "google",
+            providerUserId: googleId,
+            email: googleEmail,
+            displayName: name,
+            avatarUrl: picture,
+          });
 
-          // 생성된 유저 조회
-          const [newUser] = await db
+          const [newAccount] = await db
             .select()
-            .from(userTable)
-            .where(eq(userTable.id, Number(user.insertId)))
+            .from(oauthAccountTable)
+            .where(eq(oauthAccountTable.id, Number(result.insertId)))
             .limit(1);
 
-          return done(null, newUser);
+          return done(null, newAccount);
         } catch (error) {
           return done(error as Error);
         }
@@ -95,40 +104,49 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
       async (_accessToken, _refreshToken, profile, done) => {
         try {
           const {
-            login: githubId,
             avatar_url: url,
             name,
+            login,
           } = profile._json as {
             login: string;
             avatar_url: string;
             name: string;
           };
 
-          // 기존 유저 찾기
-          const [existingUser] = await db
+          const githubId = profile.id;
+
+          // 기존 계정 찾기
+          const [existingAccount] = await db
             .select()
-            .from(userTable)
-            .where(eq(userTable.githubId, githubId))
+            .from(oauthAccountTable)
+            .where(
+              and(
+                eq(oauthAccountTable.provider, "github"),
+                eq(oauthAccountTable.providerUserId, githubId),
+              ),
+            )
             .limit(1);
 
-          if (existingUser) {
-            return done(null, existingUser);
+          if (existingAccount) {
+            return done(null, existingAccount);
           }
 
-          // 새 유저 생성 (이미지 포함)
-          const [image] = await db.insert(imageTable).values({ url });
-          const [user] = await db
-            .insert(userTable)
-            .values({ name, githubId, imageId: Number(image.insertId) });
+          // 새 계정 생성
+          const [result] = await db.insert(oauthAccountTable).values({
+            provider: "github",
+            providerUserId: githubId,
+            email: null,
+            displayName: name ?? login,
+            avatarUrl: url,
+          });
 
-          // 생성된 유저 조회
-          const [newUser] = await db
+          const [newAccount] = await db
             .select()
-            .from(userTable)
-            .where(eq(userTable.id, Number(user.insertId)))
+            .from(oauthAccountTable)
+            .where(eq(oauthAccountTable.id, Number(result.insertId)))
             .limit(1);
 
-          return done(null, newUser);
+          return done(null, newAccount);
         } catch (error) {
           return done(error as Error);
         }

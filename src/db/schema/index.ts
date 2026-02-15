@@ -4,8 +4,6 @@
 
 // Tables
 export * from "./sessions";
-export * from "./users"; // Legacy - Phase 2에서 제거 예정
-export * from "./images"; // Legacy - Phase 2에서 제거 예정
 export * from "./admins";
 export * from "./oauth-accounts";
 export * from "./categories";

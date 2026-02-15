@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
 import { commentTable } from "../schema/comments";
 import { postTable } from "../schema/posts";
-import { userTable } from "../schema/users";
+import { oauthAccountTable } from "../schema/oauth-accounts";
 
 /**
  * Comment Relations
@@ -24,8 +24,8 @@ export const commentsRelations = relations(commentTable, ({ one, many }) => ({
     references: [commentTable.id],
     relationName: "commentReply",
   }),
-  user: one(userTable, {
+  user: one(oauthAccountTable, {
     fields: [commentTable.oauthAccountId],
-    references: [userTable.id],
+    references: [oauthAccountTable.id],
   }),
 }));

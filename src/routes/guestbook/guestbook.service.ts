@@ -8,7 +8,7 @@ import {
   NewGuestbookEntry,
 } from "@src/db/schema/guestbook";
 import * as schema from "@src/db/schema/index";
-import { userTable } from "@src/db/schema/users";
+import { oauthAccountTable } from "@src/db/schema/oauth-accounts";
 import { HttpError } from "@src/errors/http-error";
 import {
   Author,
@@ -254,19 +254,19 @@ export class GuestbookService {
     let author: CommentAuthor;
 
     if (entry.authorType === "oauth" && entry.oauthAccountId) {
-      // OAuth 사용자: userTable JOIN
-      const [user] = await db
+      // OAuth 사용자: oauthAccountTable JOIN
+      const [account] = await db
         .select()
-        .from(userTable)
-        .where(eq(userTable.id, entry.oauthAccountId))
+        .from(oauthAccountTable)
+        .where(eq(oauthAccountTable.id, entry.oauthAccountId))
         .limit(1);
 
-      if (user) {
+      if (account) {
         author = {
           type: "oauth",
-          id: user.id,
-          name: user.name,
-          avatarUrl: undefined, // imageId 기반 아바타 URL 조회는 미구현
+          id: account.id,
+          name: account.displayName,
+          avatarUrl: account.avatarUrl ?? undefined,
         };
       } else {
         // 사용자를 찾을 수 없으면 기본값

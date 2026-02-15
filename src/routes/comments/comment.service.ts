@@ -4,7 +4,7 @@ import type { CommentDetail, CommentAuthor } from "./comment.schema";
 import { Comment, commentTable, NewComment } from "@src/db/schema/comments";
 import * as schema from "@src/db/schema/index";
 import { postTable } from "@src/db/schema/posts";
-import { userTable } from "@src/db/schema/users";
+import { oauthAccountTable } from "@src/db/schema/oauth-accounts";
 import { HttpError } from "@src/errors/http-error";
 import {
   Author,
@@ -125,13 +125,13 @@ export class CommentService {
 
         // 이름 추출 (OAuth: user join, Guest: guestName)
         if (replyTo.authorType === "oauth" && replyTo.oauthAccountId) {
-          const [user] = await tx
-            .select({ name: userTable.name })
-            .from(userTable)
-            .where(eq(userTable.id, replyTo.oauthAccountId))
+          const [account] = await tx
+            .select({ name: oauthAccountTable.displayName })
+            .from(oauthAccountTable)
+            .where(eq(oauthAccountTable.id, replyTo.oauthAccountId))
             .limit(1);
 
-          replyToName = user?.name ?? "알 수 없음";
+          replyToName = account?.name ?? "알 수 없음";
         } else if (replyTo.authorType === "guest") {
           replyToName = replyTo.guestName ?? "익명";
         }
@@ -318,19 +318,19 @@ export class CommentService {
     let author: CommentAuthor;
 
     if (comment.authorType === "oauth" && comment.oauthAccountId) {
-      // OAuth 사용자: userTable JOIN
-      const [user] = await db
+      // OAuth 사용자: oauthAccountTable JOIN
+      const [account] = await db
         .select()
-        .from(userTable)
-        .where(eq(userTable.id, comment.oauthAccountId))
+        .from(oauthAccountTable)
+        .where(eq(oauthAccountTable.id, comment.oauthAccountId))
         .limit(1);
 
-      if (user) {
+      if (account) {
         author = {
           type: "oauth",
-          id: user.id,
-          name: user.name,
-          avatarUrl: undefined, // imageId 기반 아바타 URL 조회는 미구현
+          id: account.id,
+          name: account.displayName,
+          avatarUrl: account.avatarUrl ?? undefined,
         };
       } else {
         // 사용자를 찾을 수 없으면 기본값

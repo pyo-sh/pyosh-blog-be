@@ -6,7 +6,7 @@ import {
   injectAuth,
   injectOAuthUser,
 } from "@test/helpers/app";
-import { seedAdmin, seedUser, truncateAll } from "@test/helpers/seed";
+import { seedAdmin, seedOAuthUser, truncateAll } from "@test/helpers/seed";
 
 describe("Guestbook Routes", () => {
   let app: FastifyInstance;
@@ -48,7 +48,7 @@ describe("Guestbook Routes", () => {
     });
 
     it("OAuth 사용자 방명록 작성 → 201", async () => {
-      const user = await seedUser({ name: "OAuth Visitor" });
+      const user = await seedOAuthUser({ displayName:"OAuth Visitor" });
       const cookie = await injectOAuthUser(user.id);
 
       const response = await app.inject({
@@ -203,10 +203,10 @@ describe("Guestbook Routes", () => {
     });
 
     it("다른 사용자 삭제 시도 → 403", async () => {
-      const userA = await seedUser({ name: "User A" });
+      const userA = await seedOAuthUser({ displayName:"User A" });
       const cookieA = await injectOAuthUser(userA.id);
 
-      const userB = await seedUser({ name: "User B" });
+      const userB = await seedOAuthUser({ displayName:"User B" });
       const cookieB = await injectOAuthUser(userB.id);
 
       // User A가 방명록 작성

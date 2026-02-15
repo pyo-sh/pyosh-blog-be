@@ -5,12 +5,12 @@ import {
   adminTable,
   categoryTable,
   NewCategory,
+  NewOAuthAccount,
   NewPost,
   NewTag,
-  NewUser,
+  oauthAccountTable,
   postTable,
   tagTable,
-  userTable,
 } from "@src/db/schema";
 import { hashPassword } from "@src/shared/password";
 
@@ -27,8 +27,6 @@ const ALL_TABLES = [
   "oauth_account_tb",
   "admin_tb",
   "session_tb",
-  "user_tb",
-  "image_tb",
 ] as const;
 
 /**
@@ -106,26 +104,28 @@ export async function seedTag(
 }
 
 /**
- * 테스트 OAuth User 생성
+ * 테스트 OAuth 계정 생성
  */
-export async function seedUser(
-  overrides?: Partial<NewUser>,
-): Promise<typeof userTable.$inferSelect> {
+export async function seedOAuthUser(
+  overrides?: Partial<NewOAuthAccount>,
+): Promise<typeof oauthAccountTable.$inferSelect> {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  const values: NewUser = {
-    name: "Test User",
-    githubId: `test-github-${suffix}`,
-    writable: true,
+  const values: NewOAuthAccount = {
+    provider: "github",
+    providerUserId: `test-github-${suffix}`,
+    displayName: "Test User",
+    email: null,
+    avatarUrl: null,
     ...overrides,
   };
 
-  const [result] = await db.insert(userTable).values(values);
-  const [user] = await db
+  const [result] = await db.insert(oauthAccountTable).values(values);
+  const [account] = await db
     .select()
-    .from(userTable)
-    .where(eq(userTable.id, Number(result.insertId)));
+    .from(oauthAccountTable)
+    .where(eq(oauthAccountTable.id, Number(result.insertId)));
 
-  return user!;
+  return account!;
 }
 
 /**
