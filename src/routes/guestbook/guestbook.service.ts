@@ -262,11 +262,12 @@ export class GuestbookService {
         .limit(1);
 
       if (account) {
+        const isDeleted = account.deletedAt !== null;
         author = {
           type: "oauth",
-          id: account.id,
-          name: account.displayName,
-          avatarUrl: account.avatarUrl ?? undefined,
+          id: isDeleted ? undefined : account.id,
+          name: isDeleted ? "탈퇴한 사용자" : account.displayName,
+          avatarUrl: isDeleted ? undefined : (account.avatarUrl ?? undefined),
         };
       } else {
         // 사용자를 찾을 수 없으면 기본값

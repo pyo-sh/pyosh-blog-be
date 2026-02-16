@@ -21,6 +21,7 @@ export const oauthAccountTable = mysqlTable(
     avatarUrl: varchar("avatar_url", { length: 500 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+    deletedAt: timestamp("deleted_at"),
   },
   (table) => ({
     providerUserIdx: uniqueIndex("provider_user_idx").on(

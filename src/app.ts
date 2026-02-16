@@ -41,6 +41,8 @@ import {
   createAdminStatsRoute,
 } from "@src/routes/stats/stats.route";
 import { createTagRoute } from "@src/routes/tags/tag.route";
+import { createUserRoute } from "@src/routes/user/user.route";
+import { UserService } from "@src/routes/user/user.service";
 import { TagService } from "@src/routes/tags/tag.service";
 import { FileStorageService } from "@src/services/file-storage.service";
 import { StatsService } from "@src/services/stats.service";
@@ -124,6 +126,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   const commentService = new CommentService(fastify.db);
   const guestbookService = new GuestbookService(fastify.db);
   const statsService = new StatsService(fastify.db);
+  const userService = new UserService(fastify.db);
 
   // 업로드 디렉토리 생성
   await fileStorageService.ensureUploadDir();
@@ -178,6 +181,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     prefix: "/api/admin/stats",
   });
   await fastify.register(createSeoRoute());
+
+  // User routes (OAuth 인증 필수)
+  await fastify.register(createUserRoute(userService), {
+    prefix: "/api/user",
+  });
 
   return fastify;
 }
