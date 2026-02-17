@@ -19,7 +19,7 @@ export const postTable = mysqlTable(
     title: varchar("title", { length: 200 }).notNull(),
     slug: varchar("slug", { length: 200 }).notNull().unique(),
     contentMd: text("content_md").notNull(),
-    thumbnailAssetId: int("thumbnail_asset_id"),
+    thumbnailUrl: varchar("thumbnail_url", { length: 500 }),
     visibility: mysqlEnum("visibility", ["public", "private"])
       .default("public")
       .notNull(),

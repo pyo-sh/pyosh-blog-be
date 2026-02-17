@@ -210,7 +210,7 @@ export function createAdminPostRoute(
           title: body.title,
           contentMd: body.contentMd,
           categoryId: body.categoryId,
-          thumbnailAssetId: body.thumbnailAssetId,
+          thumbnailUrl: body.thumbnailUrl,
           visibility: body.visibility,
           status: body.status,
           tags: body.tags,

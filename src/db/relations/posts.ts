@@ -1,5 +1,4 @@
 import { relations } from "drizzle-orm";
-import { assetTable } from "../schema/assets";
 import { categoryTable } from "../schema/categories";
 import { postTagTable } from "../schema/post-tags";
 import { postTable } from "../schema/posts";
@@ -12,10 +11,6 @@ export const postsRelations = relations(postTable, ({ one, many }) => ({
   category: one(categoryTable, {
     fields: [postTable.categoryId],
     references: [categoryTable.id],
-  }),
-  thumbnailAsset: one(assetTable, {
-    fields: [postTable.thumbnailAssetId],
-    references: [assetTable.id],
   }),
   postTags: many(postTagTable),
 }));
@@ -57,11 +52,4 @@ export const postTagsRelations = relations(postTagTable, ({ one }) => ({
  */
 export const tagsRelations = relations(tagTable, ({ many }) => ({
   postTags: many(postTagTable),
-}));
-
-/**
- * Asset Relations
- */
-export const assetsRelations = relations(assetTable, ({ many }) => ({
-  postsAsThumbnail: many(postTable),
 }));

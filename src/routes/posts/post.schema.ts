@@ -1,6 +1,28 @@
 import { z } from "zod";
 import { PaginationMetaSchema } from "@src/schemas/common";
 
+const isAllowedThumbnailUrl = (value: string): boolean => {
+  if (value.startsWith("/uploads/")) {
+    return true;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+const ThumbnailUrlInputSchema = z
+  .string()
+  .trim()
+  .nullable()
+  .transform((value) => (value === "" ? null : value))
+  .refine((value) => value === null || isAllowedThumbnailUrl(value), {
+    message: "thumbnailUrl must be /uploads/... or http(s) URL",
+  });
+
 /**
  * Path Parameter Schemas
  */
@@ -37,7 +59,7 @@ export const CreatePostBodySchema = z.object({
   title: z.string().min(1).max(200),
   contentMd: z.string().min(1),
   categoryId: z.number().int().positive(),
-  thumbnailAssetId: z.number().int().positive().optional(),
+  thumbnailUrl: ThumbnailUrlInputSchema.optional(),
   visibility: z.enum(["public", "private"]).optional().default("public"),
   status: z
     .enum(["draft", "published", "archived"])
@@ -51,7 +73,7 @@ export const UpdatePostBodySchema = z.object({
   title: z.string().min(1).max(200).optional(),
   contentMd: z.string().min(1).optional(),
   categoryId: z.number().int().positive().optional(),
-  thumbnailAssetId: z.number().int().positive().optional(),
+  thumbnailUrl: ThumbnailUrlInputSchema.optional(),
   visibility: z.enum(["public", "private"]).optional(),
   status: z.enum(["draft", "published", "archived"]).optional(),
   tags: z.array(z.string().min(1).max(30)).optional(),
@@ -73,19 +95,13 @@ export const PostCategorySchema = z.object({
   slug: z.string(),
 });
 
-export const PostThumbnailSchema = z.object({
-  id: z.number(),
-  url: z.string(),
-  storageKey: z.string(),
-});
-
 export const PostDetailSchema = z.object({
   id: z.number(),
   categoryId: z.number(),
   title: z.string(),
   slug: z.string(),
   contentMd: z.string(),
-  thumbnailAssetId: z.number().nullable(),
+  thumbnailUrl: z.string().nullable(),
   visibility: z.enum(["public", "private"]),
   status: z.enum(["draft", "published", "archived"]),
   publishedAt: z.string().nullable(), // ISO datetime string
@@ -94,7 +110,6 @@ export const PostDetailSchema = z.object({
   deletedAt: z.string().nullable(), // ISO datetime string
   category: PostCategorySchema,
   tags: z.array(PostTagSchema),
-  thumbnail: PostThumbnailSchema.nullable(),
 });
 
 export const PostNavigationSchema = z.object({

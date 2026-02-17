@@ -1,6 +1,5 @@
 import { eq, and, isNull, sql, inArray, lt, gt, desc, asc } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
-import { assetTable } from "@src/db/schema/assets";
 import { categoryTable } from "@src/db/schema/categories";
 import * as schema from "@src/db/schema/index";
 import { postTagTable } from "@src/db/schema/post-tags";
@@ -21,7 +20,7 @@ export interface CreatePostInput {
   title: string;
   contentMd: string;
   categoryId: number;
-  thumbnailAssetId?: number;
+  thumbnailUrl?: string | null;
   visibility?: "public" | "private";
   status?: "draft" | "published" | "archived";
   tags?: string[];
@@ -35,7 +34,7 @@ export interface UpdatePostInput {
   title?: string;
   contentMd?: string;
   categoryId?: number;
-  thumbnailAssetId?: number;
+  thumbnailUrl?: string | null;
   visibility?: "public" | "private";
   status?: "draft" | "published" | "archived";
   tags?: string[];
@@ -76,21 +75,11 @@ interface PostCategory {
 }
 
 /**
- * 썸네일 정보
- */
-interface PostThumbnail {
-  id: number;
-  url: string;
-  storageKey: string;
-}
-
-/**
  * 게시글 상세 정보 (관계 포함)
  */
 export interface PostDetail extends Post {
   category: PostCategory;
   tags: PostTag[];
-  thumbnail: PostThumbnail | null;
 }
 
 /**
@@ -154,7 +143,7 @@ export class PostService {
         slug,
         contentMd: input.contentMd,
         categoryId: input.categoryId,
-        thumbnailAssetId: input.thumbnailAssetId,
+        thumbnailUrl: input.thumbnailUrl ?? null,
         visibility: input.visibility ?? "public",
         status: input.status ?? "draft",
         publishedAt,
@@ -451,7 +440,7 @@ export class PostService {
   }
 
   /**
-   * 게시글에 category, tags, thumbnail 정보 추가 (내부 헬퍼)
+   * 게시글에 category, tags 정보 추가 (내부 헬퍼)
    */
   private async enrichPostWithDetails(post: Post): Promise<PostDetail> {
     // 1. 카테고리 조회
@@ -476,32 +465,10 @@ export class PostService {
       .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
       .where(eq(postTagTable.postId, post.id));
 
-    // 3. 썸네일 조회
-    let thumbnail: PostThumbnail | null = null;
-    if (post.thumbnailAssetId) {
-      const [asset] = await this.db
-        .select({
-          id: assetTable.id,
-          storageKey: assetTable.storageKey,
-        })
-        .from(assetTable)
-        .where(eq(assetTable.id, post.thumbnailAssetId))
-        .limit(1);
-
-      if (asset) {
-        thumbnail = {
-          id: asset.id,
-          url: `/uploads/${asset.storageKey}`,
-          storageKey: asset.storageKey,
-        };
-      }
-    }
-
     return {
       ...post,
       category,
       tags: postTags,
-      thumbnail,
     };
   }
 
@@ -522,7 +489,7 @@ export class PostService {
       throw HttpError.notFound("게시글을 찾을 수 없습니다");
     }
 
-    // category, tags, thumbnail 정보 조회 (트랜잭션 컨텍스트 사용)
+    // category, tags 정보 조회 (트랜잭션 컨텍스트 사용)
     const [category] = await tx
       .select({
         id: categoryTable.id,
@@ -543,31 +510,10 @@ export class PostService {
       .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
       .where(eq(postTagTable.postId, post.id));
 
-    let thumbnail: PostThumbnail | null = null;
-    if (post.thumbnailAssetId) {
-      const [asset] = await tx
-        .select({
-          id: assetTable.id,
-          storageKey: assetTable.storageKey,
-        })
-        .from(assetTable)
-        .where(eq(assetTable.id, post.thumbnailAssetId))
-        .limit(1);
-
-      if (asset) {
-        thumbnail = {
-          id: asset.id,
-          url: `/uploads/${asset.storageKey}`,
-          storageKey: asset.storageKey,
-        };
-      }
-    }
-
     return {
       ...post,
       category,
       tags: postTags,
-      thumbnail,
     };
   }
 }

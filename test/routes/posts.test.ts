@@ -39,6 +39,7 @@ describe("Post Routes", () => {
           title: "My First Post",
           contentMd: "# Hello\n\nThis is content.",
           categoryId: category.id,
+          thumbnailUrl: "/uploads/my-first-post.jpg",
           status: "published",
           tags: ["typescript", "fastify"],
         },
@@ -50,10 +51,53 @@ describe("Post Routes", () => {
       expect(body.post).toBeDefined();
       expect(body.post.title).toBe("My First Post");
       expect(body.post.category.id).toBe(category.id);
+      expect(body.post.thumbnailUrl).toBe("/uploads/my-first-post.jpg");
       expect(body.post.tags).toHaveLength(2);
       expect(body.post.tags.map((t: { name: string }) => t.name)).toEqual(
         expect.arrayContaining(["typescript", "fastify"]),
       );
+    });
+
+    it("thumbnailUrl 빈 문자열은 null로 저장 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Post Without Thumbnail",
+          contentMd: "# Hello",
+          categoryId: category.id,
+          thumbnailUrl: "",
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json();
+      expect(body.post.thumbnailUrl).toBeNull();
+    });
+
+    it("thumbnailUrl에 javascript: 스킴 전달 시 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Invalid Thumbnail URL",
+          contentMd: "# Hello",
+          categoryId: category.id,
+          thumbnailUrl: "javascript:alert(1)",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
     });
 
     it("필수 필드 누락 (title 없음) → 400", async () => {
@@ -234,6 +278,7 @@ describe("Post Routes", () => {
         headers: { cookie },
         payload: {
           title: "Updated Title",
+          thumbnailUrl: "https://cdn.example.com/updated.jpg",
           tags: ["updated-tag"],
         },
       });
@@ -242,6 +287,7 @@ describe("Post Routes", () => {
 
       const body = response.json();
       expect(body.post.title).toBe("Updated Title");
+      expect(body.post.thumbnailUrl).toBe("https://cdn.example.com/updated.jpg");
       expect(body.post.tags).toHaveLength(1);
       expect(body.post.tags[0].name).toBe("updated-tag");
     });
