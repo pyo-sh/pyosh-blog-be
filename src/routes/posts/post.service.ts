@@ -48,7 +48,7 @@ export interface GetPostListQuery {
   page?: number;
   limit?: number;
   categoryId?: number;
-  tagId?: number;
+  tagSlug?: string;
   status?: "draft" | "published" | "archived";
   visibility?: "public" | "private";
   sort?: "published_at" | "created_at";
@@ -244,13 +244,23 @@ export class PostService {
       conditions.push(eq(postTable.categoryId, query.categoryId));
     }
 
-    // tag 필터 (post_tag_tb JOIN 필요)
+    // tag 필터 (tag slug 기반)
     let tagFilteredPostIds: number[] | undefined;
-    if (query.tagId) {
+    if (query.tagSlug) {
+      const [tag] = await this.db
+        .select({ id: tagTable.id })
+        .from(tagTable)
+        .where(eq(tagTable.slug, query.tagSlug))
+        .limit(1);
+
+      if (!tag) {
+        return buildPaginatedResponse([], page, limit, 0);
+      }
+
       const postTags = await this.db
         .select({ postId: postTagTable.postId })
         .from(postTagTable)
-        .where(eq(postTagTable.tagId, query.tagId));
+        .where(eq(postTagTable.tagId, tag.id));
 
       tagFilteredPostIds = postTags.map((pt) => pt.postId);
 

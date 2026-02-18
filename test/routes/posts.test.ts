@@ -207,6 +207,54 @@ describe("Post Routes", () => {
       expect(body.data).toHaveLength(1);
       expect(body.data[0].category.id).toBe(cat1.id);
     });
+
+    it("태그 필터링 — tagSlug 쿼리로 특정 태그 게시글만 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "TypeScript Post",
+          contentMd: "# TS",
+          categoryId: category.id,
+          status: "published",
+          visibility: "public",
+          tags: ["typescript"],
+        },
+      });
+
+      await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "React Post",
+          contentMd: "# React",
+          categoryId: category.id,
+          status: "published",
+          visibility: "public",
+          tags: ["react"],
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?tagSlug=typescript",
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe("TypeScript Post");
+      expect(body.data[0].tags.map((t: { slug: string }) => t.slug)).toContain(
+        "typescript",
+      );
+    });
   });
 
   // ===== GET /api/posts/:slug =====
@@ -365,6 +413,17 @@ describe("Post Routes", () => {
 
       const body = response.json();
       expect(body.data).toHaveLength(3);
+    });
+  });
+
+  describe("GET /api/tags", () => {
+    it("Tag API 제거 후 404", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/tags",
+      });
+
+      expect(response.statusCode).toBe(404);
     });
   });
 });

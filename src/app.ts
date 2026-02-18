@@ -40,7 +40,6 @@ import {
   createStatsRoute,
   createAdminStatsRoute,
 } from "@src/routes/stats/stats.route";
-import { createTagRoute } from "@src/routes/tags/tag.route";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { UserService } from "@src/routes/user/user.service";
 import { TagService } from "@src/routes/tags/tag.service";
@@ -137,9 +136,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
   await fastify.register(createCategoryRoute(categoryService, adminService), {
     prefix: "/api/categories",
-  });
-  await fastify.register(createTagRoute(tagService, adminService), {
-    prefix: "/api/tags",
   });
   await fastify.register(createAssetRoute(assetService, adminService), {
     prefix: "/api/assets",

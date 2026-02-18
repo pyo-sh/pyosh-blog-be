@@ -1,16 +1,9 @@
-import { eq, like, inArray, sql, notInArray } from "drizzle-orm";
+import { eq, inArray, notInArray } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "@src/db/schema/index";
 import { postTagTable } from "@src/db/schema/post-tags";
 import { Tag, tagTable, NewTag } from "@src/db/schema/tags";
 import { generateSlug } from "@src/shared/slug";
-
-/**
- * Tag with post count
- */
-export interface TagWithCount extends Tag {
-  postCount: number;
-}
 
 /**
  * Tag Service
@@ -19,18 +12,17 @@ export class TagService {
   constructor(private readonly db: MySql2Database<typeof schema>) {}
 
   /**
-   * 태그 검색 (자동완성용)
-   * - 부분 문자열 검색
-   * - 입력하면서 실시간 검색
+   * 태그 이름 정규화
+   * - trim + lowercase
+   * - 빈 문자열 제거
+   * - 중복 제거
    */
-  async searchTags(keyword: string, limit = 10): Promise<Tag[]> {
-    const tags = await this.db
-      .select()
-      .from(tagTable)
-      .where(like(tagTable.name, `%${keyword}%`))
-      .limit(limit);
+  private normalizeTagNames(names: string[]): string[] {
+    const normalized = names
+      .map((name) => name.trim().toLowerCase())
+      .filter((name) => name.length > 0);
 
-    return tags;
+    return [...new Set(normalized)];
   }
 
   /**
@@ -44,8 +36,11 @@ export class TagService {
       return [];
     }
 
-    // 1. 입력된 이름 배열 정규화 (trim, lowercase)
-    const normalizedNames = names.map((name) => name.trim().toLowerCase());
+    // 1. 입력된 이름 배열 정규화 (trim, lowercase, dedupe)
+    const normalizedNames = this.normalizeTagNames(names);
+    if (normalizedNames.length === 0) {
+      return [];
+    }
 
     // 2. 기존 태그 조회
     const existingTags = await this.db
@@ -78,31 +73,6 @@ export class TagService {
 
     // 기존 태그만 반환
     return existingTags.map((tag) => tag.id);
-  }
-
-  /**
-   * 전체 태그 목록 조회
-   * - 각 태그에 연결된 게시글 수 포함 (선택)
-   */
-  async getAllTags(includePostCount = false): Promise<Tag[] | TagWithCount[]> {
-    if (!includePostCount) {
-      return await this.db.select().from(tagTable);
-    }
-
-    // LEFT JOIN으로 각 태그의 게시글 수 포함
-    const tagsWithCount = await this.db
-      .select({
-        id: tagTable.id,
-        name: tagTable.name,
-        slug: tagTable.slug,
-        createdAt: tagTable.createdAt,
-        postCount: sql<number>`COALESCE(COUNT(${postTagTable.postId}), 0)`,
-      })
-      .from(tagTable)
-      .leftJoin(postTagTable, eq(tagTable.id, postTagTable.tagId))
-      .groupBy(tagTable.id);
-
-    return tagsWithCount;
   }
 
   /**
