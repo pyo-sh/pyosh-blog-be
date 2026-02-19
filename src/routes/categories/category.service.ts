@@ -171,34 +171,6 @@ export class CategoryService {
   }
 
   /**
-   * slug로 카테고리 조회 (하위 카테고리 포함)
-   */
-  async getCategoryBySlug(slug: string): Promise<CategoryTree> {
-    // 1. slug로 카테고리 조회
-    const [category] = await this.db
-      .select()
-      .from(categoryTable)
-      .where(eq(categoryTable.slug, slug))
-      .limit(1);
-
-    if (!category) {
-      throw HttpError.notFound("Category not found.");
-    }
-
-    // 2. 하위 카테고리 목록 조회
-    const children = await this.db
-      .select()
-      .from(categoryTable)
-      .where(eq(categoryTable.parentId, category.id))
-      .orderBy(asc(categoryTable.sortOrder));
-
-    return {
-      ...category,
-      children: children.map((c) => ({ ...c, children: [] })),
-    };
-  }
-
-  /**
    * 카테고리 수정
    * - parent_id 변경 시 순환 참조 방지
    * - name 변경 시 slug는 그대로 유지 (선택적으로 재생성 가능)

@@ -50,6 +50,15 @@ describe("Category Routes", () => {
       expect(body.categories[0].children).toHaveLength(1);
       expect(body.categories[0].children[0].name).toBe("Child Category");
     });
+
+    it("slug 단건 조회 경로 제거됨 → 404", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/categories/some-category",
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
   });
 
   // ===== POST /api/categories =====

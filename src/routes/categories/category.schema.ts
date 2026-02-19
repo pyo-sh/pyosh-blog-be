@@ -7,10 +7,6 @@ export const CategoryIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
-export const CategorySlugParamSchema = z.object({
-  slug: z.string().min(1).max(100),
-});
-
 /**
  * Query Parameter Schemas
  */
@@ -85,10 +81,6 @@ export const CategoryListResponseSchema = z.object({
   categories: z.array(CategoryTreeResponseSchema),
 });
 
-export const CategoryGetResponseSchema = z.object({
-  category: CategoryTreeResponseSchema,
-});
-
 export const CategoryCreateResponseSchema = z.object({
   category: CategoryResponseSchema,
 });
@@ -105,7 +97,6 @@ export const CategoryOrderUpdateResponseSchema = z.object({
  * Type exports
  */
 export type CategoryIdParam = z.infer<typeof CategoryIdParamSchema>;
-export type CategorySlugParam = z.infer<typeof CategorySlugParamSchema>;
 export type CategoryListQuery = z.infer<typeof CategoryListQuerySchema>;
 export type CategoryCreateBody = z.infer<typeof CategoryCreateBodySchema>;
 export type CategoryUpdateBody = z.infer<typeof CategoryUpdateBodySchema>;

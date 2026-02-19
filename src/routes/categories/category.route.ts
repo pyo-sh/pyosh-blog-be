@@ -2,13 +2,11 @@ import { FastifyPluginAsync, FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import {
   CategoryIdParamSchema,
-  CategorySlugParamSchema,
   CategoryListQuerySchema,
   CategoryCreateBodySchema,
   CategoryUpdateBodySchema,
   CategoryOrderUpdateBodySchema,
   CategoryListResponseSchema,
-  CategoryGetResponseSchema,
   CategoryCreateResponseSchema,
   CategoryUpdateResponseSchema,
   CategoryOrderUpdateResponseSchema,
@@ -72,31 +70,6 @@ export function createCategoryRoute(
           .status(200)
           .header("Cache-Control", "public, max-age=300")
           .send({ categories: categories.map(serializeCategoryTree) });
-      },
-    );
-
-    // GET /api/categories/:slug - slug로 카테고리 조회 (Public)
-    typedFastify.get(
-      "/:slug",
-      {
-        schema: {
-          tags: ["categories"],
-          summary: "Get category by slug",
-          description:
-            "slug로 카테고리 상세 정보와 하위 카테고리 목록을 조회합니다.",
-          params: CategorySlugParamSchema,
-          response: {
-            200: CategoryGetResponseSchema,
-          },
-        },
-      },
-      async (request, reply) => {
-        const { slug } = request.params;
-        const category = await categoryService.getCategoryBySlug(slug);
-
-        return reply
-          .status(200)
-          .send({ category: serializeCategoryTree(category) });
       },
     );
 
