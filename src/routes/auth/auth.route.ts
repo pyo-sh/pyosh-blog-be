@@ -58,10 +58,39 @@ export function createAuthRoute(
 
     // ===== Admin Auth Routes =====
 
+    // GET /csrf-token - CSRF 토큰 발급
+    typedFastify.get(
+      "/csrf-token",
+      {
+        schema: {
+          tags: ["auth"],
+          summary: "CSRF 토큰 발급",
+          description:
+            "state-changing 요청(POST/PUT/DELETE)에 필요한 CSRF 토큰을 발급합니다. 세션에 시크릿을 저장하고 토큰을 반환합니다.",
+          response: {
+            200: z.object({
+              token: z.string(),
+            }),
+          },
+        },
+      },
+      async (_request, reply) => {
+        const token = reply.generateCsrf();
+
+        return reply.status(200).send({ token });
+      },
+    );
+
     // POST /admin/login - 관리자 로그인
     typedFastify.post(
       "/admin/login",
       {
+        config: {
+          rateLimit: {
+            max: 5,
+            timeWindow: "1 minute",
+          },
+        },
         schema: {
           tags: ["auth"],
           summary: "Admin login",
@@ -102,6 +131,7 @@ export function createAuthRoute(
     typedFastify.post(
       "/admin/logout",
       {
+        onRequest: fastify.csrfProtection,
         schema: {
           tags: ["auth"],
           summary: "Admin logout",

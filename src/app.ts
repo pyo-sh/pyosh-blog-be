@@ -7,10 +7,12 @@ import {
 import { NodeEnv } from "@src/constants/node-env";
 import { HttpError } from "@src/errors/http-error";
 import corsPlugin from "@src/plugins/cors";
+import csrfPlugin from "@src/plugins/csrf";
 import drizzlePlugin from "@src/plugins/drizzle";
 import helmetPlugin from "@src/plugins/helmet";
 import multipartPlugin from "@src/plugins/multipart";
 import passportPlugin from "@src/plugins/passport";
+import rateLimitPlugin from "@src/plugins/rate-limit";
 import sessionPlugin from "@src/plugins/session";
 import staticPlugin from "@src/plugins/static";
 import swaggerPlugin from "@src/plugins/swagger";
@@ -69,10 +71,12 @@ export async function buildApp(): Promise<FastifyInstance> {
   fastify.setValidatorCompiler(validatorCompiler);
   fastify.setSerializerCompiler(serializerCompiler);
 
-  // 플러그인 등록 (순서 중요: helmet → drizzle → session → passport → multipart → static → swagger → cors)
+  // 플러그인 등록 (순서 중요: helmet → rate-limit → drizzle → session → csrf → passport → multipart → static → swagger → cors)
   await fastify.register(helmetPlugin);
+  await fastify.register(rateLimitPlugin);
   await fastify.register(drizzlePlugin);
   await fastify.register(sessionPlugin);
+  await fastify.register(csrfPlugin);
   await fastify.register(passportPlugin);
   await fastify.register(multipartPlugin);
   await fastify.register(staticPlugin);

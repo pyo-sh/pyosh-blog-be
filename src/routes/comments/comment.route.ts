@@ -45,7 +45,8 @@ export function createCommentRoute(
         const { postId } = request.params;
 
         // 현재 사용자 정보 추출
-        const viewerUserId = (request.user as OAuthAccount | undefined)?.id ?? null;
+        const viewerUserId =
+          (request.user as OAuthAccount | undefined)?.id ?? null;
         const viewerIsAdmin = Boolean(request.admin);
 
         const comments = await commentService.getCommentsByPostId(postId, {
@@ -63,6 +64,13 @@ export function createCommentRoute(
     typedFastify.post(
       "/posts/:postId/comments",
       {
+        config: {
+          rateLimit: {
+            max: 10,
+            timeWindow: "1 minute",
+          },
+        },
+        onRequest: fastify.csrfProtection,
         schema: {
           tags: ["comments"],
           summary: "댓글 작성",
@@ -140,6 +148,7 @@ export function createCommentRoute(
     typedFastify.delete(
       "/comments/:id",
       {
+        onRequest: fastify.csrfProtection,
         schema: {
           tags: ["comments"],
           summary: "댓글 삭제",

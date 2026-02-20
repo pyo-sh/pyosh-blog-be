@@ -47,7 +47,8 @@ export function createGuestbookRoute(
         const query = request.query;
 
         // 현재 사용자 정보 추출
-        const viewerUserId = (request.user as OAuthAccount | undefined)?.id ?? null;
+        const viewerUserId =
+          (request.user as OAuthAccount | undefined)?.id ?? null;
         const viewerIsAdmin = Boolean(request.admin);
 
         const result = await guestbookService.getEntries({
@@ -64,6 +65,13 @@ export function createGuestbookRoute(
     typedFastify.post(
       "/guestbook",
       {
+        config: {
+          rateLimit: {
+            max: 10,
+            timeWindow: "1 minute",
+          },
+        },
+        onRequest: fastify.csrfProtection,
         schema: {
           tags: ["guestbook"],
           summary: "방명록 작성",
@@ -131,6 +139,7 @@ export function createGuestbookRoute(
     typedFastify.delete(
       "/guestbook/:id",
       {
+        onRequest: fastify.csrfProtection,
         schema: {
           tags: ["guestbook"],
           summary: "방명록 삭제",

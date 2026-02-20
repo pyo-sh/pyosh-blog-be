@@ -25,6 +25,13 @@ export function createStatsRoute(
     typedFastify.post(
       "/view",
       {
+        config: {
+          rateLimit: {
+            max: 30,
+            timeWindow: "1 minute",
+          },
+        },
+        onRequest: fastify.csrfProtection,
         schema: {
           tags: ["stats"],
           summary: "조회수 기록",
