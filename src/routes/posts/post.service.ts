@@ -1,4 +1,4 @@
-import { eq, and, isNull, sql, inArray, lt, gt, desc, asc } from "drizzle-orm";
+import { eq, and, isNull, sql, inArray, lt, gt, desc, asc, like, or } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import { categoryTable } from "@src/db/schema/categories";
 import * as schema from "@src/db/schema/index";
@@ -49,6 +49,7 @@ export interface GetPostListQuery {
   limit?: number;
   categoryId?: number;
   tagSlug?: string;
+  q?: string;
   status?: "draft" | "published" | "archived";
   visibility?: "public" | "private";
   sort?: "published_at" | "created_at";
@@ -242,6 +243,14 @@ export class PostService {
     // category 필터
     if (query.categoryId) {
       conditions.push(eq(postTable.categoryId, query.categoryId));
+    }
+
+    // 키워드 검색 (title LIKE %q% OR contentMd LIKE %q%)
+    if (query.q) {
+      const term = `%${query.q}%`;
+      conditions.push(
+        or(like(postTable.title, term), like(postTable.contentMd, term))!,
+      );
     }
 
     // tag 필터 (tag slug 기반)

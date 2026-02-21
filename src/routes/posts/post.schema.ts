@@ -42,6 +42,7 @@ export const PostListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional().default(10),
   categoryId: z.coerce.number().int().positive().optional(),
   tagSlug: z.string().min(1).optional(),
+  q: z.string().min(1).max(200).optional(),
   status: z.enum(["draft", "published", "archived"]).optional(),
   visibility: z.enum(["public", "private"]).optional(),
   sort: z

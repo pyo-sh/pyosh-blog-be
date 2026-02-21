@@ -208,6 +208,92 @@ describe("Post Routes", () => {
       expect(body.data[0].category.id).toBe(cat1.id);
     });
 
+    it("키워드 검색 — q 파라미터로 제목 매칭", async () => {
+      const category = await seedCategory();
+
+      await seedPost(category.id, {
+        title: "TypeScript Deep Dive",
+        contentMd: "# TS\n\nThis is about TypeScript.",
+        status: "published",
+        visibility: "public",
+      });
+      await seedPost(category.id, {
+        title: "React Hooks Guide",
+        contentMd: "# React\n\nThis is about React.",
+        status: "published",
+        visibility: "public",
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=TypeScript",
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe("TypeScript Deep Dive");
+    });
+
+    it("키워드 검색 — q 파라미터로 본문 매칭", async () => {
+      const category = await seedCategory();
+
+      await seedPost(category.id, {
+        title: "Post A",
+        contentMd: "# A\n\nDrizzle ORM is great.",
+        status: "published",
+        visibility: "public",
+      });
+      await seedPost(category.id, {
+        title: "Post B",
+        contentMd: "# B\n\nFastify is fast.",
+        status: "published",
+        visibility: "public",
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=Drizzle",
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe("Post A");
+    });
+
+    it("키워드 검색 + 카테고리 필터 조합", async () => {
+      const cat1 = await seedCategory({ name: "Category A" });
+      const cat2 = await seedCategory({ name: "Category B" });
+
+      await seedPost(cat1.id, {
+        title: "Fastify Tutorial",
+        contentMd: "# Fastify in cat1",
+        status: "published",
+        visibility: "public",
+      });
+      await seedPost(cat2.id, {
+        title: "Fastify Advanced",
+        contentMd: "# Fastify in cat2",
+        status: "published",
+        visibility: "public",
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/posts?q=Fastify&categoryId=${cat1.id}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe("Fastify Tutorial");
+      expect(body.data[0].category.id).toBe(cat1.id);
+    });
+
     it("태그 필터링 — tagSlug 쿼리로 특정 태그 게시글만 반환", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
