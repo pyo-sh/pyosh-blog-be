@@ -9,6 +9,8 @@ import {
   DeleteGuestbookGuestBodySchema,
   GuestbookListResponseSchema,
   GuestbookEntryResponseSchema,
+  AdminGuestbookListQuerySchema,
+  AdminGuestbookListResponseSchema,
 } from "./guestbook.schema";
 import { GuestbookService } from "./guestbook.service";
 import { OAuthAccount } from "@src/db/schema/oauth-accounts";
@@ -190,6 +192,29 @@ export function createAdminGuestbookRoute(
     fastify: FastifyInstance,
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
+
+    // GET /api/admin/guestbook - 관리자 방명록 목록 조회
+    typedFastify.get(
+      "/guestbook",
+      {
+        schema: {
+          tags: ["admin", "guestbook"],
+          summary: "관리자 방명록 목록 조회",
+          description:
+            "전체 방명록 목록을 페이지네이션과 필터로 조회합니다. 비밀글 마스킹 없이 모든 내용을 반환합니다.",
+          querystring: AdminGuestbookListQuerySchema,
+          response: {
+            200: AdminGuestbookListResponseSchema,
+          },
+        },
+        preHandler: requireAdmin(adminService),
+      },
+      async (request, reply) => {
+        const query = request.query;
+        const result = await guestbookService.getAdminGuestbook(query);
+        return reply.status(200).send(result);
+      },
+    );
 
     // DELETE /api/admin/guestbook/:id - 관리자 방명록 강제 삭제
     typedFastify.delete(

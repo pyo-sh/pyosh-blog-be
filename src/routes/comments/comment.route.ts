@@ -9,6 +9,8 @@ import {
   DeleteCommentGuestBodySchema,
   CommentsResponseSchema,
   CommentResponseSchema,
+  AdminCommentListQuerySchema,
+  AdminCommentListResponseSchema,
 } from "./comment.schema";
 import { CommentService } from "./comment.service";
 import { OAuthAccount } from "@src/db/schema/oauth-accounts";
@@ -199,6 +201,29 @@ export function createAdminCommentRoute(
     fastify: FastifyInstance,
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
+
+    // GET /api/admin/comments - 관리자 댓글 목록 조회
+    typedFastify.get(
+      "/comments",
+      {
+        schema: {
+          tags: ["admin", "comments"],
+          summary: "관리자 댓글 목록 조회",
+          description:
+            "전체 댓글 목록을 페이지네이션과 필터로 조회합니다. 비밀글 마스킹 없이 모든 내용을 반환합니다.",
+          querystring: AdminCommentListQuerySchema,
+          response: {
+            200: AdminCommentListResponseSchema,
+          },
+        },
+        preHandler: requireAdmin(adminService),
+      },
+      async (request, reply) => {
+        const query = request.query;
+        const result = await commentService.getAdminComments(query);
+        return reply.status(200).send(result);
+      },
+    );
 
     // DELETE /api/admin/comments/:id - 관리자 댓글 강제 삭제
     typedFastify.delete(

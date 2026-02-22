@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PaginationMetaSchema } from "@src/schemas/common";
 
 /**
  * Path Parameter Schemas
@@ -122,6 +123,43 @@ export const CommentResponseSchema = z.object({
 });
 
 /**
+ * 관리자 댓글 목록 쿼리 스키마
+ */
+export const AdminCommentListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20),
+  postId: z.coerce.number().int().positive().optional(),
+  authorType: z.enum(["oauth", "guest"]).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
+
+/**
+ * 관리자 댓글 아이템 스키마 (flat, 비밀글 마스킹 없음)
+ */
+export const AdminCommentItemSchema = z.object({
+  id: z.number(),
+  postId: z.number(),
+  parentId: z.number().nullable(),
+  depth: z.number(),
+  body: z.string(),
+  isSecret: z.boolean(),
+  status: z.enum(["active", "deleted", "hidden"]),
+  author: CommentAuthorSchema,
+  replyToName: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+/**
+ * 관리자 댓글 목록 응답 스키마
+ */
+export const AdminCommentListResponseSchema = z.object({
+  data: z.array(AdminCommentItemSchema),
+  meta: PaginationMetaSchema,
+});
+
+/**
  * Type exports
  */
 export type PostIdParam = z.infer<typeof PostIdParamSchema>;
@@ -137,3 +175,5 @@ export type DeleteCommentGuestBody = z.infer<
 >;
 export type CommentAuthor = z.infer<typeof CommentAuthorSchema>;
 export type CommentDetail = CommentDetailSchemaType;
+export type AdminCommentListQuery = z.infer<typeof AdminCommentListQuerySchema>;
+export type AdminCommentItem = z.infer<typeof AdminCommentItemSchema>;

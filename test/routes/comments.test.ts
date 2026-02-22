@@ -351,6 +351,146 @@ describe("Comment Routes", () => {
     });
   });
 
+  // ===== GET /api/admin/comments =====
+
+  describe("GET /api/admin/comments", () => {
+    it("관리자 인증 없이 접근 → 403", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments",
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("전체 댓글 목록 조회 → 페이지네이션 구조 확인", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      // 댓글 2개 작성
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "첫 번째 댓글",
+          guestName: "작성자1",
+          guestEmail: "a@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "두 번째 댓글",
+          guestName: "작성자2",
+          guestEmail: "b@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments",
+        headers: { cookie: adminCookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(2);
+      expect(body.meta.total).toBe(2);
+      expect(body.meta.page).toBe(1);
+    });
+
+    it("postId 필터 적용 → 해당 게시글 댓글만 반환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post1 = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+      const post2 = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post1.id}/comments`,
+        payload: {
+          body: "post1 댓글",
+          guestName: "작성자",
+          guestEmail: "a@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post2.id}/comments`,
+        payload: {
+          body: "post2 댓글",
+          guestName: "작성자",
+          guestEmail: "b@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/admin/comments?postId=${post1.id}`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].body).toBe("post1 댓글");
+    });
+
+    it("비밀 댓글도 원문 반환 (마스킹 없음)", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const user = await seedOAuthUser({ displayName: "Secret Writer" });
+      const userCookie = await injectOAuthUser(user.id);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        headers: { cookie: userCookie },
+        payload: {
+          body: "비밀 내용 원문",
+          isSecret: true,
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments",
+        headers: { cookie: adminCookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data[0].body).toBe("비밀 내용 원문");
+    });
+  });
+
   // ===== DELETE /api/admin/comments/:id =====
 
   describe("DELETE /api/admin/comments/:id", () => {

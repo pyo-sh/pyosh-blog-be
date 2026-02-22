@@ -110,6 +110,39 @@ export const GuestbookEntryResponseSchema = z.object({
 });
 
 /**
+ * 관리자 방명록 목록 쿼리 스키마
+ */
+export const AdminGuestbookListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20),
+  authorType: z.enum(["oauth", "guest"]).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+});
+
+/**
+ * 관리자 방명록 아이템 스키마 (flat, 비밀글 마스킹 없음)
+ */
+export const AdminGuestbookItemSchema = z.object({
+  id: z.number(),
+  parentId: z.number().nullable(),
+  body: z.string(),
+  isSecret: z.boolean(),
+  status: z.enum(["active", "deleted"]),
+  author: CommentAuthorSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+/**
+ * 관리자 방명록 목록 응답 스키마
+ */
+export const AdminGuestbookListResponseSchema = z.object({
+  data: z.array(AdminGuestbookItemSchema),
+  meta: PaginationMetaSchema,
+});
+
+/**
  * Type exports
  */
 export type GuestbookIdParam = z.infer<typeof GuestbookIdParamSchema>;
@@ -124,3 +157,7 @@ export type DeleteGuestbookGuestBody = z.infer<
   typeof DeleteGuestbookGuestBodySchema
 >;
 export type GuestbookEntryDetail = GuestbookEntryDetailSchemaType;
+export type AdminGuestbookListQuery = z.infer<
+  typeof AdminGuestbookListQuerySchema
+>;
+export type AdminGuestbookItem = z.infer<typeof AdminGuestbookItemSchema>;

@@ -1,6 +1,11 @@
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, gte, lte } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
-import type { GuestbookEntryDetail, GuestbookQuery } from "./guestbook.schema";
+import type {
+  GuestbookEntryDetail,
+  GuestbookQuery,
+  AdminGuestbookItem,
+  AdminGuestbookListQuery,
+} from "./guestbook.schema";
 import type { CommentAuthor } from "@src/routes/comments/comment.schema";
 import {
   GuestbookEntry,
@@ -236,6 +241,70 @@ export class GuestbookService {
         deletedAt: new Date(),
       })
       .where(eq(guestbookEntryTable.id, entryId));
+  }
+
+  /**
+   * 관리자용 전체 방명록 목록 조회 (페이지네이션 + 필터)
+   *
+   * @param query 쿼리 파라미터 (page, limit, authorType, startDate, endDate)
+   * @returns 페이지네이션된 방명록 목록 (비밀글 마스킹 없음)
+   */
+  async getAdminGuestbook(
+    query: AdminGuestbookListQuery,
+  ): Promise<PaginatedResponse<AdminGuestbookItem>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const offset = calculateOffset(page, limit);
+
+    const conditions = [];
+    if (query.authorType !== undefined) {
+      conditions.push(eq(guestbookEntryTable.authorType, query.authorType));
+    }
+    if (query.startDate !== undefined) {
+      conditions.push(
+        gte(guestbookEntryTable.createdAt, new Date(query.startDate)),
+      );
+    }
+    if (query.endDate !== undefined) {
+      conditions.push(
+        lte(guestbookEntryTable.createdAt, new Date(query.endDate)),
+      );
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [entries, [{ total }]] = await Promise.all([
+      this.db
+        .select()
+        .from(guestbookEntryTable)
+        .where(where)
+        .orderBy(guestbookEntryTable.createdAt)
+        .limit(limit)
+        .offset(offset),
+
+      this.db
+        .select({ total: sql<number>`COUNT(*)` })
+        .from(guestbookEntryTable)
+        .where(where),
+    ]);
+
+    const items: AdminGuestbookItem[] = await Promise.all(
+      entries.map(async (entry) => {
+        const enriched = await this.enrichEntryWithAuthor(entry);
+        return {
+          id: enriched.id,
+          parentId: enriched.parentId,
+          body: enriched.body,
+          isSecret: enriched.isSecret,
+          status: enriched.status as "active" | "deleted",
+          author: enriched.author,
+          createdAt: enriched.createdAt.toISOString(),
+          updatedAt: enriched.updatedAt.toISOString(),
+        };
+      }),
+    );
+
+    return buildPaginatedResponse(items, total, page, limit);
   }
 
   /**

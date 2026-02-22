@@ -229,6 +229,126 @@ describe("Guestbook Routes", () => {
     });
   });
 
+  // ===== GET /api/admin/guestbook =====
+
+  describe("GET /api/admin/guestbook", () => {
+    it("관리자 인증 없이 접근 → 403", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/guestbook",
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("전체 방명록 목록 조회 → 페이지네이션 구조 확인", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      // 방명록 2개 작성
+      await app.inject({
+        method: "POST",
+        url: "/api/guestbook",
+        payload: {
+          body: "첫 번째 방명록",
+          guestName: "방문자1",
+          guestEmail: "a@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      await app.inject({
+        method: "POST",
+        url: "/api/guestbook",
+        payload: {
+          body: "두 번째 방명록",
+          guestName: "방문자2",
+          guestEmail: "b@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/guestbook",
+        headers: { cookie: adminCookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(2);
+      expect(body.meta.total).toBe(2);
+      expect(body.meta.page).toBe(1);
+    });
+
+    it("authorType 필터 적용 → guest만 반환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const user = await seedOAuthUser({ displayName: "OAuth Visitor" });
+      const userCookie = await injectOAuthUser(user.id);
+
+      // OAuth 방명록
+      await app.inject({
+        method: "POST",
+        url: "/api/guestbook",
+        headers: { cookie: userCookie },
+        payload: { body: "OAuth 방명록" },
+      });
+
+      // Guest 방명록
+      await app.inject({
+        method: "POST",
+        url: "/api/guestbook",
+        payload: {
+          body: "게스트 방명록",
+          guestName: "게스트",
+          guestEmail: "g@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/guestbook?authorType=guest",
+        headers: { cookie: adminCookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].author.type).toBe("guest");
+    });
+
+    it("비밀 방명록도 원문 반환 (마스킹 없음)", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const user = await seedOAuthUser({ displayName: "Secret Writer" });
+      const userCookie = await injectOAuthUser(user.id);
+
+      await app.inject({
+        method: "POST",
+        url: "/api/guestbook",
+        headers: { cookie: userCookie },
+        payload: {
+          body: "비밀 방명록 원문",
+          isSecret: true,
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/guestbook",
+        headers: { cookie: adminCookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data[0].body).toBe("비밀 방명록 원문");
+    });
+  });
+
   // ===== DELETE /api/admin/guestbook/:id =====
 
   describe("DELETE /api/admin/guestbook/:id", () => {

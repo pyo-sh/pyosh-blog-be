@@ -1,6 +1,11 @@
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, gte, lte } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
-import type { CommentDetail, CommentAuthor } from "./comment.schema";
+import type {
+  CommentDetail,
+  CommentAuthor,
+  AdminCommentItem,
+  AdminCommentListQuery,
+} from "./comment.schema";
 import { Comment, commentTable, NewComment } from "@src/db/schema/comments";
 import * as schema from "@src/db/schema/index";
 import { postTable } from "@src/db/schema/posts";
@@ -15,6 +20,11 @@ import {
   SecretItem,
 } from "@src/shared/interaction";
 import { hashPassword } from "@src/shared/password";
+import {
+  buildPaginatedResponse,
+  calculateOffset,
+  PaginatedResponse,
+} from "@src/shared/pagination";
 
 /**
  * 댓글 작성 입력 데이터
@@ -300,6 +310,72 @@ export class CommentService {
       );
 
     return result?.count ?? 0;
+  }
+
+  /**
+   * 관리자용 전체 댓글 목록 조회 (페이지네이션 + 필터)
+   *
+   * @param query 쿼리 파라미터 (page, limit, postId, authorType, startDate, endDate)
+   * @returns 페이지네이션된 댓글 목록 (비밀글 마스킹 없음)
+   */
+  async getAdminComments(
+    query: AdminCommentListQuery,
+  ): Promise<PaginatedResponse<AdminCommentItem>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const offset = calculateOffset(page, limit);
+
+    const conditions = [];
+    if (query.postId !== undefined) {
+      conditions.push(eq(commentTable.postId, query.postId));
+    }
+    if (query.authorType !== undefined) {
+      conditions.push(eq(commentTable.authorType, query.authorType));
+    }
+    if (query.startDate !== undefined) {
+      conditions.push(gte(commentTable.createdAt, new Date(query.startDate)));
+    }
+    if (query.endDate !== undefined) {
+      conditions.push(lte(commentTable.createdAt, new Date(query.endDate)));
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [comments, [{ total }]] = await Promise.all([
+      this.db
+        .select()
+        .from(commentTable)
+        .where(where)
+        .orderBy(commentTable.createdAt)
+        .limit(limit)
+        .offset(offset),
+
+      this.db
+        .select({ total: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(where),
+    ]);
+
+    const items: AdminCommentItem[] = await Promise.all(
+      comments.map(async (comment) => {
+        const enriched = await this.enrichCommentWithAuthor(comment);
+        return {
+          id: enriched.id,
+          postId: enriched.postId,
+          parentId: enriched.parentId,
+          depth: enriched.depth,
+          body: enriched.body,
+          isSecret: enriched.isSecret,
+          status: enriched.status as "active" | "deleted" | "hidden",
+          author: enriched.author,
+          replyToName: enriched.replyToName,
+          createdAt: enriched.createdAt.toISOString(),
+          updatedAt: enriched.updatedAt.toISOString(),
+        };
+      }),
+    );
+
+    return buildPaginatedResponse(items, total, page, limit);
   }
 
   /**
