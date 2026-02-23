@@ -43,5 +43,45 @@
     "name": "♻️CLEANING",
     "color": "#000000",
     "description": "For cleaning / refactoring codes, change names ...etc "
+  },
+  {
+    "name": "priority:0",
+    "color": "#b60205",
+    "description": "Critical - 즉시 처리"
+  },
+  {
+    "name": "priority:1",
+    "color": "#d93f0b",
+    "description": "Urgent - 가능한 빨리"
+  },
+  {
+    "name": "priority:2",
+    "color": "#e99695",
+    "description": "High - 중요"
+  },
+  {
+    "name": "priority:3",
+    "color": "#f9d0c4",
+    "description": "Medium-High"
+  },
+  {
+    "name": "priority:4",
+    "color": "#c2e0c6",
+    "description": "Medium"
+  },
+  {
+    "name": "priority:5",
+    "color": "#bfdadc",
+    "description": "Medium-Low"
+  },
+  {
+    "name": "priority:6",
+    "color": "#c5def5",
+    "description": "Low - 여유있게"
+  },
+  {
+    "name": "priority:7",
+    "color": "#bfd4f2",
+    "description": "Backlog - 나중에"
   }
 ]
