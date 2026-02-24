@@ -47,7 +47,40 @@ import { UserService } from "@src/routes/user/user.service";
 import { TagService } from "@src/routes/tags/tag.service";
 import { FileStorageService } from "@src/services/file-storage.service";
 import { StatsService } from "@src/services/stats.service";
+import { connection } from "@src/db/client";
 import { env } from "@src/shared/env";
+
+type DatabaseHealth = {
+  status: "up" | "down";
+  message?: string;
+};
+
+function getAppVersion(): string {
+  return process.env.APP_VERSION || process.env.npm_package_version || "unknown";
+}
+
+function getMemoryUsage() {
+  const memory = process.memoryUsage();
+
+  return {
+    rss: memory.rss,
+    heapTotal: memory.heapTotal,
+    heapUsed: memory.heapUsed,
+    external: memory.external,
+  };
+}
+
+async function getDatabaseHealth(): Promise<DatabaseHealth> {
+  try {
+    await connection.query("SELECT 1");
+    return { status: "up" };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Database is unavailable";
+
+    return { status: "down", message };
+  }
+}
 
 export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
@@ -117,6 +150,50 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Health check 엔드포인트
   fastify.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
+  });
+
+  fastify.get("/api/health/live", async () => {
+    return {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: getAppVersion(),
+    };
+  });
+
+  fastify.get("/api/health/ready", async (_, reply) => {
+    const database = await getDatabaseHealth();
+    const isReady = database.status === "up";
+
+    if (!isReady) {
+      reply.status(503);
+    }
+
+    return {
+      status: isReady ? "ready" : "not_ready",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: getAppVersion(),
+      database,
+    };
+  });
+
+  fastify.get("/api/health", async (_, reply) => {
+    const database = await getDatabaseHealth();
+    const isHealthy = database.status === "up";
+
+    if (!isHealthy) {
+      reply.status(503);
+    }
+
+    return {
+      status: isHealthy ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: getAppVersion(),
+      memory: getMemoryUsage(),
+      database,
+    };
   });
 
   // 서비스 인스턴스 생성 (수동 DI)
