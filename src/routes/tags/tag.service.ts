@@ -1,20 +1,17 @@
 import { and, asc, desc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
+import { z } from "zod";
 import * as schema from "@src/db/schema/index";
 import { postTagTable } from "@src/db/schema/post-tags";
 import { postTable } from "@src/db/schema/posts";
 import { Tag, tagTable, NewTag } from "@src/db/schema/tags";
 import { generateSlug } from "@src/shared/slug";
+import { TagWithPostCountSchema } from "./tag.schema";
 
 /**
  * Tag Service
  */
-export interface PublicTagWithCount {
-  id: number;
-  name: string;
-  slug: string;
-  postCount: number;
-}
+export type PublicTagWithCount = z.infer<typeof TagWithPostCountSchema>;
 
 export class TagService {
   constructor(private readonly db: MySql2Database<typeof schema>) {}
