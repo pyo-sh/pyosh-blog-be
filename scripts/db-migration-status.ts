@@ -5,7 +5,7 @@ import mysql from "mysql2/promise";
 
 type MigrationSummaryRow = {
   appliedCount: number;
-  lastAppliedAt: number | null;
+  lastAppliedAt: string | number | null;
 };
 
 function loadEnv() {
@@ -79,12 +79,17 @@ async function getAppliedMigrationSummary(conn: mysql.Connection) {
   return rows[0] || { appliedCount: 0, lastAppliedAt: null };
 }
 
-function formatLastApplied(lastAppliedAt: number | null): string {
+function formatLastApplied(lastAppliedAt: string | number | null): string {
   if (!lastAppliedAt) {
     return "none";
   }
 
-  return new Date(lastAppliedAt).toISOString();
+  const timestamp = Number(lastAppliedAt);
+  if (!Number.isFinite(timestamp)) {
+    return "none";
+  }
+
+  return new Date(timestamp).toISOString();
 }
 
 async function main() {

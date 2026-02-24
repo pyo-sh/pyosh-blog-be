@@ -74,11 +74,8 @@ async function getDatabaseHealth(): Promise<DatabaseHealth> {
   try {
     await connection.query("SELECT 1");
     return { status: "up" };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Database is unavailable";
-
-    return { status: "down", message };
+  } catch {
+    return { status: "down", message: "Database is unavailable" };
   }
 }
 
