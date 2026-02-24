@@ -12,7 +12,7 @@ OAuth 사용자 Request Body:
 {
   "body": "string (trim, 1~2000)",
   "parentId": "number (optional)",
-  "isSecret": false
+  "isSecret": "boolean (optional, default: false)"
 }
 ```
 
@@ -22,7 +22,7 @@ OAuth 사용자 Request Body:
 {
   "body": "string (trim, 1~2000)",
   "parentId": "number (optional)",
-  "isSecret": false,
+  "isSecret": "boolean (optional, default: false)",
   "guestName": "string (trim, 1~50)",
   "guestEmail": "string (email, max 100)",
   "guestPassword": "string (4~100)"
@@ -57,23 +57,16 @@ Response `204`: no content
   "parentId": null,
   "body": "...",
   "isSecret": false,
-  "status": "active",
+  "status": "active|deleted",
   "author": {
     "type": "oauth|guest",
-    "id": 1,
+    "id?": 1,
     "name": "...",
-    "email": "...",
-    "avatarUrl": "..."
+    "email?": "...",
+    "avatarUrl?": "..."
   },
   "replies": [GuestbookEntryDetail],
   "createdAt": "ISO",
   "updatedAt": "ISO"
 }
 ```
-
-## Consistency Check
-
-Verified against:
-- `src/routes/guestbook/guestbook.route.ts`
-- `src/routes/guestbook/guestbook.schema.ts`
-- `test/routes/guestbook.test.ts`
