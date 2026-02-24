@@ -61,5 +61,5 @@ pnpm test
 
 ## 워크플로
 
-전역 `CLAUDE.md`의 작업 선택 규칙과 `/dev-workflow` 스킬을 따른다.
+전역 `CLAUDE.md`의 작업 선택 규칙과 `/dev-build` 스킬을 따른다.
 기록은 모두 `docs/server/`에 저장된다.
