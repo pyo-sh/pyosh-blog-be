@@ -71,6 +71,7 @@ describe("Health Routes", () => {
     expect(response.statusCode).toBe(200);
     expect(body.status).toBe("ok");
     expect(typeof body.uptime).toBe("number");
+    expect(typeof body.memory).toBe("object");
     expect(body.database.status).toBe("up");
   });
 

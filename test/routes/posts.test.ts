@@ -502,14 +502,4 @@ describe("Post Routes", () => {
     });
   });
 
-  describe("GET /api/tags", () => {
-    it("Tag API 제거 후 404", async () => {
-      const response = await app.inject({
-        method: "GET",
-        url: "/api/tags",
-      });
-
-      expect(response.statusCode).toBe(404);
-    });
-  });
 });

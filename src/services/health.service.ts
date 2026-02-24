@@ -19,6 +19,17 @@ export function getAppVersion(): string {
   );
 }
 
+export function getMemoryUsage() {
+  const memory = process.memoryUsage();
+
+  return {
+    rss: memory.rss,
+    heapTotal: memory.heapTotal,
+    heapUsed: memory.heapUsed,
+    external: memory.external,
+  };
+}
+
 export async function getDatabaseHealth(
   fastify: FastifyInstance,
 ): Promise<DatabaseHealth> {
