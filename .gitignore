@@ -40,7 +40,6 @@ uploads/
 *.njsproj
 *.sln
 *.sw?
-CLAUDE.md
 
 # AI agent worktrees
 .claude/worktrees/
