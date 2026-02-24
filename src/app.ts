@@ -43,10 +43,16 @@ import {
   createAdminStatsRoute,
 } from "@src/routes/stats/stats.route";
 import { createTagRoute } from "@src/routes/tags/tag.route";
+import { TagService } from "@src/routes/tags/tag.service";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { UserService } from "@src/routes/user/user.service";
-import { TagService } from "@src/routes/tags/tag.service";
 import { FileStorageService } from "@src/services/file-storage.service";
+import {
+  getAppVersion,
+  getDatabaseHealth,
+  getHealthStatus,
+  getMemoryUsage,
+} from "@src/services/health.service";
 import { StatsService } from "@src/services/stats.service";
 import { env } from "@src/shared/env";
 
@@ -118,6 +124,50 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Health check 엔드포인트
   fastify.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
+  });
+
+  fastify.get("/api/health/live", async () => {
+    return {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: getAppVersion(),
+    };
+  });
+
+  fastify.get("/api/health/ready", async (_, reply) => {
+    const database = await getDatabaseHealth(fastify);
+    const health = getHealthStatus("ready", database);
+
+    if (health.httpStatusCode !== 200) {
+      reply.status(health.httpStatusCode);
+    }
+
+    return {
+      status: health.status,
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: getAppVersion(),
+      memory: getMemoryUsage(),
+      database,
+    };
+  });
+
+  fastify.get("/api/health", async (_, reply) => {
+    const database = await getDatabaseHealth(fastify);
+    const health = getHealthStatus("health", database);
+
+    if (health.httpStatusCode !== 200) {
+      reply.status(health.httpStatusCode);
+    }
+
+    return {
+      status: health.status,
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: getAppVersion(),
+      database,
+    };
   });
 
   // 서비스 인스턴스 생성 (수동 DI)
