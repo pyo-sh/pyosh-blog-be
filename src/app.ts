@@ -46,7 +46,11 @@ import { TagService } from "@src/routes/tags/tag.service";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { UserService } from "@src/routes/user/user.service";
 import { FileStorageService } from "@src/services/file-storage.service";
-import { getAppVersion, getDatabaseHealth } from "@src/services/health.service";
+import {
+  getAppVersion,
+  getDatabaseHealth,
+  getHealthStatus,
+} from "@src/services/health.service";
 import { StatsService } from "@src/services/stats.service";
 import { env } from "@src/shared/env";
 
@@ -131,14 +135,14 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   fastify.get("/api/health/ready", async (_, reply) => {
     const database = await getDatabaseHealth(fastify);
-    const isReady = database.status === "up";
+    const health = getHealthStatus("ready", database);
 
-    if (!isReady) {
-      reply.status(503);
+    if (health.httpStatusCode !== 200) {
+      reply.status(health.httpStatusCode);
     }
 
     return {
-      status: isReady ? "ready" : "not_ready",
+      status: health.status,
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       version: getAppVersion(),
@@ -148,14 +152,14 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   fastify.get("/api/health", async (_, reply) => {
     const database = await getDatabaseHealth(fastify);
-    const isHealthy = database.status === "up";
+    const health = getHealthStatus("health", database);
 
-    if (!isHealthy) {
-      reply.status(503);
+    if (health.httpStatusCode !== 200) {
+      reply.status(health.httpStatusCode);
     }
 
     return {
-      status: isHealthy ? "ok" : "degraded",
+      status: health.status,
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       version: getAppVersion(),

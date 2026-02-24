@@ -1,22 +1,9 @@
-import { config } from "dotenv";
 import { z } from "zod";
+import { loadEnvFiles } from "@src/shared/env-loader";
 
 // 환경변수 로드 (서버 시작 시 즉시 실행)
 (function initEnvs() {
-  const NODE_ENV = process.env.NODE_ENV;
-  const ENV_TARGET =
-    NODE_ENV === "production"
-      ? "production"
-      : NODE_ENV === "test"
-        ? "test"
-        : "development";
-
-  config();
-  if (NODE_ENV) {
-    const envPath =
-      NODE_ENV === "test" ? `.env.test` : `.env.${ENV_TARGET}.local`;
-    config({ path: envPath, override: true });
-  }
+  loadEnvFiles();
 })();
 
 // Zod 스키마 정의

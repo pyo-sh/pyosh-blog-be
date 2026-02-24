@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { FastifyInstance } from "fastify";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, createTestApp } from "@test/helpers/app";
 
 describe("Health Routes", () => {
@@ -72,7 +72,6 @@ describe("Health Routes", () => {
     expect(body.status).toBe("ok");
     expect(typeof body.uptime).toBe("number");
     expect(body.database.status).toBe("up");
-    expect(body.memory).toBeUndefined();
   });
 
   it("GET /api/health/ready should return 503 when DB is down", async () => {

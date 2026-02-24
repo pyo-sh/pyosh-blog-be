@@ -6,6 +6,13 @@ export type DatabaseHealth = {
   message?: string;
 };
 
+type HealthRouteKind = "ready" | "health";
+
+type HealthStatus = {
+  httpStatusCode: 200 | 503;
+  status: "ready" | "not_ready" | "ok" | "degraded";
+};
+
 export function getAppVersion(): string {
   return (
     process.env.APP_VERSION || process.env.npm_package_version || "unknown"
@@ -22,4 +29,23 @@ export async function getDatabaseHealth(
   } catch {
     return { status: "down", message: "Database is unavailable" };
   }
+}
+
+export function getHealthStatus(
+  routeKind: HealthRouteKind,
+  database: DatabaseHealth,
+): HealthStatus {
+  const isHealthy = database.status === "up";
+
+  if (routeKind === "ready") {
+    return {
+      httpStatusCode: isHealthy ? 200 : 503,
+      status: isHealthy ? "ready" : "not_ready",
+    };
+  }
+
+  return {
+    httpStatusCode: isHealthy ? 200 : 503,
+    status: isHealthy ? "ok" : "degraded",
+  };
 }

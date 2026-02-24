@@ -33,7 +33,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check migration status
-        run: pnpm db:migrate:status
+        id: migration_status
+        run: |
+          pending_count=$(pnpm db:migrate:status -- --pending-only)
+          echo "pending_count=${pending_count}" >> "$GITHUB_OUTPUT"
+          echo "Pending migrations: ${pending_count}"
         env:
           NODE_ENV: production
           DB_HOST: ${{ secrets.DB_HOST }}
@@ -43,6 +47,7 @@ jobs:
           DB_DTBS: ${{ secrets.DB_DTBS }}
 
       - name: Apply migrations
+        if: steps.migration_status.outputs.pending_count != '0'
         run: pnpm db:migrate
         env:
           NODE_ENV: production

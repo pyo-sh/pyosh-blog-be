@@ -18,7 +18,7 @@ function getLocalMigrationCount(): number {
 }
 
 async function getAppliedMigrationSummary(conn: mysql.Connection) {
-  const [tableRows] = await conn.query<{ exists: number }[]>(
+  const [tableRows] = await conn.query<Array<{ exists: number }>>(
     `
       SELECT COUNT(*) AS exists
       FROM information_schema.tables
@@ -57,6 +57,7 @@ function formatLastApplied(lastAppliedAt: string | number | null): string {
 }
 
 async function main() {
+  const pendingOnly = process.argv.includes("--pending-only");
   loadEnv();
   const dbEnv = requireDbEnv("DB Status");
   const localCount = getLocalMigrationCount();
@@ -66,11 +67,19 @@ async function main() {
     const applied = await getAppliedMigrationSummary(connection);
     const pendingCount = Math.max(localCount - applied.appliedCount, 0);
 
+    if (pendingOnly) {
+      console.log(pendingCount);
+
+      return;
+    }
+
     console.log("[DB Status] Migration summary");
     console.log(`- Local migrations: ${localCount}`);
     console.log(`- Applied migrations: ${applied.appliedCount}`);
     console.log(`- Pending (estimated): ${pendingCount}`);
-    console.log(`- Last applied at: ${formatLastApplied(applied.lastAppliedAt)}`);
+    console.log(
+      `- Last applied at: ${formatLastApplied(applied.lastAppliedAt)}`,
+    );
   } finally {
     await connection.end();
   }

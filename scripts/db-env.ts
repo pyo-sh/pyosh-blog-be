@@ -1,4 +1,4 @@
-import { config } from "dotenv";
+import { loadEnvFiles } from "../src/shared/env-loader";
 
 type DbEnv = {
   host: string;
@@ -9,21 +9,7 @@ type DbEnv = {
 };
 
 export function loadEnv() {
-  config();
-
-  const nodeEnv = process.env.NODE_ENV;
-  const envTarget =
-    nodeEnv === "production"
-      ? "production"
-      : nodeEnv === "test"
-        ? "test"
-        : "development";
-
-  if (nodeEnv) {
-    const envPath =
-      nodeEnv === "test" ? ".env.test" : `.env.${envTarget}.local`;
-    config({ path: envPath, override: true });
-  }
+  loadEnvFiles();
 }
 
 export function requireDbEnv(context: string): DbEnv {
