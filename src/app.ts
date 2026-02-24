@@ -42,6 +42,7 @@ import {
   createStatsRoute,
   createAdminStatsRoute,
 } from "@src/routes/stats/stats.route";
+import { createTagRoute } from "@src/routes/tags/tag.route";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { UserService } from "@src/routes/user/user.service";
 import { TagService } from "@src/routes/tags/tag.service";
@@ -146,6 +147,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
   await fastify.register(createPostRoute(postService), {
     prefix: "/api/posts",
+  });
+  await fastify.register(createTagRoute(tagService), {
+    prefix: "/api/tags",
   });
   await fastify.register(createAdminPostRoute(postService, adminService), {
     prefix: "/api/admin/posts",

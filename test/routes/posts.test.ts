@@ -503,13 +503,84 @@ describe("Post Routes", () => {
   });
 
   describe("GET /api/tags", () => {
-    it("Tag API 제거 후 404", async () => {
+    it("공개 발행 게시글 기준 태그 목록 + postCount 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Post One",
+          contentMd: "# One",
+          categoryId: category.id,
+          status: "published",
+          visibility: "public",
+          tags: ["react", "typescript"],
+        },
+      });
+
+      await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Post Two",
+          contentMd: "# Two",
+          categoryId: category.id,
+          status: "published",
+          visibility: "public",
+          tags: ["react"],
+        },
+      });
+
+      await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Private Post",
+          contentMd: "# Private",
+          categoryId: category.id,
+          status: "published",
+          visibility: "private",
+          tags: ["secret-tag"],
+        },
+      });
+
+      await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Draft Post",
+          contentMd: "# Draft",
+          categoryId: category.id,
+          status: "draft",
+          visibility: "public",
+          tags: ["draft-tag"],
+        },
+      });
+
       const response = await app.inject({
         method: "GET",
         url: "/api/tags",
       });
 
-      expect(response.statusCode).toBe(404);
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.tags).toEqual([
+        { id: expect.any(Number), name: "react", slug: "react", postCount: 2 },
+        {
+          id: expect.any(Number),
+          name: "typescript",
+          slug: "typescript",
+          postCount: 1,
+        },
+      ]);
     });
   });
 });
