@@ -1,13 +1,18 @@
-import { eq, inArray, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
+import { z } from "zod";
 import * as schema from "@src/db/schema/index";
 import { postTagTable } from "@src/db/schema/post-tags";
+import { postTable } from "@src/db/schema/posts";
 import { Tag, tagTable, NewTag } from "@src/db/schema/tags";
 import { generateSlug } from "@src/shared/slug";
+import { TagWithPostCountSchema } from "./tag.schema";
 
 /**
  * Tag Service
  */
+export type PublicTagWithCount = z.infer<typeof TagWithPostCountSchema>;
+
 export class TagService {
   constructor(private readonly db: MySql2Database<typeof schema>) {}
 
@@ -73,6 +78,40 @@ export class TagService {
 
     // 기존 태그만 반환
     return existingTags.map((tag) => tag.id);
+  }
+
+  /**
+   * 공개 태그 목록 조회
+   * - 공개(public) + 발행(published) + 미삭제 게시글 기준 집계
+   * - postCount 내림차순, 이름 오름차순 정렬
+   */
+  async getPublicTagsWithCount(): Promise<PublicTagWithCount[]> {
+    const postCountExpr = sql<number>`COUNT(${postTagTable.postId})`;
+
+    const rows = await this.db
+      .select({
+        id: tagTable.id,
+        name: tagTable.name,
+        slug: tagTable.slug,
+        postCount: postCountExpr,
+      })
+      .from(tagTable)
+      .innerJoin(postTagTable, eq(tagTable.id, postTagTable.tagId))
+      .innerJoin(postTable, eq(postTagTable.postId, postTable.id))
+      .where(
+        and(
+          eq(postTable.status, "published"),
+          eq(postTable.visibility, "public"),
+          isNull(postTable.deletedAt),
+        ),
+      )
+      .groupBy(tagTable.id)
+      .orderBy(desc(postCountExpr), asc(tagTable.name));
+
+    return rows.map((row) => ({
+      ...row,
+      postCount: Number(row.postCount),
+    }));
   }
 
   /**
