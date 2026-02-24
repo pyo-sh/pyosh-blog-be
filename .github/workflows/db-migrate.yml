@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+
 jobs:
   migrate:
     runs-on: ubuntu-latest

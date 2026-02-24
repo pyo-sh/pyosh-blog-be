@@ -42,42 +42,13 @@ import {
   createStatsRoute,
   createAdminStatsRoute,
 } from "@src/routes/stats/stats.route";
+import { TagService } from "@src/routes/tags/tag.service";
 import { createUserRoute } from "@src/routes/user/user.route";
 import { UserService } from "@src/routes/user/user.service";
-import { TagService } from "@src/routes/tags/tag.service";
 import { FileStorageService } from "@src/services/file-storage.service";
+import { getAppVersion, getDatabaseHealth } from "@src/services/health.service";
 import { StatsService } from "@src/services/stats.service";
-import { connection } from "@src/db/client";
 import { env } from "@src/shared/env";
-
-type DatabaseHealth = {
-  status: "up" | "down";
-  message?: string;
-};
-
-function getAppVersion(): string {
-  return process.env.APP_VERSION || process.env.npm_package_version || "unknown";
-}
-
-function getMemoryUsage() {
-  const memory = process.memoryUsage();
-
-  return {
-    rss: memory.rss,
-    heapTotal: memory.heapTotal,
-    heapUsed: memory.heapUsed,
-    external: memory.external,
-  };
-}
-
-async function getDatabaseHealth(): Promise<DatabaseHealth> {
-  try {
-    await connection.query("SELECT 1");
-    return { status: "up" };
-  } catch {
-    return { status: "down", message: "Database is unavailable" };
-  }
-}
 
 export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
@@ -159,7 +130,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   fastify.get("/api/health/ready", async (_, reply) => {
-    const database = await getDatabaseHealth();
+    const database = await getDatabaseHealth(fastify);
     const isReady = database.status === "up";
 
     if (!isReady) {
@@ -176,7 +147,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   fastify.get("/api/health", async (_, reply) => {
-    const database = await getDatabaseHealth();
+    const database = await getDatabaseHealth(fastify);
     const isHealthy = database.status === "up";
 
     if (!isHealthy) {
@@ -188,7 +159,6 @@ export async function buildApp(): Promise<FastifyInstance> {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       version: getAppVersion(),
-      memory: getMemoryUsage(),
       database,
     };
   });

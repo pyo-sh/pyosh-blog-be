@@ -14,8 +14,8 @@
     "test:coverage": "NODE_ENV=test vitest run --coverage",
     "lint": "eslint src",
     "compile:types": "tsc --noEmit",
-    "db:migrate": "NODE_ENV=production ts-node ./scripts/db-migrate.ts",
-    "db:migrate:status": "NODE_ENV=production ts-node ./scripts/db-migration-status.ts"
+    "db:migrate": "ts-node ./scripts/db-migrate.ts",
+    "db:migrate:status": "ts-node ./scripts/db-migration-status.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

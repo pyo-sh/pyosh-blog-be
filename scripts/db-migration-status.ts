@@ -1,48 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import { config } from "dotenv";
 import mysql from "mysql2/promise";
+import { loadEnv, requireDbEnv } from "./db-env";
 
 type MigrationSummaryRow = {
   appliedCount: number;
   lastAppliedAt: string | number | null;
 };
-
-function loadEnv() {
-  config();
-
-  const nodeEnv = process.env.NODE_ENV;
-  const envTarget =
-    nodeEnv === "production"
-      ? "production"
-      : nodeEnv === "test"
-        ? "test"
-        : "development";
-
-  if (nodeEnv) {
-    const envPath =
-      nodeEnv === "test" ? ".env.test" : `.env.${envTarget}.local`;
-    config({ path: envPath, override: true });
-  }
-}
-
-function requireDbEnv() {
-  const { DB_HOST, DB_PORT, DB_USER, DB_PSWD, DB_DTBS } = process.env;
-
-  if (!DB_HOST || !DB_PORT || !DB_USER || !DB_PSWD || !DB_DTBS) {
-    throw new Error(
-      "[DB Status] Missing required DB envs: DB_HOST, DB_PORT, DB_USER, DB_PSWD, DB_DTBS",
-    );
-  }
-
-  return {
-    host: DB_HOST,
-    port: Number(DB_PORT),
-    user: DB_USER,
-    password: DB_PSWD,
-    database: DB_DTBS,
-  };
-}
 
 function getLocalMigrationCount(): number {
   const journalPath = path.resolve(process.cwd(), "drizzle/meta/_journal.json");
@@ -94,7 +58,7 @@ function formatLastApplied(lastAppliedAt: string | number | null): string {
 
 async function main() {
   loadEnv();
-  const dbEnv = requireDbEnv();
+  const dbEnv = requireDbEnv("DB Status");
   const localCount = getLocalMigrationCount();
   const connection = await mysql.createConnection(dbEnv);
 
