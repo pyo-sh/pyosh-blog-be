@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PaginationMetaSchema } from "@src/schemas/common";
 
 /**
  * Asset 응답 스키마
@@ -13,6 +14,13 @@ export const assetResponseSchema = z.object({
 });
 
 /**
+ * Asset 목록 응답 아이템 스키마 (createdAt 포함)
+ */
+export const assetListItemSchema = assetResponseSchema.extend({
+  createdAt: z.string(),
+});
+
+/**
  * Asset 업로드 응답 (단일)
  */
 export const uploadAssetResponseSchema = assetResponseSchema;
@@ -22,6 +30,22 @@ export const uploadAssetResponseSchema = assetResponseSchema;
  */
 export const uploadAssetsResponseSchema = z.object({
   assets: z.array(assetResponseSchema),
+});
+
+/**
+ * Asset 목록 쿼리 스키마
+ */
+export const assetListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+/**
+ * Asset 목록 응답 스키마
+ */
+export const assetListResponseSchema = z.object({
+  data: z.array(assetListItemSchema),
+  meta: PaginationMetaSchema,
 });
 
 /**

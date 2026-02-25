@@ -3,6 +3,8 @@ import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
   assetIdParamSchema,
+  assetListQuerySchema,
+  assetListResponseSchema,
   uploadAssetsResponseSchema,
   assetResponseSchema,
   errorResponseSchema,
@@ -61,6 +63,30 @@ export function createAssetRoute(
         return reply.status(201).send({
           assets,
         });
+      },
+    );
+
+    // GET /api/assets - Asset 목록 조회 (Admin)
+    typedFastify.get(
+      "/",
+      {
+        preHandler: requireAdmin(adminService),
+        schema: {
+          tags: ["assets"],
+          summary: "Get asset list",
+          description:
+            "에셋 목록을 페이지네이션으로 조회합니다. Admin 권한이 필요합니다.",
+          querystring: assetListQuerySchema,
+          response: {
+            200: assetListResponseSchema,
+            403: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const result = await assetService.getAssetList(request.query);
+
+        return reply.status(200).send(result);
       },
     );
 

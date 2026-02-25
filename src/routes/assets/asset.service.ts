@@ -1,10 +1,15 @@
-import { eq } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import type { MultipartFile } from "@fastify/multipart";
 import { assetTable, type Asset } from "@src/db/schema/assets";
 import * as schema from "@src/db/schema/index";
 import { HttpError } from "@src/errors/http-error";
 import { FileStorageService } from "@src/services/file-storage.service";
+import {
+  buildPaginatedResponse,
+  calculateOffset,
+  type PaginatedResponse,
+} from "@src/shared/pagination";
 
 /**
  * 업로드된 Asset 응답
@@ -16,6 +21,21 @@ export interface UploadedAsset {
   sizeBytes: number;
   width?: number;
   height?: number;
+}
+
+/**
+ * Asset 목록 아이템 (createdAt 포함)
+ */
+export interface AssetListItem extends UploadedAsset {
+  createdAt: string;
+}
+
+/**
+ * Asset 목록 조회 쿼리
+ */
+export interface GetAssetListQuery {
+  page?: number;
+  limit?: number;
 }
 
 /**
@@ -102,6 +122,34 @@ export class AssetService {
   }
 
   /**
+   * Asset 목록 조회 (페이지네이션)
+   * @param query 페이지네이션 쿼리
+   * @returns 페이지네이션 응답
+   */
+  async getAssetList(
+    query: GetAssetListQuery,
+  ): Promise<PaginatedResponse<AssetListItem>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const offset = calculateOffset(page, limit);
+
+    const [{ total }] = await this.db
+      .select({ total: sql<number>`COUNT(*)` })
+      .from(assetTable);
+
+    const assets = await this.db
+      .select()
+      .from(assetTable)
+      .orderBy(desc(assetTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const data = assets.map((asset) => this.toAssetListItem(asset));
+
+    return buildPaginatedResponse(data, total, page, limit);
+  }
+
+  /**
    * Asset을 UploadedAsset 형태로 변환
    */
   private toUploadedAsset(asset: Asset): UploadedAsset {
@@ -112,6 +160,16 @@ export class AssetService {
       sizeBytes: asset.sizeBytes,
       width: asset.width ?? undefined,
       height: asset.height ?? undefined,
+    };
+  }
+
+  /**
+   * Asset을 AssetListItem 형태로 변환 (createdAt 포함)
+   */
+  private toAssetListItem(asset: Asset): AssetListItem {
+    return {
+      ...this.toUploadedAsset(asset),
+      createdAt: asset.createdAt.toISOString(),
     };
   }
 }
