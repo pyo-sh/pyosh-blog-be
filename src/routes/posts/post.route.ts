@@ -5,6 +5,7 @@ import {
   PostSlugParamSchema,
   PostIdParamSchema,
   PostListQuerySchema,
+  AdminPostListQuerySchema,
   CreatePostBodySchema,
   UpdatePostBodySchema,
   PostListResponseSchema,
@@ -126,7 +127,7 @@ export function createAdminPostRoute(
           summary: "Get all posts (Admin)",
           description:
             "모든 게시글 목록을 조회합니다. status, visibility, deleted 상태와 무관하게 조회 가능합니다.",
-          querystring: PostListQuerySchema,
+          querystring: AdminPostListQuerySchema,
           response: {
             200: PostListResponseSchema,
           },
