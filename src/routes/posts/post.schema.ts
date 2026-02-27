@@ -53,6 +53,19 @@ export const PostListQuerySchema = z.object({
   includeDeleted: z.coerce.boolean().optional().default(false),
 });
 
+export const AdminPostListQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20),
+  categoryId: z.coerce.number().int().positive().optional(),
+  tagSlug: z.string().min(1).optional(),
+  q: z.string().min(1).max(200).optional(),
+  status: z.enum(["draft", "published", "archived"]).optional(),
+  visibility: z.enum(["public", "private"]).optional(),
+  sort: z.enum(["published_at", "created_at"]).optional().default("created_at"),
+  order: z.enum(["asc", "desc"]).optional().default("desc"),
+  includeDeleted: z.coerce.boolean().optional().default(false),
+});
+
 /**
  * Request Body Schemas
  */
@@ -139,5 +152,6 @@ export const PostDetailWithNavigationResponseSchema = z.object({
 export type PostSlugParam = z.infer<typeof PostSlugParamSchema>;
 export type PostIdParam = z.infer<typeof PostIdParamSchema>;
 export type PostListQuery = z.infer<typeof PostListQuerySchema>;
+export type AdminPostListQuery = z.infer<typeof AdminPostListQuerySchema>;
 export type CreatePostBody = z.infer<typeof CreatePostBodySchema>;
 export type UpdatePostBody = z.infer<typeof UpdatePostBodySchema>;
