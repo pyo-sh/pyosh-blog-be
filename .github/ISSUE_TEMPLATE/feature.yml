@@ -71,6 +71,18 @@ body:
         - [ ] 코드 리뷰 완료
     validations:
       required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: 이 작업 전에 먼저 완료되어야 하는 선행 Issue를 작성해 주세요. 없으면 "없음"으로 작성합니다.
+      placeholder: |
+        - #123 (설명)
+        - #456 (설명)
+
+        선행 작업이 없으면: 없음
+    validations:
+      required: true
   - type: dropdown
     id: priority
     attributes:

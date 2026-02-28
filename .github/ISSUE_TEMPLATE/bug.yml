@@ -69,6 +69,18 @@ body:
       placeholder: |
         - [ ] 재현 시나리오에서 문제 미발생
         - [ ] 관련 테스트 추가 및 통과
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: 이 작업 전에 먼저 완료되어야 하는 선행 Issue를 작성해 주세요. 없으면 "없음"으로 작성합니다.
+      placeholder: |
+        - #123 (설명)
+        - #456 (설명)
+
+        선행 작업이 없으면: 없음
+    validations:
+      required: true
   - type: dropdown
     id: priority
     attributes:
