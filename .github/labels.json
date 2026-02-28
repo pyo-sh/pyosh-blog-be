@@ -1,72 +1,72 @@
 [
   {
-    "name": "🐛BUG",
+    "name": "bug",
     "color": "#F66570",
-    "description": "Something isn't working / went wrong"
+    "description": "Something isn't working or went wrong"
   },
   {
-    "name": "📚DOCS",
+    "name": "docs",
     "color": "#0075CA",
-    "description": "This is for recording documentations"
+    "description": "Documentation changes or additions"
   },
   {
-    "name": "✔️DUPLICATE",
+    "name": "duplicate",
     "color": "#CFD3D7",
-    "description": "This content already exists"
+    "description": "This issue or pull request already exists"
   },
   {
-    "name": "✨FEAT",
+    "name": "feat",
     "color": "#A2EEEF",
-    "description": "New feature in development / service"
+    "description": "New feature request or implementation"
   },
   {
-    "name": "⭕️FIXED",
+    "name": "fixed",
     "color": "#FFFFFF",
-    "description": "This problem solved"
+    "description": "This issue has been resolved"
   },
   {
-    "name": "🙋‍♂️HEY",
+    "name": "attention",
     "color": "#008672",
-    "description": "Extra attention is needed!!"
+    "description": "Needs extra attention or discussion"
   },
   {
-    "name": "🙋ASK",
+    "name": "question",
     "color": "#D876E3",
     "description": "Further information is requested"
   },
   {
-    "name": "✅TEST",
+    "name": "test",
     "color": "#0C6267",
-    "description": "Only for development test"
+    "description": "Testing only, not for production"
   },
   {
-    "name": "♻️CLEANING",
+    "name": "refactor",
     "color": "#000000",
-    "description": "For cleaning / refactoring codes, change names ...etc "
+    "description": "Code cleanup, refactoring, or renaming"
   },
   {
     "name": "priority:0",
     "color": "#b60205",
-    "description": "Critical — 즉시 대응"
+    "description": "Critical — Immediate response required"
   },
   {
     "name": "priority:1",
     "color": "#d93f0b",
-    "description": "High — 가능한 빨리"
+    "description": "High — Address as soon as possible"
   },
   {
     "name": "priority:2",
     "color": "#c2e0c6",
-    "description": "Medium — 일반"
+    "description": "Medium — Normal priority"
   },
   {
     "name": "priority:3",
     "color": "#c5def5",
-    "description": "Low — 여유"
+    "description": "Low — No rush"
   },
   {
     "name": "priority:4",
     "color": "#bfd4f2",
-    "description": "Backlog — 나중에"
+    "description": "Backlog — Someday maybe"
   }
 ]

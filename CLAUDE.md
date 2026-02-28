@@ -52,4 +52,4 @@ type NewPost = typeof posts.$inferInsert;
 
 ## Workflow
 
-`/dev-pipeline`이 전체 사이클을 관리. Records go in `docs/server/`.
+`/dev-pipeline` manages the full cycle. Records go in `docs/server/`.
