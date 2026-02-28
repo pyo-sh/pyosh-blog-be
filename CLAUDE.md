@@ -52,4 +52,4 @@ type NewPost = typeof posts.$inferInsert;
 
 ## Workflow
 
-Follow root `CLAUDE.md` task rules. Records go in `docs/server/`.
+`/dev-pipeline`이 전체 사이클을 관리. Records go in `docs/server/`.
