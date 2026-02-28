@@ -4,12 +4,12 @@ import {
   serializerCompiler,
   validatorCompiler,
 } from "fastify-type-provider-zod";
-import { NodeEnv } from "@src/constants/node-env";
 import { HttpError } from "@src/errors/http-error";
 import corsPlugin from "@src/plugins/cors";
 import csrfPlugin from "@src/plugins/csrf";
 import drizzlePlugin from "@src/plugins/drizzle";
 import helmetPlugin from "@src/plugins/helmet";
+import loggerPlugin, { buildLoggerOptions } from "@src/plugins/logger";
 import multipartPlugin from "@src/plugins/multipart";
 import passportPlugin from "@src/plugins/passport";
 import rateLimitPlugin from "@src/plugins/rate-limit";
@@ -54,31 +54,19 @@ import {
   getMemoryUsage,
 } from "@src/services/health.service";
 import { StatsService } from "@src/services/stats.service";
-import { env } from "@src/shared/env";
 
 export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
   const fastify = Fastify({
-    logger: {
-      level: env.NODE_ENV === NodeEnv.DEV ? "info" : "warn",
-      transport:
-        env.NODE_ENV === NodeEnv.DEV
-          ? {
-              target: "pino-pretty",
-              options: {
-                translateTime: "HH:MM:ss Z",
-                ignore: "pid,hostname",
-              },
-            }
-          : undefined,
-    },
+    logger: buildLoggerOptions(),
   }).withTypeProvider<ZodTypeProvider>();
 
   // Zod validator & serializer 설정
   fastify.setValidatorCompiler(validatorCompiler);
   fastify.setSerializerCompiler(serializerCompiler);
 
-  // 플러그인 등록 (순서 중요: helmet → rate-limit → drizzle → session → csrf → passport → multipart → static → swagger → cors)
+  // 플러그인 등록 (순서 중요: logger → helmet → rate-limit → drizzle → session → csrf → passport → multipart → static → swagger → cors)
+  await fastify.register(loggerPlugin);
   await fastify.register(helmetPlugin);
   await fastify.register(rateLimitPlugin);
   await fastify.register(drizzlePlugin);
@@ -91,7 +79,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(corsPlugin);
 
   // 에러 핸들러 등록
-  fastify.setErrorHandler((error, _request, reply) => {
+  fastify.setErrorHandler((error, request, reply) => {
     if (error instanceof HttpError) {
       return reply.status(error.statusCode).send({
         statusCode: error.statusCode,
@@ -111,8 +99,18 @@ export async function buildApp(): Promise<FastifyInstance> {
       });
     }
 
-    // 기타 에러
-    fastify.log.error(error);
+    // 기타 에러: 스택 트레이스 + 요청 컨텍스트 로깅 (pino serializes Error via err key)
+    request.log.error(
+      {
+        err: error,
+        method: request.method,
+        url: request.routeOptions.url,
+        ip: request.ip,
+        userId: (request.session as { user?: { id?: unknown } } | undefined)
+          ?.user?.id,
+      },
+      "Unhandled server error",
+    );
 
     return reply.status(500).send({
       statusCode: 500,

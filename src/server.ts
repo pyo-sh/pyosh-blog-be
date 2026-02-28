@@ -8,19 +8,28 @@ async function start() {
 
     await app.ready();
 
+    // 프로세스 예외 처리 (uncaughtException / unhandledRejection)
+    process.on("uncaughtException", (error) => {
+      app.log.error({ err: error }, "Uncaught exception — shutting down");
+      app.close().finally(() => process.exit(1));
+    });
+
+    process.on("unhandledRejection", (reason) => {
+      app.log.error({ err: reason }, "Unhandled promise rejection — shutting down");
+      app.close().finally(() => process.exit(1));
+    });
+
     const signals = ["SIGINT", "SIGTERM"] as const;
     signals.forEach((signal) => {
       process.on(signal, async () => {
-        console.log(
-          `\n[Server] Received ${signal}, shutting down gracefully...`,
-        );
+        app.log.info(`Received ${signal}, shutting down gracefully`);
         await app.close();
         process.exit(0);
       });
     });
 
     process.once("SIGUSR2", async () => {
-      console.log(`\n[Server] Received SIGUSR2, shutting down gracefully...`);
+      app.log.info("Received SIGUSR2, shutting down gracefully");
       await app.close();
       process.kill(process.pid, "SIGUSR2");
     });
