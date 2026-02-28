@@ -15,7 +15,7 @@ async function start() {
     });
 
     process.on("unhandledRejection", (reason) => {
-      app.log.error({ reason }, "Unhandled promise rejection — shutting down");
+      app.log.error({ err: reason }, "Unhandled promise rejection — shutting down");
       app.close().finally(() => process.exit(1));
     });
 

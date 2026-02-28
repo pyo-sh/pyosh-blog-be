@@ -104,7 +104,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       {
         err: error,
         method: request.method,
-        url: request.url,
+        url: request.routeOptions.url,
         ip: request.ip,
         userId: (request.session as { user?: { id?: unknown } } | undefined)
           ?.user?.id,
