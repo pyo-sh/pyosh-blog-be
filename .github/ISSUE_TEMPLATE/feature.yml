@@ -1,0 +1,87 @@
+name: Feature Request
+description: 신규 기능을 요청합니다
+labels: ["feat"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: 기능이 구현될 영역을 선택하세요
+      options:
+        - client
+        - server
+        - workspace
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: 무엇을 만들 것인가? 한 줄로 요약해 주세요.
+      placeholder: "예: 블로그 포스트 검색 기능"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: 왜 이 기능이 필요한가? 배경, 동기, 사용자 시나리오를 설명해 주세요.
+      placeholder: |
+        - 배경: ...
+        - 사용자 시나리오: ...
+        - 기대 효과: ...
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Requirements
+      description: 기능 명세를 작성해 주세요. UI/UX, API 등 해당하는 항목만 포함합니다.
+      placeholder: |
+        기능:
+        - ...
+
+        UI/UX: (해당 시)
+        - ...
+
+        API: (해당 시)
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: 관련된 파일, 모듈, 경로를 알고 있다면 적어 주세요.
+      placeholder: |
+        - 파일: src/...
+        - 모듈: ...
+  - type: textarea
+    id: tech
+    attributes:
+      label: Tech Stack
+      description: 추가 라이브러리가 필요한 경우 작성해 주세요.
+      placeholder: "예: react-markdown, zod 등"
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of Done
+      description: 체크리스트 형태로 완료 조건을 작성해 주세요.
+      placeholder: |
+        - [ ] 기능 동작 확인
+        - [ ] 관련 테스트 추가 및 통과
+        - [ ] 코드 리뷰 완료
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: 작업의 중요도를 선택하세요
+      options:
+        - "priority:0 — Critical (즉시 대응)"
+        - "priority:1 — High (가능한 빨리)"
+        - "priority:2 — Medium (일반)"
+        - "priority:3 — Low (여유)"
+        - "priority:4 — Backlog (나중에)"
+      default: 2
+    validations:
+      required: true

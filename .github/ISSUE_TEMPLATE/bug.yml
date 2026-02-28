@@ -1,0 +1,85 @@
+name: Bug Report
+description: 버그를 보고합니다
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: 버그가 발생한 영역을 선택하세요
+      options:
+        - client
+        - server
+        - workspace
+    validations:
+      required: true
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Symptom
+      description: 어떤 문제가 발생하는가? 재현 조건을 포함해 주세요.
+      placeholder: |
+        버그 설명:
+        - 증상: ...
+        - 재현 방법: ...
+        - 예상 결과: ...
+        - 실제 결과: ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots
+      description: 에러 메시지, 스택 트레이스, 스크린샷 등을 첨부해 주세요.
+      render: shell
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: 문제가 발생한 환경을 설명해 주세요.
+      placeholder: |
+        - Node.js: ...
+        - Browser: ...
+        - OS: ...
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: 관련된 파일, 모듈, 경로를 알고 있다면 적어 주세요.
+      placeholder: |
+        - 파일: src/...
+        - 모듈: ...
+  - type: textarea
+    id: cause
+    attributes:
+      label: Cause
+      description: 기술적 원인을 설명해 주세요. (파악된 경우)
+      placeholder: "예: API 응답 파싱 중 null 체크 누락"
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution
+      description: 계획된 수정 방법을 설명해 주세요.
+      placeholder: "예: Optional chaining 적용하여 null 안전성 확보"
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of Done
+      description: 버그가 해결되었음을 확인할 수 있는 조건을 작성해 주세요.
+      placeholder: |
+        - [ ] 재현 시나리오에서 문제 미발생
+        - [ ] 관련 테스트 추가 및 통과
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: 버그의 심각도를 선택하세요
+      options:
+        - "priority:0 — Critical (즉시 대응)"
+        - "priority:1 — High (가능한 빨리)"
+        - "priority:2 — Medium (일반)"
+        - "priority:3 — Low (여유)"
+        - "priority:4 — Backlog (나중에)"
+      default: 2
+    validations:
+      required: true
