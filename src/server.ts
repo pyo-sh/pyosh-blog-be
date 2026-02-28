@@ -11,12 +11,12 @@ async function start() {
     // 프로세스 예외 처리 (uncaughtException / unhandledRejection)
     process.on("uncaughtException", (error) => {
       app.log.error({ err: error }, "Uncaught exception — shutting down");
-      app.close().then(() => process.exit(1));
+      app.close().finally(() => process.exit(1));
     });
 
     process.on("unhandledRejection", (reason) => {
       app.log.error({ reason }, "Unhandled promise rejection — shutting down");
-      app.close().then(() => process.exit(1));
+      app.close().finally(() => process.exit(1));
     });
 
     const signals = ["SIGINT", "SIGTERM"] as const;

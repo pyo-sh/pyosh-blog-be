@@ -7,14 +7,14 @@ import { env } from "@src/shared/env";
  * 환경별 로그 레벨
  * - development: debug (모든 로그 출력)
  * - production: info (운영 필요 정보만)
- * - test: silent (테스트 중 로그 비활성화)
+ * - test: warn (테스트 중 경고/오류만 출력)
  */
 export function getLogLevel(): string {
   switch (env.NODE_ENV) {
     case NodeEnv.PROD:
       return "info";
     case NodeEnv.TEST:
-      return "silent";
+      return "warn";
     default:
       return "debug";
   }
@@ -56,23 +56,8 @@ export function buildLoggerOptions() {
   };
 }
 
-async function loggerPlugin(fastify: FastifyInstance) {
-  // 에러 응답에 대한 컨텍스트 추가 로그
-  fastify.addHook("onSend", async (request, reply) => {
-    if (reply.statusCode >= 500) {
-      request.log.error(
-        {
-          method: request.method,
-          url: request.url,
-          statusCode: reply.statusCode,
-          ip: request.ip,
-          userId: (request.session as { user?: { id?: unknown } } | undefined)
-            ?.user?.id,
-        },
-        "Server error response",
-      );
-    }
-  });
+async function loggerPlugin(_fastify: FastifyInstance) {
+  // 5xx 로그는 app.ts 에러 핸들러에서 err 객체와 함께 기록하므로 여기서 중복 로깅하지 않음
 }
 
 export default fp(loggerPlugin, {
