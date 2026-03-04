@@ -40,6 +40,11 @@
     "description": "Testing only, not for production"
   },
   {
+    "name": "chore",
+    "color": "#795548",
+    "description": "Build, config, or maintenance tasks"
+  },
+  {
     "name": "refactor",
     "color": "#000000",
     "description": "Code cleanup, refactoring, or renaming"
