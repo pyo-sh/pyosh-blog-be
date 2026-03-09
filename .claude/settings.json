@@ -43,18 +43,5 @@
       "Edit(./secrets/**)",
       "Edit(**/secrets/**)"
     ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate-bash.py\""
-          }
-        ]
-      }
-    ]
   }
 }
