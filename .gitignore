@@ -41,5 +41,9 @@ uploads/
 *.sln
 *.sw?
 
+# Claude Code local overrides
+CLAUDE.local.md
+.claude/settings.local.json
+
 # AI agent worktrees
 .claude/worktrees/

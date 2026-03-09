@@ -1,55 +1,43 @@
-# Server — Fastify API
+# Server - Fastify API
 
-Blog API server with Fastify + Drizzle ORM + MySQL.
+Shared Claude Code instructions for the backend repository.
 
-## Tech Stack
+Personal preferences belong in `CLAUDE.local.md` or `.claude/settings.local.json`, not in this file.
 
-Fastify 5.7 / Drizzle ORM 0.45 / MySQL2 3.16 / Zod 3.25 / Vitest 2.1
+## Purpose
+
+Blog API server with Fastify, Drizzle ORM, and MySQL.
+
+## Tech stack
+
+Fastify 5.7
+Drizzle ORM 0.45
+MySQL2 3.16
+Zod 3.25
+Vitest 2.1
 
 ## Commands
 
 ```bash
-pnpm dev          # http://localhost:5500
-pnpm test         # Vitest
+pnpm dev
+pnpm test
 ```
 
-## Directory Structure
+## Architecture notes
 
-```
-src/
-├── app.ts                 # buildApp() entry point
-├── db/schema/             # Drizzle schema (12 tables)
-├── db/relations/          # Drizzle relations
-├── routes/                # API routes (auth, posts, categories, tags, comments, guestbook, stats, seo, assets, user)
-├── services/              # Business logic (file-storage, health, stats)
-├── schemas/               # Zod common schemas
-├── plugins/               # Fastify plugins (cors, csrf, drizzle, helmet, passport, rate-limit, session, static, swagger, multipart)
-├── hooks/                 # auth.hook.ts — requireAuth, optionalAuth
-├── errors/                # HttpError static methods
-├── shared/                # Shared utilities
-└── types/                 # Type definitions
-```
+- `src/app.ts` is the `buildApp()` entry point.
+- Routes live in `src/routes/`.
+- Business logic lives in `src/services/`.
+- Shared schemas live in `src/schemas/`.
+- Plugins live in `src/plugins/`.
+- Shared backend coding rules live in `.claude/rules/`.
 
-## Coding Patterns
+## Context sources
 
-```typescript
-// Error responses
-throw HttpError.notFound('Post not found');
-throw HttpError.unauthorized();
-
-// Drizzle types
-type Post = typeof posts.$inferSelect;
-type NewPost = typeof posts.$inferInsert;
-
-// Auth hook usage
-{ preHandler: [requireAuth] }   // login required
-{ preHandler: [optionalAuth] }  // login optional
-```
-
-## Auth
-
-@fastify/passport (Google/GitHub OAuth) + custom Drizzle Session Store.
+- Before changing behavior, architecture, or conventions, read `../docs/server/progress.index.md`, `../docs/server/findings.index.md`, and `../docs/server/decisions.index.md`.
+- For workspace mappings and shell helpers, read `../.agents/references/monorepo-layout.md`.
 
 ## Workflow
 
-`/dev-pipeline` manages the full cycle. Records go in `docs/server/`.
+- `/dev-pipeline` manages the full cycle for issue-driven work.
+- Records go in `../docs/server/`.
