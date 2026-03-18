@@ -23,5 +23,9 @@ if (!password) {
   process.exit(1);
 }
 
-const hash = await argon2.hash(password, ARGON2_OPTIONS);
-console.log(hash);
+async function main() {
+  const hash = await argon2.hash(password, ARGON2_OPTIONS);
+  console.log(hash);
+}
+
+main();
