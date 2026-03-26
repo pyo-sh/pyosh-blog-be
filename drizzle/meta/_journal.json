@@ -43,6 +43,13 @@
       "when": 1772006500000,
       "tag": "0005_post_nullable_category",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1772973600000,
+      "tag": "0006_stats_post_id_not_null",
+      "breakpoints": true
     }
   ]
 }

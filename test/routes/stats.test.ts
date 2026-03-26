@@ -230,7 +230,7 @@ describe("Stats Routes", () => {
       expect(response.json()).toEqual({ totalPageviews: 0 });
     });
 
-    it("postId IS NULL 행의 pageviews 합산 반환", async () => {
+    it("postId=0 센티넬 행의 pageviews 합산 반환", async () => {
       const today = new Date();
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
