@@ -90,7 +90,7 @@ function validateEnv(): Env {
   }
 }
 
-export const env = validateEnv();
+export const env = Object.freeze(validateEnv());
 
 // 기존 코드와의 호환성을 위한 별칭 export
 export default env;
