@@ -648,7 +648,7 @@ describe("Comment Routes", () => {
       expect(oauthBody.data[0].author.type).toBe("oauth");
     });
 
-    it("order 파라미터 → asc/desc 응답 정상 반환", async () => {
+    it("order 파라미터 → asc/desc 정렬 순서 확인", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
 
@@ -658,8 +658,10 @@ describe("Comment Routes", () => {
         visibility: "public",
       });
 
+      // 1초 간격으로 댓글 생성해서 distinct created_at 보장 (TIMESTAMP precision = 1s)
+      const createdIds: number[] = [];
       for (let i = 1; i <= 3; i++) {
-        await app.inject({
+        const r = await app.inject({
           method: "POST",
           url: `/api/posts/${post.id}/comments`,
           payload: {
@@ -669,6 +671,8 @@ describe("Comment Routes", () => {
             guestPassword: "pass1234",
           },
         });
+        createdIds.push(r.json().data.id);
+        if (i < 3) await new Promise((resolve) => setTimeout(resolve, 1100));
       }
 
       const descResponse = await app.inject({
@@ -683,10 +687,17 @@ describe("Comment Routes", () => {
       });
 
       expect(descResponse.statusCode).toBe(200);
-      expect(descResponse.json().data).toHaveLength(3);
-
       expect(ascResponse.statusCode).toBe(200);
-      expect(ascResponse.json().data).toHaveLength(3);
+
+      const descData = descResponse.json().data;
+      const ascData = ascResponse.json().data;
+
+      expect(descData).toHaveLength(3);
+      expect(ascData).toHaveLength(3);
+
+      // desc의 첫 번째 = asc의 마지막, asc의 첫 번째 = desc의 마지막
+      expect(descData[0].id).toBe(ascData[ascData.length - 1].id);
+      expect(ascData[0].id).toBe(descData[descData.length - 1].id);
     });
   });
 
