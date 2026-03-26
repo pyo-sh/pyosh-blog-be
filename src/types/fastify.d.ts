@@ -10,8 +10,9 @@ declare module "fastify" {
     admin?: AdminResponse;
 
     /**
-     * OAuth 로그인 사용자 정보 (Passport에서 설정)
+     * OAuth 로그인 사용자 정보 (Passport에서 설정).
+     * optionalAuth 훅 통과 후 미인증 시 null로 설정됨.
      */
-    user?: OAuthAccount;
+    user?: OAuthAccount | null;
   }
 }

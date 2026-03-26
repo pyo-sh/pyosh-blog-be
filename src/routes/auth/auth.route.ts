@@ -22,39 +22,43 @@ export function createAuthRoute(
   const authRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // ===== OAuth Routes =====
+    // ===== OAuth Routes (registered only when credentials are configured) =====
 
     // Google OAuth
-    fastify.get(
-      "/google",
-      fastifyPassport.authenticate("google", {
-        scope: ["email", "profile"],
-      }),
-    );
+    if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
+      fastify.get(
+        "/google",
+        fastifyPassport.authenticate("google", {
+          scope: ["email", "profile"],
+        }),
+      );
 
-    fastify.get(
-      "/google/callback",
-      fastifyPassport.authenticate("google", {
-        successRedirect: new URL(env.LOGIN_SUCCESS_PATH, env.CLIENT_URL).href,
-        failureRedirect: new URL(env.LOGIN_FAILURE_PATH, env.CLIENT_URL).href,
-      }),
-    );
+      fastify.get(
+        "/google/callback",
+        fastifyPassport.authenticate("google", {
+          successRedirect: new URL(env.LOGIN_SUCCESS_PATH, env.CLIENT_URL).href,
+          failureRedirect: new URL(env.LOGIN_FAILURE_PATH, env.CLIENT_URL).href,
+        }),
+      );
+    }
 
     // GitHub OAuth
-    fastify.get(
-      "/github",
-      fastifyPassport.authenticate("github", {
-        scope: ["user:email"],
-      }),
-    );
+    if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
+      fastify.get(
+        "/github",
+        fastifyPassport.authenticate("github", {
+          scope: ["user:email"],
+        }),
+      );
 
-    fastify.get(
-      "/github/callback",
-      fastifyPassport.authenticate("github", {
-        successRedirect: new URL(env.LOGIN_SUCCESS_PATH, env.CLIENT_URL).href,
-        failureRedirect: new URL(env.LOGIN_FAILURE_PATH, env.CLIENT_URL).href,
-      }),
-    );
+      fastify.get(
+        "/github/callback",
+        fastifyPassport.authenticate("github", {
+          successRedirect: new URL(env.LOGIN_SUCCESS_PATH, env.CLIENT_URL).href,
+          failureRedirect: new URL(env.LOGIN_FAILURE_PATH, env.CLIENT_URL).href,
+        }),
+      );
+    }
 
     // ===== Admin Auth Routes =====
 
