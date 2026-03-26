@@ -286,14 +286,7 @@ export class CommentService {
     const replies = await this.db
       .select()
       .from(commentTable)
-      .where(
-        and(
-          eq(commentTable.postId, postId),
-          eq(commentTable.status, "active"),
-          isNull(commentTable.deletedAt),
-          inArray(commentTable.parentId, rootIds),
-        ),
-      )
+      .where(and(activeCondition, inArray(commentTable.parentId, rootIds)))
       .orderBy(asc(commentTable.createdAt));
 
     // 4. 작성자 정보 보강

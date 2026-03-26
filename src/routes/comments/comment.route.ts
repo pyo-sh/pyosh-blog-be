@@ -274,7 +274,7 @@ export function createAdminCommentRoute(
     );
 
     // DELETE /api/admin/comments/bulk - 벌크 삭제/복원
-    // NOTE: must be registered BEFORE /:id to avoid route conflict
+    // Static path '/bulk' takes priority over '/:id' in find-my-way; ordering is for readability only.
     typedFastify.delete(
       "/comments/bulk",
       {

@@ -656,6 +656,56 @@ describe("Comment Routes", () => {
       expect(body.replies).toHaveLength(2);
     });
 
+    it("답글 ID로 스레드 조회 → 루트 부모로 정규화", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      // 루트 댓글
+      const rootResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "루트 댓글",
+          guestName: "부모",
+          guestEmail: "parent@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const rootComment = rootResponse.json().data;
+
+      // 답글
+      const replyResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "답글",
+          parentId: rootComment.id,
+          guestName: "자식",
+          guestEmail: "child@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const replyComment = replyResponse.json().data;
+
+      // 답글 ID로 스레드 조회 → parent.id는 루트 ID
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/admin/comments/${replyComment.id}/thread`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.parent.id).toBe(rootComment.id);
+      expect(body.replies).toHaveLength(1);
+    });
+
     it("존재하지 않는 댓글 ID → 404", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);

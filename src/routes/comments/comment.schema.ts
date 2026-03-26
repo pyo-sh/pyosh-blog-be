@@ -209,7 +209,7 @@ export const AdminCommentRestoreResponseSchema = z.object({
  * 관리자 벌크 삭제/복원 요청 바디 스키마
  */
 export const AdminCommentBulkBodySchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1),
+  ids: z.array(z.number().int().positive()).min(1).max(100),
   action: z.enum(["restore", "soft_delete", "hard_delete"]),
 });
 
