@@ -53,6 +53,7 @@ export function createPostRoute(postService: PostService): FastifyPluginAsync {
         const data = result.data.map((post) => ({
           ...post,
           publishedAt: post.publishedAt?.toISOString() ?? null,
+          contentModifiedAt: post.contentModifiedAt?.toISOString() ?? null,
           createdAt: post.createdAt.toISOString(),
           updatedAt: post.updatedAt.toISOString(),
           deletedAt: post.deletedAt?.toISOString() ?? null,
@@ -89,6 +90,8 @@ export function createPostRoute(postService: PostService): FastifyPluginAsync {
           post: {
             ...result.post,
             publishedAt: result.post.publishedAt?.toISOString() ?? null,
+            contentModifiedAt:
+              result.post.contentModifiedAt?.toISOString() ?? null,
             createdAt: result.post.createdAt.toISOString(),
             updatedAt: result.post.updatedAt.toISOString(),
             deletedAt: result.post.deletedAt?.toISOString() ?? null,
@@ -142,6 +145,7 @@ export function createAdminPostRoute(
         const data = result.data.map((post) => ({
           ...post,
           publishedAt: post.publishedAt?.toISOString() ?? null,
+          contentModifiedAt: post.contentModifiedAt?.toISOString() ?? null,
           createdAt: post.createdAt.toISOString(),
           updatedAt: post.updatedAt.toISOString(),
           deletedAt: post.deletedAt?.toISOString() ?? null,
@@ -179,6 +183,7 @@ export function createAdminPostRoute(
           post: {
             ...post,
             publishedAt: post.publishedAt?.toISOString() ?? null,
+            contentModifiedAt: post.contentModifiedAt?.toISOString() ?? null,
             createdAt: post.createdAt.toISOString(),
             updatedAt: post.updatedAt.toISOString(),
             deletedAt: post.deletedAt?.toISOString() ?? null,
@@ -211,9 +216,13 @@ export function createAdminPostRoute(
           title: body.title,
           contentMd: body.contentMd,
           categoryId: body.categoryId,
+          summary: body.summary,
+          description: body.description,
           thumbnailUrl: body.thumbnailUrl,
           visibility: body.visibility,
           status: body.status,
+          commentStatus: body.commentStatus,
+          isPinned: body.isPinned,
           tags: body.tags,
           publishedAt: body.publishedAt
             ? new Date(body.publishedAt)
@@ -224,6 +233,7 @@ export function createAdminPostRoute(
           post: {
             ...post,
             publishedAt: post.publishedAt?.toISOString() ?? null,
+            contentModifiedAt: post.contentModifiedAt?.toISOString() ?? null,
             createdAt: post.createdAt.toISOString(),
             updatedAt: post.updatedAt.toISOString(),
             deletedAt: post.deletedAt?.toISOString() ?? null,
@@ -267,6 +277,7 @@ export function createAdminPostRoute(
           post: {
             ...post,
             publishedAt: post.publishedAt?.toISOString() ?? null,
+            contentModifiedAt: post.contentModifiedAt?.toISOString() ?? null,
             createdAt: post.createdAt.toISOString(),
             updatedAt: post.updatedAt.toISOString(),
             deletedAt: post.deletedAt?.toISOString() ?? null,
@@ -324,6 +335,7 @@ export function createAdminPostRoute(
           post: {
             ...post,
             publishedAt: post.publishedAt?.toISOString() ?? null,
+            contentModifiedAt: post.contentModifiedAt?.toISOString() ?? null,
             createdAt: post.createdAt.toISOString(),
             updatedAt: post.updatedAt.toISOString(),
             deletedAt: post.deletedAt?.toISOString() ?? null,
