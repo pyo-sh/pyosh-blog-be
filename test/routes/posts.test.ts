@@ -502,4 +502,173 @@ describe("Post Routes", () => {
     });
   });
 
+  // ===== GET /api/posts/slugs =====
+
+  describe("GET /api/posts/slugs", () => {
+    it("발행된 공개 글의 slug + updatedAt 반환", async () => {
+      const category = await seedCategory();
+
+      const published = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+      // draft → 제외
+      await seedPost(category.id, { status: "draft", visibility: "public" });
+      // private → 제외
+      await seedPost(category.id, {
+        status: "published",
+        visibility: "private",
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts/slugs",
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.slugs).toHaveLength(1);
+      expect(body.slugs[0].slug).toBe(published.slug);
+      expect(body.slugs[0].updatedAt).toBeDefined();
+    });
+
+    it("발행된 글이 없으면 빈 배열 반환", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts/slugs",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.slugs).toHaveLength(0);
+    });
+  });
+
+  // ===== GET /api/posts - filter param =====
+
+  describe("GET /api/posts - filter 파라미터", () => {
+    it("filter=title 로 제목에서만 검색", async () => {
+      const category = await seedCategory();
+
+      await seedPost(category.id, {
+        title: "Drizzle ORM Guide",
+        contentMd: "# Guide\n\nFastify is great.",
+        status: "published",
+        visibility: "public",
+      });
+      await seedPost(category.id, {
+        title: "Fastify Tutorial",
+        contentMd: "# Tutorial\n\nDrizzle is great.",
+        status: "published",
+        visibility: "public",
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=Drizzle&filter=title",
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe("Drizzle ORM Guide");
+    });
+
+    it("filter=content 로 본문에서만 검색", async () => {
+      const category = await seedCategory();
+
+      await seedPost(category.id, {
+        title: "Post A",
+        contentMd: "# A\n\nFastify content here.",
+        status: "published",
+        visibility: "public",
+      });
+      await seedPost(category.id, {
+        title: "Fastify Post B",
+        contentMd: "# B\n\nDrizzle content here.",
+        status: "published",
+        visibility: "public",
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=Fastify&filter=content",
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe("Post A");
+    });
+  });
+
+  // ===== PostDetail schema - category.ancestors =====
+
+  describe("GET /api/posts/:slug - category ancestors", () => {
+    it("중첩 카테고리의 ancestors 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+
+      const parent = await seedCategory({ name: "Programming" });
+      const child = await seedCategory({ name: "TypeScript", parentId: parent.id });
+
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "TypeScript Tips",
+          contentMd: "# Tips",
+          categoryId: child.id,
+          status: "published",
+          visibility: "public",
+        },
+      });
+
+      const { post } = createRes.json();
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/posts/${post.slug}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.post.category.id).toBe(child.id);
+      expect(body.post.category.ancestors).toHaveLength(1);
+      expect(body.post.category.ancestors[0].name).toBe("Programming");
+    });
+  });
+
+  // ===== PostListItem schema - totalPageviews and commentCount =====
+
+  describe("GET /api/posts - totalPageviews and commentCount in response", () => {
+    it("목록 응답에 totalPageviews와 commentCount 포함", async () => {
+      const category = await seedCategory();
+
+      await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts",
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].totalPageviews).toBeDefined();
+      expect(body.data[0].commentCount).toBeDefined();
+      expect(typeof body.data[0].totalPageviews).toBe("number");
+      expect(typeof body.data[0].commentCount).toBe("number");
+    });
+  });
+
 });

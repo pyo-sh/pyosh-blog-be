@@ -1,9 +1,11 @@
 import { eq, and, isNull, sql, inArray, lt, gt, desc, asc, like, or } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import { categoryTable } from "@src/db/schema/categories";
+import { commentTable } from "@src/db/schema/comments";
 import * as schema from "@src/db/schema/index";
 import { postTagTable } from "@src/db/schema/post-tags";
 import { Post, postTable, NewPost } from "@src/db/schema/posts";
+import { statsDailyTable } from "@src/db/schema/stats";
 import { tagTable } from "@src/db/schema/tags";
 import { HttpError } from "@src/errors/http-error";
 import { TagService } from "@src/routes/tags/tag.service";
@@ -58,6 +60,7 @@ export interface GetPostListQuery {
   categoryId?: number;
   tagSlug?: string;
   q?: string;
+  filter?: "title_content" | "title" | "content" | "tag" | "category" | "comment";
   status?: "draft" | "published" | "archived";
   visibility?: "public" | "private";
   sort?: "published_at" | "created_at";
@@ -75,21 +78,44 @@ interface PostTag {
 }
 
 /**
- * 카테고리 정보
+ * 카테고리 정보 (목록용 - ancestors 없음)
  */
-interface PostCategory {
+interface PostListCategory {
   id: number;
   name: string;
   slug: string;
 }
 
 /**
- * 게시글 상세 정보 (관계 포함)
+ * 카테고리 정보 (상세용 - ancestors 포함)
  */
-export interface PostDetail extends Post {
-  category: PostCategory;
-  tags: PostTag[];
+interface PostDetailCategory extends PostListCategory {
+  ancestors: { name: string; slug: string }[];
 }
+
+/**
+ * 게시글 집계 필드
+ */
+interface PostAggregates {
+  totalPageviews: number;
+  commentCount: number;
+}
+
+/**
+ * 게시글 목록 항목 (contentMd 제외)
+ */
+export type PostListItem = Omit<Post, "contentMd"> & PostAggregates & {
+  category: PostListCategory;
+  tags: PostTag[];
+};
+
+/**
+ * 게시글 상세 정보 (관계 + 집계 포함)
+ */
+export type PostDetail = Post & PostAggregates & {
+  category: PostDetailCategory;
+  tags: PostTag[];
+};
 
 /**
  * 이전/다음 글 정보
@@ -106,6 +132,14 @@ export interface PostDetailWithNavigation {
   post: PostDetail;
   prevPost: PostNavigation | null;
   nextPost: PostNavigation | null;
+}
+
+/**
+ * slug 목록 항목 (sitemap용)
+ */
+export interface PostSlugItem {
+  slug: string;
+  updatedAt: Date;
 }
 
 /**
@@ -262,16 +296,61 @@ export class PostService {
       conditions.push(eq(postTable.categoryId, query.categoryId));
     }
 
-    // 키워드 검색 (title LIKE %q% OR contentMd LIKE %q%)
+    // 키워드 검색 (filter에 따라 검색 범위 결정)
     if (query.q) {
       const term = `%${query.q}%`;
-      conditions.push(
-        or(like(postTable.title, term), like(postTable.contentMd, term))!,
-      );
+      const filter = query.filter ?? "title_content";
+
+      if (filter === "title") {
+        conditions.push(like(postTable.title, term));
+      } else if (filter === "content") {
+        conditions.push(like(postTable.contentMd, term));
+      } else if (filter === "title_content") {
+        conditions.push(
+          or(like(postTable.title, term), like(postTable.contentMd, term))!,
+        );
+      } else if (filter === "tag") {
+        const matchedTags = await this.db
+          .select({ id: tagTable.id })
+          .from(tagTable)
+          .where(like(tagTable.name, term));
+        if (matchedTags.length === 0) {
+          return buildPaginatedResponse([], page, limit, 0);
+        }
+        const tagIds = matchedTags.map((t) => t.id);
+        const postIdsFromTags = await this.db
+          .select({ postId: postTagTable.postId })
+          .from(postTagTable)
+          .where(inArray(postTagTable.tagId, tagIds));
+        const postIds = [...new Set(postIdsFromTags.map((pt) => pt.postId))];
+        if (postIds.length === 0) {
+          return buildPaginatedResponse([], page, limit, 0);
+        }
+        conditions.push(inArray(postTable.id, postIds));
+      } else if (filter === "category") {
+        const matchedCategories = await this.db
+          .select({ id: categoryTable.id })
+          .from(categoryTable)
+          .where(like(categoryTable.name, term));
+        if (matchedCategories.length === 0) {
+          return buildPaginatedResponse([], page, limit, 0);
+        }
+        const categoryIds = matchedCategories.map((c) => c.id);
+        conditions.push(inArray(postTable.categoryId, categoryIds));
+      } else if (filter === "comment") {
+        const matchedComments = await this.db
+          .select({ postId: commentTable.postId })
+          .from(commentTable)
+          .where(and(like(commentTable.body, term), isNull(commentTable.deletedAt)));
+        const postIds = [...new Set(matchedComments.map((c) => c.postId))];
+        if (postIds.length === 0) {
+          return buildPaginatedResponse([], page, limit, 0);
+        }
+        conditions.push(inArray(postTable.id, postIds));
+      }
     }
 
     // tag 필터 (tag slug 기반)
-    let tagFilteredPostIds: number[] | undefined;
     if (query.tagSlug) {
       const [tag] = await this.db
         .select({ id: tagTable.id })
@@ -288,7 +367,7 @@ export class PostService {
         .from(postTagTable)
         .where(eq(postTagTable.tagId, tag.id));
 
-      tagFilteredPostIds = postTags.map((pt) => pt.postId);
+      const tagFilteredPostIds = postTags.map((pt) => pt.postId);
 
       // 해당 태그를 가진 게시글이 없으면 빈 배열 반환
       if (tagFilteredPostIds.length === 0) {
@@ -321,9 +400,9 @@ export class PostService {
       .limit(limit)
       .offset(offset);
 
-    // 각 post에 category, tags 정보 추가
+    // 각 post에 category, tags, 집계 정보 추가 (목록용 - contentMd/ancestors 제외)
     const postsWithDetails = await Promise.all(
-      posts.map((post) => this.enrichPostWithDetails(post)),
+      posts.map((post) => this.enrichPostListItemWithDetails(post)),
     );
 
     return buildPaginatedResponse(postsWithDetails, page, limit, total);
@@ -385,6 +464,25 @@ export class PostService {
       prevPost: prevPosts[0] ?? null,
       nextPost: nextPosts[0] ?? null,
     };
+  }
+
+  /**
+   * 발행된 글 slug 목록 조회 (sitemap용)
+   */
+  async getPostSlugs(): Promise<PostSlugItem[]> {
+    const rows = await this.db
+      .select({ slug: postTable.slug, updatedAt: postTable.updatedAt })
+      .from(postTable)
+      .where(
+        and(
+          eq(postTable.status, "published"),
+          eq(postTable.visibility, "public"),
+          isNull(postTable.deletedAt),
+        ),
+      )
+      .orderBy(desc(postTable.updatedAt));
+
+    return rows;
   }
 
   /**
@@ -476,36 +574,109 @@ export class PostService {
   }
 
   /**
-   * 게시글에 category, tags 정보 추가 (내부 헬퍼)
+   * 게시글 상세 정보 조회 (category ancestors + 집계 포함)
    */
   private async enrichPostWithDetails(post: Post): Promise<PostDetail> {
-    // 1. 카테고리 조회
-    const [category] = await this.db
-      .select({
-        id: categoryTable.id,
-        name: categoryTable.name,
-        slug: categoryTable.slug,
-      })
-      .from(categoryTable)
-      .where(eq(categoryTable.id, post.categoryId))
-      .limit(1);
-
-    // 2. 태그 조회
-    const postTags = await this.db
-      .select({
-        id: tagTable.id,
-        name: tagTable.name,
-        slug: tagTable.slug,
-      })
-      .from(postTagTable)
-      .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
-      .where(eq(postTagTable.postId, post.id));
+    const [category, postTags, totalPageviews, commentCount, ancestors] =
+      await Promise.all([
+        this.db
+          .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug })
+          .from(categoryTable)
+          .where(eq(categoryTable.id, post.categoryId))
+          .limit(1)
+          .then((rows) => rows[0]),
+        this.db
+          .select({ id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
+          .from(postTagTable)
+          .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
+          .where(eq(postTagTable.postId, post.id)),
+        this.db
+          .select({ total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)` })
+          .from(statsDailyTable)
+          .where(eq(statsDailyTable.postId, post.id))
+          .then((rows) => Number(rows[0]?.total ?? 0)),
+        this.db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(commentTable)
+          .where(and(eq(commentTable.postId, post.id), isNull(commentTable.deletedAt)))
+          .then((rows) => Number(rows[0]?.count ?? 0)),
+        this.db
+          .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug, parentId: categoryTable.parentId })
+          .from(categoryTable)
+          .then((rows) => rows),
+      ]);
 
     return {
       ...post,
+      category: {
+        ...category,
+        ancestors: this.buildAncestors(category.id, ancestors),
+      },
+      tags: postTags,
+      totalPageviews,
+      commentCount,
+    };
+  }
+
+  /**
+   * 게시글 목록 항목 조회 (contentMd/ancestors 제외, 집계 포함)
+   */
+  private async enrichPostListItemWithDetails(post: Post): Promise<PostListItem> {
+    const { contentMd: _contentMd, ...postWithoutContent } = post;
+
+    const [category, postTags, totalPageviews, commentCount] =
+      await Promise.all([
+        this.db
+          .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug })
+          .from(categoryTable)
+          .where(eq(categoryTable.id, post.categoryId))
+          .limit(1)
+          .then((rows) => rows[0]),
+        this.db
+          .select({ id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
+          .from(postTagTable)
+          .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
+          .where(eq(postTagTable.postId, post.id)),
+        this.db
+          .select({ total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)` })
+          .from(statsDailyTable)
+          .where(eq(statsDailyTable.postId, post.id))
+          .then((rows) => Number(rows[0]?.total ?? 0)),
+        this.db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(commentTable)
+          .where(and(eq(commentTable.postId, post.id), isNull(commentTable.deletedAt)))
+          .then((rows) => Number(rows[0]?.count ?? 0)),
+      ]);
+
+    return {
+      ...postWithoutContent,
       category,
       tags: postTags,
+      totalPageviews,
+      commentCount,
     };
+  }
+
+  /**
+   * 카테고리 ancestors 빌드 (루트부터 부모까지, 직속 카테고리 제외)
+   */
+  private buildAncestors(
+    categoryId: number,
+    allCategories: { id: number; name: string; slug: string; parentId: number | null }[],
+  ): { name: string; slug: string }[] {
+    const categoryMap = new Map(allCategories.map((c) => [c.id, c]));
+    const ancestors: { name: string; slug: string }[] = [];
+
+    let current = categoryMap.get(categoryId);
+    while (current?.parentId != null) {
+      const parent = categoryMap.get(current.parentId);
+      if (!parent) break;
+      ancestors.unshift({ name: parent.name, slug: parent.slug });
+      current = parent;
+    }
+
+    return ancestors;
   }
 
   /**
@@ -525,31 +696,44 @@ export class PostService {
       throw HttpError.notFound("게시글을 찾을 수 없습니다");
     }
 
-    // category, tags 정보 조회 (트랜잭션 컨텍스트 사용)
-    const [category] = await tx
-      .select({
-        id: categoryTable.id,
-        name: categoryTable.name,
-        slug: categoryTable.slug,
-      })
-      .from(categoryTable)
-      .where(eq(categoryTable.id, post.categoryId))
-      .limit(1);
-
-    const postTags = await tx
-      .select({
-        id: tagTable.id,
-        name: tagTable.name,
-        slug: tagTable.slug,
-      })
-      .from(postTagTable)
-      .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
-      .where(eq(postTagTable.postId, post.id));
+    const [category, postTags, totalPageviews, commentCount, allCategories] =
+      await Promise.all([
+        tx
+          .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug })
+          .from(categoryTable)
+          .where(eq(categoryTable.id, post.categoryId))
+          .limit(1)
+          .then((rows) => rows[0]),
+        tx
+          .select({ id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
+          .from(postTagTable)
+          .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
+          .where(eq(postTagTable.postId, post.id)),
+        tx
+          .select({ total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)` })
+          .from(statsDailyTable)
+          .where(eq(statsDailyTable.postId, post.id))
+          .then((rows) => Number(rows[0]?.total ?? 0)),
+        tx
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(commentTable)
+          .where(and(eq(commentTable.postId, post.id), isNull(commentTable.deletedAt)))
+          .then((rows) => Number(rows[0]?.count ?? 0)),
+        tx
+          .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug, parentId: categoryTable.parentId })
+          .from(categoryTable)
+          .then((rows) => rows),
+      ]);
 
     return {
       ...post,
-      category,
+      category: {
+        ...category,
+        ancestors: this.buildAncestors(category.id, allCategories),
+      },
       tags: postTags,
+      totalPageviews,
+      commentCount,
     };
   }
 }
