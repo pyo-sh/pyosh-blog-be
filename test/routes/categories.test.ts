@@ -283,5 +283,19 @@ describe("Category Routes", () => {
 
       expect(response.statusCode).toBe(400);
     });
+
+    it("action=move moveTo가 삭제 대상과 동일하면 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory({ name: "Category" });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/categories/${category.id}?action=move&moveTo=${category.id}`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
   });
 });

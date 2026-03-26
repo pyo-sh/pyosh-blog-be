@@ -318,30 +318,39 @@ export class CategoryService {
    *   (현재 DB 상태 기준으로 검증하면 유효한 부모-자식 위치 교환이 거부됨)
    */
   async updateCategoryTree(items: CategoryTreeItem[]): Promise<void> {
-    // 1. 전체 카테고리 목록을 DB에서 한 번만 조회
+    // 1. 중복 ID 검증
+    const seenIds = new Set<number>();
+    for (const item of items) {
+      if (seenIds.has(item.id)) {
+        throw HttpError.badRequest(`Duplicate category ID ${item.id} in changes.`);
+      }
+      seenIds.add(item.id);
+    }
+
+    // 2. 전체 카테고리 목록을 DB에서 한 번만 조회
     const allCategories = await this.db
       .select({ id: categoryTable.id, parentId: categoryTable.parentId })
       .from(categoryTable);
 
-    // 2. 현재 DB 상태로 부모 맵 구성
+    // 3. 현재 DB 상태로 부모 맵 구성
     const targetMap = new Map<number, number | null>(
       allCategories.map((c) => [c.id, c.parentId]),
     );
     const existingIds = new Set(allCategories.map((c) => c.id));
 
-    // 3. 배치 변경 사항을 반영해 목표 상태 맵 갱신
-    for (const item of items) {
-      targetMap.set(item.id, item.parentId);
-    }
-
-    // 4. item.id 존재 여부 사전 검증
+    // 4. item.id 존재 여부 사전 검증 (targetMap 갱신 전에 수행)
     for (const item of items) {
       if (!existingIds.has(item.id)) {
         throw HttpError.badRequest(`Category ${item.id} not found.`);
       }
     }
 
-    // 5. 목표 상태에서 각 항목 유효성 검증
+    // 5. 배치 변경 사항을 반영해 목표 상태 맵 갱신
+    for (const item of items) {
+      targetMap.set(item.id, item.parentId);
+    }
+
+    // 6. 목표 상태에서 각 항목 유효성 검증
     for (const item of items) {
       if (item.parentId === null) continue;
 
@@ -381,7 +390,7 @@ export class CategoryService {
       }
     }
 
-    // 6. 트랜잭션으로 일괄 업데이트
+    // 7. 트랜잭션으로 일괄 업데이트
     await this.db.transaction(async (tx) => {
       for (const item of items) {
         await tx
@@ -404,6 +413,13 @@ export class CategoryService {
     // action=move일 때 moveTo 필수 (HTTP 레이어와 무관하게 서비스 레이어에서도 보장)
     if (action === "move" && moveTo == null) {
       throw HttpError.badRequest("moveTo is required when action is move.");
+    }
+
+    // 삭제 대상과 이동 대상이 같으면 포스트가 orphaned FK 상태가 됨
+    if (action === "move" && moveTo === id) {
+      throw HttpError.badRequest(
+        "moveTo cannot be the same as the category being deleted.",
+      );
     }
 
     // 단일 트랜잭션: 존재 확인 + 하위 카테고리 확인 + 게시글 처리 + 카테고리 삭제
