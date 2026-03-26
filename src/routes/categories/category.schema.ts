@@ -17,6 +17,16 @@ export const CategoryListQuerySchema = z.object({
     .transform((val) => val === "true"),
 });
 
+export const CategoryDeleteQuerySchema = z
+  .object({
+    action: z.enum(["move", "trash"]),
+    moveTo: z.coerce.number().int().positive().optional(),
+  })
+  .refine((data) => data.action !== "move" || data.moveTo != null, {
+    message: "moveTo is required when action is move",
+    path: ["moveTo"],
+  });
+
 /**
  * Request Body Schemas
  */
@@ -33,13 +43,17 @@ export const CategoryUpdateBodySchema = z.object({
   isVisible: z.boolean().optional(),
 });
 
-export const CategoryOrderUpdateBodySchema = z.object({
-  items: z.array(
-    z.object({
-      id: z.number().int().positive(),
-      sortOrder: z.number().int().min(0),
-    }),
-  ),
+export const CategoryTreeUpdateBodySchema = z.object({
+  changes: z
+    .array(
+      z.object({
+        id: z.number().int().positive(),
+        parentId: z.number().int().positive().nullable(),
+        sortOrder: z.number().int().min(0),
+      }),
+    )
+    .min(1, "At least one change is required")
+    .max(200, "Too many changes in a single request"),
 });
 
 /**
@@ -52,6 +66,8 @@ export const CategoryResponseSchema = z.object({
   slug: z.string(),
   sortOrder: z.number(),
   isVisible: z.boolean(),
+  publishedPostCount: z.number(),
+  totalPostCount: z.number(),
   createdAt: z.string(), // ISO datetime string
   updatedAt: z.string(), // ISO datetime string
 });
@@ -63,6 +79,8 @@ type CategoryTreeResponse = {
   slug: string;
   sortOrder: number;
   isVisible: boolean;
+  publishedPostCount: number;
+  totalPostCount: number;
   createdAt: string;
   updatedAt: string;
   children: CategoryTreeResponse[];
@@ -89,7 +107,7 @@ export const CategoryUpdateResponseSchema = z.object({
   category: CategoryResponseSchema,
 });
 
-export const CategoryOrderUpdateResponseSchema = z.object({
+export const CategoryTreeUpdateResponseSchema = z.object({
   success: z.boolean(),
 });
 
@@ -100,6 +118,7 @@ export type CategoryIdParam = z.infer<typeof CategoryIdParamSchema>;
 export type CategoryListQuery = z.infer<typeof CategoryListQuerySchema>;
 export type CategoryCreateBody = z.infer<typeof CategoryCreateBodySchema>;
 export type CategoryUpdateBody = z.infer<typeof CategoryUpdateBodySchema>;
-export type CategoryOrderUpdateBody = z.infer<
-  typeof CategoryOrderUpdateBodySchema
+export type CategoryTreeUpdateBody = z.infer<
+  typeof CategoryTreeUpdateBodySchema
 >;
+export type CategoryDeleteQuery = z.infer<typeof CategoryDeleteQuerySchema>;

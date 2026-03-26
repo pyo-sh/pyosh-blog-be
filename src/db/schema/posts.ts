@@ -16,7 +16,7 @@ export const postTable = mysqlTable(
   "post_tb",
   {
     id: int("id").primaryKey().autoincrement(),
-    categoryId: int("category_id").notNull(),
+    categoryId: int("category_id"),
     title: varchar("title", { length: 200 }).notNull(),
     slug: varchar("slug", { length: 200 }).notNull().unique(),
     contentMd: text("content_md").notNull(),
