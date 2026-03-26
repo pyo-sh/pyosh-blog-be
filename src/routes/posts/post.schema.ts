@@ -111,7 +111,7 @@ export const UpdatePostBodySchema = z.object({
 
 export const BulkPostActionBodySchema = z
   .object({
-    ids: z.array(z.number().int().positive()).min(1),
+    ids: z.array(z.number().int().positive()).min(1).max(100),
     action: z.enum(["update", "soft_delete", "restore", "hard_delete"]),
     categoryId: z.number().int().positive().optional(),
     commentStatus: z.enum(["open", "locked", "disabled"]).optional(),

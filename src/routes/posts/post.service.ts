@@ -592,17 +592,7 @@ export class PostService {
       await tx.delete(postTable).where(eq(postTable.id, id));
 
       // 7. 고아 태그 삭제 (다른 게시글에서 사용하지 않는 태그)
-      if (linkedTagIds.length > 0) {
-        const stillUsed = await tx
-          .select({ tagId: postTagTable.tagId })
-          .from(postTagTable)
-          .where(inArray(postTagTable.tagId, linkedTagIds));
-        const stillUsedIds = new Set(stillUsed.map((r) => r.tagId));
-        const orphanTagIds = linkedTagIds.filter((tagId) => !stillUsedIds.has(tagId));
-        if (orphanTagIds.length > 0) {
-          await tx.delete(tagTable).where(inArray(tagTable.id, orphanTagIds));
-        }
-      }
+      await this.cleanOrphanTags(tx, linkedTagIds);
     });
   }
 
@@ -660,19 +650,29 @@ export class PostService {
         await tx.delete(postTable).where(inArray(postTable.id, ids));
 
         // 고아 태그 삭제
-        if (linkedTagIds.length > 0) {
-          const stillUsed = await tx
-            .select({ tagId: postTagTable.tagId })
-            .from(postTagTable)
-            .where(inArray(postTagTable.tagId, linkedTagIds));
-          const stillUsedIds = new Set(stillUsed.map((r) => r.tagId));
-          const orphanTagIds = linkedTagIds.filter((tagId) => !stillUsedIds.has(tagId));
-          if (orphanTagIds.length > 0) {
-            await tx.delete(tagTable).where(inArray(tagTable.id, orphanTagIds));
-          }
-        }
+        await this.cleanOrphanTags(tx, linkedTagIds);
       }
     });
+  }
+
+  /**
+   * 고아 태그 삭제 (다른 게시글에서 사용하지 않는 태그)
+   * post_tag_tb에서 tagIds가 참조되지 않으면 tag_tb에서 삭제한다.
+   */
+  private async cleanOrphanTags(
+    tx: MySql2Database<typeof schema>,
+    tagIds: number[],
+  ): Promise<void> {
+    if (tagIds.length === 0) return;
+    const stillUsed = await tx
+      .select({ tagId: postTagTable.tagId })
+      .from(postTagTable)
+      .where(inArray(postTagTable.tagId, tagIds));
+    const stillUsedIds = new Set(stillUsed.map((r) => r.tagId));
+    const orphanIds = tagIds.filter((id) => !stillUsedIds.has(id));
+    if (orphanIds.length > 0) {
+      await tx.delete(tagTable).where(inArray(tagTable.id, orphanIds));
+    }
   }
 
   /**
