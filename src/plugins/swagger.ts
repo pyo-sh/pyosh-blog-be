@@ -9,6 +9,10 @@ import {
 import { env } from "@src/shared/env";
 
 const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
+  if (env.NODE_ENV === "production") {
+    return;
+  }
+
   // @fastify/swagger 등록 (OpenAPI 스펙 생성)
   await fastify.register(swagger, {
     openapi: {
