@@ -1,14 +1,19 @@
+import { eq } from "drizzle-orm";
 import { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { eq } from "drizzle-orm";
-import {
-  createTestApp,
-  cleanup,
-  injectOAuthUser,
-} from "@test/helpers/app";
-import { seedOAuthUser, truncateAll, seedCategory, seedPost } from "@test/helpers/seed";
 import { db } from "@src/db/client";
-import { oauthAccountTable, commentTable, guestbookEntryTable } from "@src/db/schema";
+import {
+  oauthAccountTable,
+  commentTable,
+  guestbookEntryTable,
+} from "@src/db/schema";
+import { createTestApp, cleanup, injectOAuthUser } from "@test/helpers/app";
+import {
+  seedOAuthUser,
+  truncateAll,
+  seedCategory,
+  seedPost,
+} from "@test/helpers/seed";
 
 describe("User Routes (/api/user)", () => {
   let app: FastifyInstance;
