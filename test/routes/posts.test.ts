@@ -1439,6 +1439,74 @@ describe("Post Routes", () => {
       expect(getRes.statusCode).toBe(404);
     });
 
+    it("action=hard_delete: 고아 태그 삭제, 공유 태그 유지", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      // post1: orphan-tag-bulk (다른 글 없음)
+      const res1 = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Bulk Post 1",
+          contentMd: "# Content",
+          categoryId: category.id,
+          tags: ["orphan-tag-bulk"],
+        },
+      });
+      // post2: shared-tag-bulk (post3과 공유)
+      const res2 = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Bulk Post 2",
+          contentMd: "# Content",
+          categoryId: category.id,
+          tags: ["shared-tag-bulk"],
+        },
+      });
+      // post3: shared-tag-bulk 공유
+      await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Bulk Post 3",
+          contentMd: "# Content",
+          categoryId: category.id,
+          tags: ["shared-tag-bulk"],
+        },
+      });
+
+      const bulkRes = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: {
+          ids: [res1.json().post.id, res2.json().post.id],
+          action: "hard_delete",
+        },
+      });
+      expect(bulkRes.statusCode).toBe(204);
+
+      // orphan-tag-bulk → 삭제됨
+      const orphanRows = await db
+        .select()
+        .from(tagTable)
+        .where(eq(tagTable.slug, "orphan-tag-bulk"));
+      expect(orphanRows).toHaveLength(0);
+
+      // shared-tag-bulk → post3에 남아있으므로 유지
+      const sharedRows = await db
+        .select()
+        .from(tagTable)
+        .where(eq(tagTable.slug, "shared-tag-bulk"));
+      expect(sharedRows).toHaveLength(1);
+    });
+
     it("중복 ids 허용 — 존재하는 게시글이면 204", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);

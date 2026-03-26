@@ -609,7 +609,7 @@ export class PostService {
     const uniqueIds = [...new Set(input.ids)];
 
     await this.db.transaction(async (tx) => {
-      // 모든 대상 게시글 존재 확인
+      // 모든 대상 게시글 존재 확인 (deletedAt 필터 없음 — 소프트 삭제된 글도 admin이 조작 가능)
       const found = await tx
         .select({ id: postTable.id })
         .from(postTable)
