@@ -232,10 +232,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Admin routes: CSRF 보호 (GET 제외) 일괄 적용
   await fastify.register(
     async (adminRoutes) => {
+      const CSRF_SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
       adminRoutes.addHook(
         "onRequest",
         (request, reply, done) => {
-          if (request.method !== "GET") {
+          if (!CSRF_SAFE_METHODS.has(request.method)) {
             return fastify.csrfProtection(request, reply, done);
           }
           done();
