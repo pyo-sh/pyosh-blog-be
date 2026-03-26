@@ -59,7 +59,7 @@ export const assetIdParamSchema = z.object({
  * Asset 벌크 삭제 요청 스키마
  */
 export const bulkDeleteAssetsBodySchema = z.object({
-  ids: z.array(z.number().positive()).min(1),
+  ids: z.array(z.number().positive()).min(1).max(100),
 });
 
 /**
