@@ -7,6 +7,7 @@ import {
   PopularPostsResponseSchema,
   StatsViewBodySchema,
   StatsViewResponseSchema,
+  TotalViewsResponseSchema,
 } from "./stats.schema";
 import { requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
@@ -78,6 +79,27 @@ export function createStatsRoute(
         const data = await statsService.getPopularPosts(limit, days);
 
         return reply.status(200).send({ data });
+      },
+    );
+
+    // GET /api/stats/total-views - 사이트 전체 누적 조회수
+    typedFastify.get(
+      "/total-views",
+      {
+        schema: {
+          tags: ["stats"],
+          summary: "사이트 전체 누적 조회수",
+          description:
+            "postId가 없는 행의 pageviews 합산을 반환합니다.",
+          response: {
+            200: TotalViewsResponseSchema,
+          },
+        },
+      },
+      async (_request, reply) => {
+        const totalPageviews = await statsService.getTotalViews();
+
+        return reply.status(200).send({ totalPageviews });
       },
     );
 

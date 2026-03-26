@@ -20,6 +20,7 @@ export interface DashboardStats {
   monthPageviews: number;
   totalPosts: number;
   totalComments: number;
+  postsByStatus: { draft: number; published: number; archived: number };
 }
 
 /**
@@ -32,47 +33,56 @@ export class StatsService {
   constructor(private readonly db: MySql2Database<typeof schema>) {}
 
   /**
-   * 게시글 페이지뷰 증가 (동일 IP 5분 이내 중복 방지)
+   * 페이지뷰 증가 (동일 IP 5분 이내 중복 방지, KST 기준 날짜)
+   * postId가 없으면 사이트 전체 조회수로 기록
    * @returns 중복 차단 여부
    */
-  async incrementPageView(postId: number, ip: string): Promise<boolean> {
+  async incrementPageView(
+    postId: number | undefined,
+    ip: string,
+  ): Promise<boolean> {
     const normalizedIp = ip.trim();
     if (!normalizedIp) {
       throw HttpError.badRequest("유효한 IP가 필요합니다");
     }
 
-    const [post] = await this.db
-      .select({ id: postTable.id })
-      .from(postTable)
-      .where(
-        and(
-          eq(postTable.id, postId),
-          eq(postTable.status, "published"),
-          eq(postTable.visibility, "public"),
-          isNull(postTable.deletedAt),
-        ),
-      )
-      .limit(1);
+    if (postId !== undefined) {
+      const [post] = await this.db
+        .select({ id: postTable.id })
+        .from(postTable)
+        .where(
+          and(
+            eq(postTable.id, postId),
+            eq(postTable.status, "published"),
+            eq(postTable.visibility, "public"),
+            isNull(postTable.deletedAt),
+          ),
+        )
+        .limit(1);
 
-    if (!post) {
-      throw HttpError.notFound("게시글을 찾을 수 없습니다");
+      if (!post) {
+        throw HttpError.notFound("게시글을 찾을 수 없습니다");
+      }
     }
 
     const now = Date.now();
     this.pruneExpiredViews(now);
 
-    const key = `${postId}:${normalizedIp}`;
+    const targetKey = postId !== undefined ? String(postId) : "site";
+    const key = `${targetKey}:${normalizedIp}`;
     const lastViewedAt = this.recentViews.get(key);
 
     if (lastViewedAt && now - lastViewedAt < this.dedupeWindowMs) {
       return true;
     }
 
+    // KST(UTC+9) 기준 날짜 사용. postId=0은 사이트 전체 조회수 센티넬 값
+    // (NULL은 MySQL unique index에서 NULL≠NULL 처리되어 중복키 업데이트가 동작하지 않음)
     await this.db
       .insert(statsDailyTable)
       .values({
-        postId,
-        date: sql`curdate()`,
+        postId: postId ?? 0,
+        date: sql`DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))`,
         pageviews: 1,
         uniques: 1,
       })
@@ -106,6 +116,20 @@ export class StatsService {
       pageviews: Number(result?.pageviews ?? 0),
       uniques: Number(result?.uniques ?? 0),
     };
+  }
+
+  /**
+   * 사이트 전체 누적 조회수 (postId=0 센티넬 행의 합산)
+   */
+  async getTotalViews(): Promise<number> {
+    const [result] = await this.db
+      .select({
+        total: sql<number>`coalesce(sum(${statsDailyTable.pageviews}), 0)`,
+      })
+      .from(statsDailyTable)
+      .where(eq(statsDailyTable.postId, 0));
+
+    return Number(result?.total ?? 0);
   }
 
   /**
@@ -158,7 +182,7 @@ export class StatsService {
     const weekDate = this.startOfDay(this.subtractDays(today, 6));
     const monthDate = this.startOfDay(this.subtractDays(today, 29));
 
-    const [todayView, weekView, monthView, postCount, commentCount] =
+    const [todayView, weekView, monthView, postCount, commentCount, postsByStatus] =
       await Promise.all([
         this.db
           .select({
@@ -191,7 +215,20 @@ export class StatsService {
               isNull(commentTable.deletedAt),
             ),
           ),
+        this.db
+          .select({
+            status: postTable.status,
+            count: sql<number>`count(*)`,
+          })
+          .from(postTable)
+          .where(isNull(postTable.deletedAt))
+          .groupBy(postTable.status),
       ]);
+
+    const statusCounts = { draft: 0, published: 0, archived: 0 };
+    for (const row of postsByStatus) {
+      statusCounts[row.status] = Number(row.count);
+    }
 
     return {
       todayPageviews: Number(todayView[0]?.value ?? 0),
@@ -199,6 +236,7 @@ export class StatsService {
       monthPageviews: Number(monthView[0]?.value ?? 0),
       totalPosts: Number(postCount[0]?.value ?? 0),
       totalComments: Number(commentCount[0]?.value ?? 0),
+      postsByStatus: statusCounts,
     };
   }
 
