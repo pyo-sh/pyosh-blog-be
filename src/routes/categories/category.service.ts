@@ -160,7 +160,7 @@ export class CategoryService {
       ? categories
       : categories.filter((c) => c.isVisible);
 
-    // 3. 카테고리별 게시글 카운트 조회
+    // 3. 카테고리별 게시글 카운트 조회 (categoryId IS NULL인 고아 행 제외)
     const postCounts = await this.db
       .select({
         categoryId: postTable.categoryId,
@@ -170,6 +170,7 @@ export class CategoryService {
           sql<number>`SUM(CASE WHEN ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
       })
       .from(postTable)
+      .where(isNotNull(postTable.categoryId))
       .groupBy(postTable.categoryId);
 
     const countMap = new Map(
@@ -316,6 +317,11 @@ export class CategoryService {
    * - parentId와 sortOrder를 동시에 업데이트
    * - 배치의 목표 상태(target state)를 기준으로 순환 참조 검증
    *   (현재 DB 상태 기준으로 검증하면 유효한 부모-자식 위치 교환이 거부됨)
+   *
+   * NOTE: 중복 ID 검증, 존재 확인, 순환 참조 검증은 트랜잭션 외부에서 수행됩니다.
+   * 두 Admin이 동시에 요청하면 검증 통과 후 순서대로 적용되어 의도치 않은 순환이
+   * 생길 수 있는 TOCTOU 윈도우가 있습니다. Admin 전용 엔드포인트이므로 실질적
+   * 위험은 낮으며, DB 레벨 제약이 없는 한 완전한 방어는 불가합니다.
    */
   async updateCategoryTree(items: CategoryTreeItem[]): Promise<void> {
     // 1. 중복 ID 검증
