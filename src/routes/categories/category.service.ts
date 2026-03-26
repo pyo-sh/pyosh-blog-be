@@ -334,7 +334,14 @@ export class CategoryService {
       targetMap.set(item.id, item.parentId);
     }
 
-    // 4. 목표 상태에서 각 항목 유효성 검증
+    // 4. item.id 존재 여부 사전 검증
+    for (const item of items) {
+      if (!existingIds.has(item.id)) {
+        throw HttpError.badRequest(`Category ${item.id} not found.`);
+      }
+    }
+
+    // 5. 목표 상태에서 각 항목 유효성 검증
     for (const item of items) {
       if (item.parentId === null) continue;
 
@@ -374,7 +381,7 @@ export class CategoryService {
       }
     }
 
-    // 5. 트랜잭션으로 일괄 업데이트
+    // 6. 트랜잭션으로 일괄 업데이트
     await this.db.transaction(async (tx) => {
       for (const item of items) {
         await tx
@@ -394,19 +401,24 @@ export class CategoryService {
   async deleteCategory(args: CategoryDeleteArgs): Promise<void> {
     const { id, action, moveTo } = args;
 
-    // 1. 카테고리 존재 확인
-    const [existing] = await this.db
-      .select()
-      .from(categoryTable)
-      .where(eq(categoryTable.id, id))
-      .limit(1);
-
-    if (!existing) {
-      throw HttpError.notFound("Category not found.");
+    // action=move일 때 moveTo 필수 (HTTP 레이어와 무관하게 서비스 레이어에서도 보장)
+    if (action === "move" && moveTo == null) {
+      throw HttpError.badRequest("moveTo is required when action is move.");
     }
 
-    // 2. 단일 트랜잭션: 하위 카테고리 확인 + 게시글 처리 + 카테고리 삭제
+    // 단일 트랜잭션: 존재 확인 + 하위 카테고리 확인 + 게시글 처리 + 카테고리 삭제
     await this.db.transaction(async (tx) => {
+      // 카테고리 존재 확인 (트랜잭션 내에서 TOCTOU 방지)
+      const [existing] = await tx
+        .select()
+        .from(categoryTable)
+        .where(eq(categoryTable.id, id))
+        .limit(1);
+
+      if (!existing) {
+        throw HttpError.notFound("Category not found.");
+      }
+
       // 하위 카테고리 존재 여부 확인 (트랜잭션 내에서 TOCTOU 방지)
       const [childCount] = await tx
         .select({ count: sql<number>`COUNT(*)` })
@@ -418,7 +430,7 @@ export class CategoryService {
       }
 
       if (action === "move") {
-        // 이동 대상 카테고리 존재 확인 (moveTo는 Zod 스키마에서 필수 보장)
+        // 이동 대상 카테고리 존재 확인
         const [targetCategory] = await tx
           .select()
           .from(categoryTable)
