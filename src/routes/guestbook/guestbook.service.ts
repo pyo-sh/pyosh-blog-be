@@ -7,7 +7,7 @@ import type {
   AdminGuestbookListQuery,
   AdminGuestbookDeleteQuery,
   AdminGuestbookBulkDeleteBody,
-  AdminGuestbookBulkRestoreBody,
+  AdminGuestbookBulkPatchBody,
 } from "./guestbook.schema";
 import type { CommentAuthor } from "@src/routes/comments/comment.schema";
 import {
@@ -362,10 +362,11 @@ export class GuestbookService {
   }
 
   /**
-   * 관리자 방명록 벌크 삭제 (비가역적 액션: hide | soft_delete | hard_delete)
+   * 관리자 방명록 벌크 삭제 (비가역적 액션: soft_delete | hard_delete)
+   * 존재하지 않는 ID는 묵시적으로 무시됩니다 (idempotent).
    *
    * @param ids 방명록 ID 배열
-   * @param action 삭제 액션 (hide | soft_delete | hard_delete)
+   * @param action 삭제 액션 (soft_delete | hard_delete)
    */
   async bulkDeleteEntries(
     ids: AdminGuestbookBulkDeleteBody["ids"],
@@ -374,11 +375,6 @@ export class GuestbookService {
     if (action === "hard_delete") {
       await this.db
         .delete(guestbookEntryTable)
-        .where(inArray(guestbookEntryTable.id, ids));
-    } else if (action === "hide") {
-      await this.db
-        .update(guestbookEntryTable)
-        .set({ status: "hidden" })
         .where(inArray(guestbookEntryTable.id, ids));
     } else {
       // soft_delete
@@ -390,17 +386,28 @@ export class GuestbookService {
   }
 
   /**
-   * 관리자 방명록 벌크 복원 (status=active 로 되돌림)
+   * 관리자 방명록 벌크 상태 변경 (가역적 액션: hide | restore)
+   * 존재하지 않는 ID는 묵시적으로 무시됩니다 (idempotent).
    *
    * @param ids 방명록 ID 배열
+   * @param action 상태 변경 액션 (hide | restore)
    */
-  async bulkRestoreEntries(
-    ids: AdminGuestbookBulkRestoreBody["ids"],
+  async bulkPatchEntries(
+    ids: AdminGuestbookBulkPatchBody["ids"],
+    action: AdminGuestbookBulkPatchBody["action"],
   ): Promise<void> {
-    await this.db
-      .update(guestbookEntryTable)
-      .set({ status: "active", deletedAt: null })
-      .where(inArray(guestbookEntryTable.id, ids));
+    if (action === "hide") {
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "hidden" })
+        .where(inArray(guestbookEntryTable.id, ids));
+    } else {
+      // restore
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "active", deletedAt: null })
+        .where(inArray(guestbookEntryTable.id, ids));
+    }
   }
 
   /**

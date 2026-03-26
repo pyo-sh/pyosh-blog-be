@@ -72,7 +72,8 @@ export function createAdminSettingsRoute(
       async (request, reply) => {
         const { enabled } = request.body;
         await settingsService.setGuestbookEnabled(enabled);
-        return reply.status(200).send({ enabled });
+        const persisted = await settingsService.getGuestbookEnabled();
+        return reply.status(200).send({ enabled: persisted });
       },
     );
   };
