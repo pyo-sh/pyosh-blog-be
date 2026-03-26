@@ -132,9 +132,11 @@ export const AdminGuestbookDeleteQuerySchema = z.object({
 
 /**
  * 관리자 방명록 단건 상태 변경 쿼리 스키마 (PATCH - 가역적 액션)
+ * - hide: status=hidden (공개 목록에서 숨김)
+ * - restore: status=active (hidden 상태만 복원, soft_delete는 별도 undelete 필요)
  */
 export const AdminGuestbookPatchQuerySchema = z.object({
-  action: z.enum(["hide"]),
+  action: z.enum(["hide", "restore"]),
 });
 
 /**

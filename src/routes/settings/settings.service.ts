@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "@src/db/schema/index";
 import { siteSettingsTable } from "@src/db/schema/settings";
@@ -22,12 +22,12 @@ export class SettingsService {
 
   /**
    * 방명록 활성 상태 변경
-   * 마이그레이션이 id=1 싱글톤 레코드를 보장하므로 직접 UPDATE
+   * INSERT ... ON DUPLICATE KEY UPDATE로 싱글톤 레코드 부재도 안전하게 처리
    */
   async setGuestbookEnabled(enabled: boolean): Promise<void> {
     await this.db
-      .update(siteSettingsTable)
-      .set({ guestbookEnabled: enabled })
-      .where(eq(siteSettingsTable.id, 1));
+      .insert(siteSettingsTable)
+      .values({ id: 1, guestbookEnabled: enabled })
+      .onDuplicateKeyUpdate({ set: { guestbookEnabled: sql`VALUES(guestbook_enabled)` } });
   }
 }

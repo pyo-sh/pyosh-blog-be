@@ -358,10 +358,11 @@ export class GuestbookService {
   }
 
   /**
-   * 관리자 방명록 단건 상태 변경 (가역적 액션: hide)
+   * 관리자 방명록 단건 상태 변경 (가역적 액션: hide | restore)
+   * restore는 hidden 상태 엔트리만 복원합니다 (soft_delete 복원은 별도 undelete 필요).
    *
    * @param entryId 방명록 ID
-   * @param action 상태 변경 액션 (hide)
+   * @param action 상태 변경 액션 (hide | restore)
    */
   async adminPatchEntry(
     entryId: number,
@@ -377,11 +378,23 @@ export class GuestbookService {
       throw HttpError.notFound("Guestbook entry not found.");
     }
 
-    // hide
-    await this.db
-      .update(guestbookEntryTable)
-      .set({ status: "hidden" })
-      .where(eq(guestbookEntryTable.id, entryId));
+    if (action === "hide") {
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "hidden" })
+        .where(eq(guestbookEntryTable.id, entryId));
+    } else {
+      // restore: only undo hide, not soft_delete
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "active" })
+        .where(
+          and(
+            eq(guestbookEntryTable.id, entryId),
+            eq(guestbookEntryTable.status, "hidden"),
+          ),
+        );
+    }
   }
 
   /**
@@ -411,6 +424,7 @@ export class GuestbookService {
   /**
    * 관리자 방명록 벌크 상태 변경 (가역적 액션: hide | restore)
    * 존재하지 않는 ID는 묵시적으로 무시됩니다 (idempotent).
+   * restore는 hidden 상태 엔트리만 복원합니다 (soft_delete 복원은 별도 undelete 필요).
    *
    * @param ids 방명록 ID 배열
    * @param action 상태 변경 액션 (hide | restore)
@@ -425,11 +439,16 @@ export class GuestbookService {
         .set({ status: "hidden" })
         .where(inArray(guestbookEntryTable.id, ids));
     } else {
-      // restore
+      // restore: only undo hide, not soft_delete
       await this.db
         .update(guestbookEntryTable)
-        .set({ status: "active", deletedAt: null })
-        .where(inArray(guestbookEntryTable.id, ids));
+        .set({ status: "active" })
+        .where(
+          and(
+            inArray(guestbookEntryTable.id, ids),
+            eq(guestbookEntryTable.status, "hidden"),
+          ),
+        );
     }
   }
 
