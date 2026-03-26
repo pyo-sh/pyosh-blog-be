@@ -457,11 +457,19 @@ export class CategoryService {
           throw HttpError.badRequest("Target category not found.");
         }
 
-        // 게시글을 대상 카테고리로 이동
+        // 미삭제 게시글: 대상 카테고리로 이동
         await tx
           .update(postTable)
           .set({ categoryId: moveTo! })
-          .where(eq(postTable.categoryId, id));
+          .where(and(eq(postTable.categoryId, id), isNull(postTable.deletedAt)));
+
+        // 이미 soft-delete된 게시글: categoryId 초기화 (복구 시 삭제된 카테고리 참조 방지)
+        await tx
+          .update(postTable)
+          .set({ categoryId: null })
+          .where(
+            and(eq(postTable.categoryId, id), isNotNull(postTable.deletedAt)),
+          );
       } else {
         // 미삭제 게시글: soft delete + categoryId 초기화
         await tx

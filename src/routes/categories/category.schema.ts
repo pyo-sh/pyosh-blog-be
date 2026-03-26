@@ -44,13 +44,15 @@ export const CategoryUpdateBodySchema = z.object({
 });
 
 export const CategoryTreeUpdateBodySchema = z.object({
-  changes: z.array(
-    z.object({
-      id: z.number().int().positive(),
-      parentId: z.number().int().positive().nullable(),
-      sortOrder: z.number().int().min(0),
-    }),
-  ),
+  changes: z
+    .array(
+      z.object({
+        id: z.number().int().positive(),
+        parentId: z.number().int().positive().nullable(),
+        sortOrder: z.number().int().min(0),
+      }),
+    )
+    .min(1, "At least one change is required"),
 });
 
 /**
