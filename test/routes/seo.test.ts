@@ -94,9 +94,7 @@ describe("SEO Routes", () => {
       const response = await app.inject({ method: "GET", url: "/rss.xml" });
 
       expect(response.statusCode).toBe(200);
-      expect(response.headers["content-type"]).toMatch(
-        /application\/rss\+xml|application\/xml/,
-      );
+      expect(response.headers["content-type"]).toMatch(/application\/rss\+xml/);
     });
 
     it("Cache-Control: public, max-age=3600", async () => {
@@ -120,6 +118,19 @@ describe("SEO Routes", () => {
       expect(response.body).toContain(post.title);
       expect(response.body).toContain(`/posts/${post.slug}`);
       expect(response.body).toContain("<pubDate>");
+    });
+
+    it("private 글은 피드에 포함되지 않는다", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        slug: "private-rss-post",
+        status: "published",
+        visibility: "private",
+      });
+
+      const response = await app.inject({ method: "GET", url: "/rss.xml" });
+
+      expect(response.body).not.toContain(`/posts/${post.slug}`);
     });
 
     it("draft 글은 피드에 포함되지 않는다", async () => {
@@ -170,7 +181,7 @@ describe("SEO Routes", () => {
 
       const itemMatches = response.body.match(/<item>/g);
       expect(itemMatches).not.toBeNull();
-      expect(itemMatches!.length).toBeLessThanOrEqual(20);
+      expect(itemMatches!.length).toBe(20);
     });
   });
 });
