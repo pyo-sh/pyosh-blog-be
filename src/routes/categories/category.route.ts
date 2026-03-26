@@ -3,13 +3,14 @@ import { ZodTypeProvider } from "fastify-type-provider-zod";
 import {
   CategoryIdParamSchema,
   CategoryListQuerySchema,
+  CategoryDeleteQuerySchema,
   CategoryCreateBodySchema,
   CategoryUpdateBodySchema,
-  CategoryOrderUpdateBodySchema,
+  CategoryTreeUpdateBodySchema,
   CategoryListResponseSchema,
   CategoryCreateResponseSchema,
   CategoryUpdateResponseSchema,
-  CategoryOrderUpdateResponseSchema,
+  CategoryTreeUpdateResponseSchema,
   CategoryTreeResponse,
 } from "./category.schema";
 import { CategoryService, CategoryTree } from "./category.service";
@@ -106,6 +107,31 @@ export function createCategoryRoute(
       },
     );
 
+    // PATCH /api/categories/tree - 카테고리 트리 배치 변경 (Admin)
+    // 반드시 /:id 앞에 등록해야 정적 경로 우선 매칭 보장
+    typedFastify.patch(
+      "/tree",
+      {
+        preHandler: requireAdmin(adminService),
+        schema: {
+          tags: ["categories"],
+          summary: "Batch update category tree",
+          description:
+            "여러 카테고리의 parentId와 sortOrder를 단일 트랜잭션으로 변경합니다. Admin 권한이 필요합니다.",
+          body: CategoryTreeUpdateBodySchema,
+          response: {
+            200: CategoryTreeUpdateResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const { changes } = request.body;
+        await categoryService.updateCategoryTree(changes);
+
+        return reply.status(200).send({ success: true });
+      },
+    );
+
     // PATCH /api/categories/:id - 카테고리 수정 (Admin)
     typedFastify.patch(
       "/:id",
@@ -144,35 +170,6 @@ export function createCategoryRoute(
       },
     );
 
-    // PATCH /api/categories/order - 카테고리 순서 일괄 변경 (Admin)
-    typedFastify.patch(
-      "/order",
-      {
-        preHandler: requireAdmin(adminService),
-        schema: {
-          tags: ["categories"],
-          summary: "Update category order",
-          description:
-            "여러 카테고리의 순서를 일괄 변경합니다. Admin 권한이 필요합니다.",
-          body: CategoryOrderUpdateBodySchema,
-          response: {
-            200: CategoryOrderUpdateResponseSchema,
-          },
-        },
-      },
-      async (request, reply) => {
-        const { items } = request.body;
-        await categoryService.updateCategoryOrder(
-          items.map((item) => ({
-            id: item.id,
-            sortOrder: item.sortOrder,
-          })),
-        );
-
-        return reply.status(200).send({ success: true });
-      },
-    );
-
     // DELETE /api/categories/:id - 카테고리 삭제 (Admin)
     typedFastify.delete(
       "/:id",
@@ -182,13 +179,16 @@ export function createCategoryRoute(
           tags: ["categories"],
           summary: "Delete category",
           description:
-            "카테고리를 삭제합니다. 하위 카테고리나 게시글이 있으면 삭제할 수 없습니다. Admin 권한이 필요합니다.",
+            "카테고리를 삭제합니다. action=move면 게시글을 지정 카테고리로 이동, action=trash면 게시글을 휴지통으로 이동합니다. 하위 카테고리가 있으면 삭제할 수 없습니다. Admin 권한이 필요합니다.",
           params: CategoryIdParamSchema,
+          querystring: CategoryDeleteQuerySchema,
         },
       },
       async (request, reply) => {
         const { id } = request.params;
-        await categoryService.deleteCategory(id);
+        const { action, moveTo } = request.query;
+
+        await categoryService.deleteCategory({ id, action, moveTo });
 
         return reply.status(204).send();
       },

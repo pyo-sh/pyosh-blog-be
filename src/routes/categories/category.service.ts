@@ -1,4 +1,4 @@
-import { asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import {
   Category,
@@ -31,17 +31,35 @@ export interface CategoryUpdateArgs {
 }
 
 /**
- * Category 순서 변경 파라미터
+ * Category 트리 배치 변경 아이템
  */
-export interface CategoryOrderItem {
+export interface CategoryTreeItem {
   id: number;
+  parentId: number | null;
   sortOrder: number;
+}
+
+/**
+ * Category 삭제 파라미터
+ */
+export interface CategoryDeleteArgs {
+  id: number;
+  action: "move" | "trash";
+  moveTo?: number;
+}
+
+/**
+ * 게시글 카운트가 포함된 Category
+ */
+export interface CategoryWithCounts extends Category {
+  publishedPostCount: number;
+  totalPostCount: number;
 }
 
 /**
  * 트리 구조 Category (children 포함)
  */
-export interface CategoryTree extends Category {
+export interface CategoryTree extends CategoryWithCounts {
   children: CategoryTree[];
 }
 
@@ -57,7 +75,7 @@ export class CategoryService {
    * - 부모 카테고리 존재 확인
    * - sort_order 자동 부여 (같은 부모 아래 최대값 + 1)
    */
-  async createCategory(data: CategoryCreateArgs): Promise<Category> {
+  async createCategory(data: CategoryCreateArgs): Promise<CategoryWithCounts> {
     // 1. slug 생성
     let slug = generateSlug(data.name);
 
@@ -121,13 +139,14 @@ export class CategoryService {
       throw HttpError.internal("Failed to create category.");
     }
 
-    return category;
+    return { ...category, publishedPostCount: 0, totalPostCount: 0 };
   }
 
   /**
    * 전체 카테고리 트리 조회
    * - flat 리스트를 계층 구조로 변환
    * - is_visible 필터링 옵션 제공 (Public API용)
+   * - 각 카테고리에 publishedPostCount / totalPostCount 포함
    */
   async getAllCategoriesTree(includeHidden = false): Promise<CategoryTree[]> {
     // 1. 전체 카테고리 조회 (sortOrder 오름차순)
@@ -141,13 +160,39 @@ export class CategoryService {
       ? categories
       : categories.filter((c) => c.isVisible);
 
-    // 3. flat 리스트 → 트리 구조 변환
+    // 3. 카테고리별 게시글 카운트 조회
+    const postCounts = await this.db
+      .select({
+        categoryId: postTable.categoryId,
+        publishedPostCount:
+          sql<number>`SUM(CASE WHEN ${postTable.status} = 'published' AND ${postTable.visibility} = 'public' AND ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
+        totalPostCount:
+          sql<number>`SUM(CASE WHEN ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
+      })
+      .from(postTable)
+      .groupBy(postTable.categoryId);
+
+    const countMap = new Map(
+      postCounts.map((c) => [
+        c.categoryId,
+        {
+          publishedPostCount: Number(c.publishedPostCount),
+          totalPostCount: Number(c.totalPostCount),
+        },
+      ]),
+    );
+
+    // 4. flat 리스트 → 트리 구조 변환
     const categoryMap = new Map<number, CategoryTree>();
     const rootCategories: CategoryTree[] = [];
 
     // 모든 카테고리를 Map에 저장 (children 빈 배열로 초기화)
     filteredCategories.forEach((category) => {
-      categoryMap.set(category.id, { ...category, children: [] });
+      const counts = countMap.get(category.id) ?? {
+        publishedPostCount: 0,
+        totalPostCount: 0,
+      };
+      categoryMap.set(category.id, { ...category, ...counts, children: [] });
     });
 
     // 부모-자식 관계 설정
@@ -175,7 +220,7 @@ export class CategoryService {
    * - parent_id 변경 시 순환 참조 방지
    * - name 변경 시 slug는 그대로 유지 (선택적으로 재생성 가능)
    */
-  async updateCategory(args: CategoryUpdateArgs): Promise<Category> {
+  async updateCategory(args: CategoryUpdateArgs): Promise<CategoryWithCounts> {
     const { id, name, parentId, sortOrder, isVisible } = args;
 
     // 1. 카테고리 존재 확인
@@ -248,18 +293,34 @@ export class CategoryService {
       throw HttpError.internal("Failed to update category.");
     }
 
-    return updated;
+    // 5. 게시글 카운트 조회
+    const [counts] = await this.db
+      .select({
+        publishedPostCount:
+          sql<number>`SUM(CASE WHEN ${postTable.status} = 'published' AND ${postTable.visibility} = 'public' AND ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
+        totalPostCount:
+          sql<number>`SUM(CASE WHEN ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
+      })
+      .from(postTable)
+      .where(eq(postTable.categoryId, id));
+
+    return {
+      ...updated,
+      publishedPostCount: Number(counts?.publishedPostCount ?? 0),
+      totalPostCount: Number(counts?.totalPostCount ?? 0),
+    };
   }
 
   /**
-   * 카테고리 순서 일괄 변경 (트랜잭션)
+   * 카테고리 트리 배치 변경 (단일 트랜잭션)
+   * - parentId와 sortOrder를 동시에 업데이트
    */
-  async updateCategoryOrder(items: CategoryOrderItem[]): Promise<void> {
+  async updateCategoryTree(items: CategoryTreeItem[]): Promise<void> {
     await this.db.transaction(async (tx) => {
       for (const item of items) {
         await tx
           .update(categoryTable)
-          .set({ sortOrder: item.sortOrder })
+          .set({ parentId: item.parentId, sortOrder: item.sortOrder })
           .where(eq(categoryTable.id, item.id));
       }
     });
@@ -267,11 +328,25 @@ export class CategoryService {
 
   /**
    * 카테고리 삭제
-   * - 하위 카테고리 존재 시 삭제 불가
-   * - 연결된 게시글 존재 시 삭제 불가
+   * - 하위 카테고리 존재 시 삭제 불가 (409)
+   * - action=move: 해당 카테고리의 게시글을 moveTo 카테고리로 이동 후 삭제
+   * - action=trash: 해당 카테고리의 게시글을 휴지통(soft delete)으로 이동 후 삭제
    */
-  async deleteCategory(id: number): Promise<void> {
-    // 1. 하위 카테고리 존재 여부 확인
+  async deleteCategory(args: CategoryDeleteArgs): Promise<void> {
+    const { id, action, moveTo } = args;
+
+    // 1. 카테고리 존재 확인
+    const [existing] = await this.db
+      .select()
+      .from(categoryTable)
+      .where(eq(categoryTable.id, id))
+      .limit(1);
+
+    if (!existing) {
+      throw HttpError.notFound("Category not found.");
+    }
+
+    // 2. 하위 카테고리 존재 여부 확인
     const [childCount] = await this.db
       .select({ count: sql<number>`COUNT(*)` })
       .from(categoryTable)
@@ -281,18 +356,42 @@ export class CategoryService {
       throw HttpError.conflict("Cannot delete category with subcategories.");
     }
 
-    // 2. 게시글 존재 여부 확인
-    const [postCount] = await this.db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(postTable)
-      .where(eq(postTable.categoryId, id));
+    // 3. 단일 트랜잭션: 게시글 처리 + 카테고리 삭제
+    await this.db.transaction(async (tx) => {
+      if (action === "move") {
+        if (!moveTo) {
+          throw HttpError.badRequest("moveTo is required when action is move.");
+        }
 
-    if (postCount && postCount.count > 0) {
-      throw HttpError.conflict("Cannot delete category with existing posts.");
-    }
+        // 이동 대상 카테고리 존재 확인
+        const [targetCategory] = await tx
+          .select()
+          .from(categoryTable)
+          .where(eq(categoryTable.id, moveTo))
+          .limit(1);
 
-    // 3. 카테고리 삭제
-    await this.db.delete(categoryTable).where(eq(categoryTable.id, id));
+        if (!targetCategory) {
+          throw HttpError.badRequest("Target category not found.");
+        }
+
+        // 게시글을 대상 카테고리로 이동
+        await tx
+          .update(postTable)
+          .set({ categoryId: moveTo })
+          .where(eq(postTable.categoryId, id));
+      } else {
+        // 게시글 휴지통 이동 (soft delete, 미삭제 게시글만)
+        await tx
+          .update(postTable)
+          .set({ deletedAt: new Date() })
+          .where(
+            and(eq(postTable.categoryId, id), isNull(postTable.deletedAt)),
+          );
+      }
+
+      // 카테고리 삭제
+      await tx.delete(categoryTable).where(eq(categoryTable.id, id));
+    });
   }
 
   /**

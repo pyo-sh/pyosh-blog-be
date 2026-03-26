@@ -1,7 +1,12 @@
 import { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
-import { seedAdmin, seedCategory, truncateAll } from "@test/helpers/seed";
+import {
+  seedAdmin,
+  seedCategory,
+  seedPost,
+  truncateAll,
+} from "@test/helpers/seed";
 
 describe("Category Routes", () => {
   let app: FastifyInstance;
@@ -51,6 +56,23 @@ describe("Category Routes", () => {
       expect(body.categories[0].children[0].name).toBe("Child Category");
     });
 
+    it("publishedPostCount / totalPostCount 포함", async () => {
+      const category = await seedCategory({ name: "Category With Posts" });
+      await seedPost(category.id, { status: "published", visibility: "public" });
+      await seedPost(category.id, { status: "draft", visibility: "public" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/categories",
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.categories[0].publishedPostCount).toBe(1);
+      expect(body.categories[0].totalPostCount).toBe(2);
+    });
+
     it("slug 단건 조회 경로 제거됨 → 404", async () => {
       const response = await app.inject({
         method: "GET",
@@ -85,6 +107,8 @@ describe("Category Routes", () => {
       expect(body.category.name).toBe("New Category");
       expect(body.category.slug).toBeDefined();
       expect(body.category.isVisible).toBe(true);
+      expect(body.category.publishedPostCount).toBe(0);
+      expect(body.category.totalPostCount).toBe(0);
     });
 
     it("비인증 → 403", async () => {
@@ -125,6 +149,46 @@ describe("Category Routes", () => {
     });
   });
 
+  // ===== PATCH /api/categories/tree =====
+
+  describe("PATCH /api/categories/tree", () => {
+    it("트리 배치 변경 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const parent = await seedCategory({ name: "Parent" });
+      const child = await seedCategory({ name: "Child", parentId: parent.id, sortOrder: 1 });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/categories/tree",
+        headers: { cookie },
+        payload: {
+          changes: [
+            { id: parent.id, parentId: null, sortOrder: 1 },
+            { id: child.id, parentId: null, sortOrder: 0 },
+          ],
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.success).toBe(true);
+    });
+
+    it("비인증 → 403", async () => {
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/categories/tree",
+        payload: {
+          changes: [],
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+  });
+
   // ===== DELETE /api/categories/:id =====
 
   describe("DELETE /api/categories/:id", () => {
@@ -136,7 +200,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/categories/${parent.id}`,
+        url: `/api/categories/${parent.id}?action=trash`,
         headers: { cookie },
       });
 
@@ -150,11 +214,70 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/categories/${category.id}`,
+        url: `/api/categories/${category.id}?action=trash`,
         headers: { cookie },
       });
 
       expect(response.statusCode).toBe(204);
+    });
+
+    it("action=trash: 게시글 휴지통 이동 후 삭제 → 204", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory({ name: "Category With Posts" });
+      await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/categories/${category.id}?action=trash`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(204);
+    });
+
+    it("action=move: 게시글 이동 후 삭제 → 204", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const target = await seedCategory({ name: "Target Category" });
+      const source = await seedCategory({ name: "Source Category" });
+      await seedPost(source.id);
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/categories/${source.id}?action=move&moveTo=${target.id}`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(204);
+    });
+
+    it("action=move moveTo 없으면 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory({ name: "Category" });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/categories/${category.id}?action=move`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("action 없으면 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory({ name: "Category" });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/categories/${category.id}`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(400);
     });
   });
 });
