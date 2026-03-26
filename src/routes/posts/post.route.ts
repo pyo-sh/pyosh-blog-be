@@ -11,6 +11,7 @@ import {
   PostListResponseSchema,
   PostDetailResponseSchema,
   PostDetailWithNavigationResponseSchema,
+  PostSlugsResponseSchema,
 } from "./post.schema";
 import { PostService } from "./post.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
@@ -62,6 +63,31 @@ export function createPostRoute(postService: PostService): FastifyPluginAsync {
         return reply.status(200).send({
           data,
           meta: result.meta,
+        });
+      },
+    );
+
+    // GET /api/posts/slugs - 발행된 글 slug 목록 (sitemap용)
+    typedFastify.get(
+      "/slugs",
+      {
+        schema: {
+          tags: ["posts"],
+          summary: "Get published post slugs (Public)",
+          description: "발행된 글의 slug와 updatedAt을 반환합니다. sitemap 생성에 사용됩니다.",
+          response: {
+            200: PostSlugsResponseSchema,
+          },
+        },
+      },
+      async (_request, reply) => {
+        const slugItems = await postService.getPostSlugs();
+
+        return reply.status(200).send({
+          slugs: slugItems.map((item) => ({
+            slug: item.slug,
+            updatedAt: item.updatedAt.toISOString(),
+          })),
         });
       },
     );

@@ -1,10 +1,14 @@
-import { eq, and, isNull, sql, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, sql, gte, lte, or, like, inArray, ne } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import type {
   GuestbookEntryDetail,
   GuestbookQuery,
   AdminGuestbookItem,
   AdminGuestbookListQuery,
+  AdminGuestbookDeleteQuery,
+  AdminGuestbookPatchQuery,
+  AdminGuestbookBulkDeleteBody,
+  AdminGuestbookBulkPatchBody,
 } from "./guestbook.schema";
 import type { CommentAuthor } from "@src/routes/comments/comment.schema";
 import {
@@ -244,9 +248,9 @@ export class GuestbookService {
   }
 
   /**
-   * 관리자용 전체 방명록 목록 조회 (페이지네이션 + 필터)
+   * 관리자용 전체 방명록 목록 조회 (페이지네이션 + 필터 + 검색)
    *
-   * @param query 쿼리 파라미터 (page, limit, authorType, startDate, endDate)
+   * @param query 쿼리 파라미터 (page, limit, status, authorType, q, startDate, endDate)
    * @returns 페이지네이션된 방명록 목록 (비밀글 마스킹 없음)
    */
   async getAdminGuestbook(
@@ -257,8 +261,21 @@ export class GuestbookService {
     const offset = calculateOffset(page, limit);
 
     const conditions = [];
+    if (query.status !== undefined) {
+      conditions.push(eq(guestbookEntryTable.status, query.status));
+    }
     if (query.authorType !== undefined) {
       conditions.push(eq(guestbookEntryTable.authorType, query.authorType));
+    }
+    if (query.q !== undefined) {
+      const escaped = query.q.replace(/[%_\\]/g, "\\$&");
+      const pattern = `%${escaped}%`;
+      conditions.push(
+        or(
+          like(guestbookEntryTable.guestName, pattern),
+          like(guestbookEntryTable.body, pattern),
+        ),
+      );
     }
     if (query.startDate !== undefined) {
       conditions.push(
@@ -296,7 +313,7 @@ export class GuestbookService {
           parentId: enriched.parentId,
           body: enriched.body,
           isSecret: enriched.isSecret,
-          status: enriched.status as "active" | "deleted",
+          status: enriched.status as "active" | "deleted" | "hidden",
           author: enriched.author,
           createdAt: enriched.createdAt.toISOString(),
           updatedAt: enriched.updatedAt.toISOString(),
@@ -305,6 +322,155 @@ export class GuestbookService {
     );
 
     return buildPaginatedResponse(items, total, page, limit);
+  }
+
+  /**
+   * 관리자 방명록 삭제 (비가역적 액션: soft_delete | hard_delete)
+   *
+   * @param entryId 방명록 ID
+   * @param action 삭제 액션 (soft_delete | hard_delete)
+   */
+  async adminDeleteEntry(
+    entryId: number,
+    action: AdminGuestbookDeleteQuery["action"],
+  ): Promise<void> {
+    const [entry] = await this.db
+      .select({ id: guestbookEntryTable.id, status: guestbookEntryTable.status })
+      .from(guestbookEntryTable)
+      .where(eq(guestbookEntryTable.id, entryId))
+      .limit(1);
+
+    if (!entry) {
+      throw HttpError.notFound("Guestbook entry not found.");
+    }
+
+    if (action === "hard_delete") {
+      await this.db
+        .delete(guestbookEntryTable)
+        .where(eq(guestbookEntryTable.id, entryId));
+    } else {
+      // soft_delete: skip already-deleted entries to preserve original deletedAt
+      if (entry.status === "deleted") return;
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "deleted", deletedAt: new Date() })
+        .where(eq(guestbookEntryTable.id, entryId));
+    }
+  }
+
+  /**
+   * 관리자 방명록 단건 상태 변경 (가역적 액션: hide | restore)
+   * - hide: active 상태만 hidden으로 변경 (삭제된 항목에 hide 적용 방지)
+   * - restore: hidden 상태만 active로 복원 (soft_delete 복원은 별도 undelete 필요)
+   * 상태 조건 불일치 시 no-op으로 처리됩니다 (idempotent).
+   *
+   * @param entryId 방명록 ID
+   * @param action 상태 변경 액션 (hide | restore)
+   */
+  async adminPatchEntry(
+    entryId: number,
+    action: AdminGuestbookPatchQuery["action"],
+  ): Promise<void> {
+    const [entry] = await this.db
+      .select({ id: guestbookEntryTable.id })
+      .from(guestbookEntryTable)
+      .where(eq(guestbookEntryTable.id, entryId))
+      .limit(1);
+
+    if (!entry) {
+      throw HttpError.notFound("Guestbook entry not found.");
+    }
+
+    if (action === "hide") {
+      // Only hide active entries; skip deleted to avoid unintentional state change
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "hidden" })
+        .where(
+          and(
+            eq(guestbookEntryTable.id, entryId),
+            eq(guestbookEntryTable.status, "active"),
+          ),
+        );
+    } else {
+      // restore: only undo hide, not soft_delete
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "active" })
+        .where(
+          and(
+            eq(guestbookEntryTable.id, entryId),
+            eq(guestbookEntryTable.status, "hidden"),
+          ),
+        );
+    }
+  }
+
+  /**
+   * 관리자 방명록 벌크 삭제 (비가역적 액션: soft_delete | hard_delete)
+   * 존재하지 않는 ID는 묵시적으로 무시됩니다 (idempotent).
+   *
+   * @param ids 방명록 ID 배열
+   * @param action 삭제 액션 (soft_delete | hard_delete)
+   */
+  async bulkDeleteEntries(
+    ids: AdminGuestbookBulkDeleteBody["ids"],
+    action: AdminGuestbookBulkDeleteBody["action"],
+  ): Promise<void> {
+    if (action === "hard_delete") {
+      await this.db
+        .delete(guestbookEntryTable)
+        .where(inArray(guestbookEntryTable.id, ids));
+    } else {
+      // soft_delete: skip already-deleted entries to preserve original deletedAt
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "deleted", deletedAt: new Date() })
+        .where(
+          and(
+            inArray(guestbookEntryTable.id, ids),
+            ne(guestbookEntryTable.status, "deleted"),
+          ),
+        );
+    }
+  }
+
+  /**
+   * 관리자 방명록 벌크 상태 변경 (가역적 액션: hide | restore)
+   * 존재하지 않거나 상태 조건 불일치 ID는 묵시적으로 무시됩니다 (idempotent).
+   * - hide: active 상태만 hidden으로 변경 (삭제된 항목에 hide 적용 방지)
+   * - restore: hidden 상태만 active로 복원 (soft_delete 복원은 별도 undelete 필요)
+   *
+   * @param ids 방명록 ID 배열
+   * @param action 상태 변경 액션 (hide | restore)
+   */
+  async bulkPatchEntries(
+    ids: AdminGuestbookBulkPatchBody["ids"],
+    action: AdminGuestbookBulkPatchBody["action"],
+  ): Promise<void> {
+    if (action === "hide") {
+      // Only hide active entries; skip deleted to avoid unintentional state change
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "hidden" })
+        .where(
+          and(
+            inArray(guestbookEntryTable.id, ids),
+            eq(guestbookEntryTable.status, "active"),
+          ),
+        );
+    } else {
+      // restore: only undo hide, not soft_delete
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "active" })
+        .where(
+          and(
+            inArray(guestbookEntryTable.id, ids),
+            eq(guestbookEntryTable.status, "hidden"),
+          ),
+        );
+    }
   }
 
   /**

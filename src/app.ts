@@ -33,6 +33,11 @@ import {
 } from "@src/routes/guestbook/guestbook.route";
 import { GuestbookService } from "@src/routes/guestbook/guestbook.service";
 import {
+  createSettingsRoute,
+  createAdminSettingsRoute,
+} from "@src/routes/settings/settings.route";
+import { SettingsService } from "@src/routes/settings/settings.service";
+import {
   createPostRoute,
   createAdminPostRoute,
 } from "@src/routes/posts/post.route";
@@ -178,6 +183,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   const postService = new PostService(fastify.db, tagService);
   const commentService = new CommentService(fastify.db);
   const guestbookService = new GuestbookService(fastify.db);
+  const settingsService = new SettingsService(fastify.db);
   const statsService = new StatsService(fastify.db);
   const userService = new UserService(fastify.db);
 
@@ -216,11 +222,25 @@ export async function buildApp(): Promise<FastifyInstance> {
   );
 
   // Guestbook routes
-  await fastify.register(createGuestbookRoute(guestbookService), {
-    prefix: "/api",
-  });
+  await fastify.register(
+    createGuestbookRoute(guestbookService, settingsService),
+    {
+      prefix: "/api",
+    },
+  );
   await fastify.register(
     createAdminGuestbookRoute(guestbookService, adminService),
+    {
+      prefix: "/api/admin",
+    },
+  );
+
+  // Settings routes
+  await fastify.register(createSettingsRoute(settingsService), {
+    prefix: "/api/settings",
+  });
+  await fastify.register(
+    createAdminSettingsRoute(settingsService, adminService),
     {
       prefix: "/api/admin",
     },
