@@ -315,7 +315,7 @@ export class PostService {
           .from(tagTable)
           .where(like(tagTable.name, term));
         if (matchedTags.length === 0) {
-          return buildPaginatedResponse([], page, limit, 0);
+          return buildPaginatedResponse([], 0, page, limit);
         }
         const tagIds = matchedTags.map((t) => t.id);
         const postIdsFromTags = await this.db
@@ -324,7 +324,7 @@ export class PostService {
           .where(inArray(postTagTable.tagId, tagIds));
         const postIds = [...new Set(postIdsFromTags.map((pt) => pt.postId))];
         if (postIds.length === 0) {
-          return buildPaginatedResponse([], page, limit, 0);
+          return buildPaginatedResponse([], 0, page, limit);
         }
         conditions.push(inArray(postTable.id, postIds));
       } else if (filter === "category") {
@@ -333,7 +333,7 @@ export class PostService {
           .from(categoryTable)
           .where(like(categoryTable.name, term));
         if (matchedCategories.length === 0) {
-          return buildPaginatedResponse([], page, limit, 0);
+          return buildPaginatedResponse([], 0, page, limit);
         }
         const categoryIds = matchedCategories.map((c) => c.id);
         conditions.push(inArray(postTable.categoryId, categoryIds));
@@ -344,7 +344,7 @@ export class PostService {
           .where(and(like(commentTable.body, term), isNull(commentTable.deletedAt)));
         const postIds = [...new Set(matchedComments.map((c) => c.postId))];
         if (postIds.length === 0) {
-          return buildPaginatedResponse([], page, limit, 0);
+          return buildPaginatedResponse([], 0, page, limit);
         }
         conditions.push(inArray(postTable.id, postIds));
       } else {
@@ -365,7 +365,7 @@ export class PostService {
         .limit(1);
 
       if (!tag) {
-        return buildPaginatedResponse([], page, limit, 0);
+        return buildPaginatedResponse([], 0, page, limit);
       }
 
       const postTags = await this.db
@@ -377,7 +377,7 @@ export class PostService {
 
       // 해당 태그를 가진 게시글이 없으면 빈 배열 반환
       if (tagFilteredPostIds.length === 0) {
-        return buildPaginatedResponse([], page, limit, 0);
+        return buildPaginatedResponse([], 0, page, limit);
       }
 
       conditions.push(inArray(postTable.id, tagFilteredPostIds));
@@ -409,7 +409,7 @@ export class PostService {
     // 각 post에 category, tags, 집계 정보 추가 (목록용 - contentMd/ancestors 제외, 배치)
     const postsWithDetails = await this.enrichPostListItems(posts);
 
-    return buildPaginatedResponse(postsWithDetails, page, limit, total);
+    return buildPaginatedResponse(postsWithDetails, total, page, limit);
   }
 
   /**
