@@ -347,13 +347,15 @@ export class CommentService {
     await verifyDeletePermission(comment, author, isAdmin);
 
     if (hardDelete && isAdmin) {
-      // Hard delete: 자식 댓글 cascade 삭제 후 본 댓글 삭제
-      await this.db
-        .delete(commentTable)
-        .where(eq(commentTable.parentId, commentId));
-      await this.db
-        .delete(commentTable)
-        .where(eq(commentTable.id, commentId));
+      // Hard delete: 자식 댓글 cascade 삭제 후 본 댓글 삭제 (atomic)
+      await this.db.transaction(async (tx) => {
+        await tx
+          .delete(commentTable)
+          .where(eq(commentTable.parentId, commentId));
+        await tx
+          .delete(commentTable)
+          .where(eq(commentTable.id, commentId));
+      });
     } else {
       // Soft delete (status='deleted', deletedAt 설정)
       await this.db
@@ -465,10 +467,24 @@ export class CommentService {
         .where(where),
     ]);
 
+    // Batch-fetch posts to avoid N+1 queries
+    const postIds = [...new Set(comments.map((c) => c.postId))];
+    const postRows =
+      postIds.length > 0
+        ? await this.db
+            .select({ id: postTable.id, title: postTable.title })
+            .from(postTable)
+            .where(inArray(postTable.id, postIds))
+        : [];
+    const postMap = new Map(postRows.map((p) => [p.id, p]));
+
     const items: AdminCommentItem[] = await Promise.all(
       comments.map(async (comment) => {
         const enriched = await this.enrichCommentWithAuthor(comment);
-        const post = await this.getPostSummary(comment.postId);
+        const post = postMap.get(comment.postId) ?? {
+          id: comment.postId,
+          title: "(삭제된 게시글)",
+        };
         return this.mapToAdminCommentItem(enriched, post);
       }),
     );
@@ -546,28 +562,35 @@ export class CommentService {
       await this.db
         .update(commentTable)
         .set({ status: "active", deletedAt: null })
-        .where(inArray(commentTable.id, ids));
+        .where(
+          and(
+            inArray(commentTable.id, ids),
+            eq(commentTable.status, "deleted"),
+          ),
+        );
     } else if (action === "soft_delete") {
       await this.db
         .update(commentTable)
         .set({ status: "deleted", deletedAt: new Date() })
         .where(inArray(commentTable.id, ids));
     } else {
-      // hard_delete: 자식 댓글도 cascade 삭제
-      const childRows = await this.db
-        .select({ id: commentTable.id })
-        .from(commentTable)
-        .where(inArray(commentTable.parentId, ids));
+      // hard_delete: 자식 댓글도 cascade 삭제 (atomic)
+      await this.db.transaction(async (tx) => {
+        const childRows = await tx
+          .select({ id: commentTable.id })
+          .from(commentTable)
+          .where(inArray(commentTable.parentId, ids));
 
-      const childIds = childRows.map((c) => c.id);
-      if (childIds.length > 0) {
-        await this.db
+        const childIds = childRows.map((c) => c.id);
+        if (childIds.length > 0) {
+          await tx
+            .delete(commentTable)
+            .where(inArray(commentTable.id, childIds));
+        }
+        await tx
           .delete(commentTable)
-          .where(inArray(commentTable.id, childIds));
-      }
-      await this.db
-        .delete(commentTable)
-        .where(inArray(commentTable.id, ids));
+          .where(inArray(commentTable.id, ids));
+      });
     }
   }
 
@@ -583,7 +606,7 @@ export class CommentService {
       .where(eq(postTable.id, postId))
       .limit(1);
 
-    return post ?? { id: postId, title: "" };
+    return post ?? { id: postId, title: "(삭제된 게시글)" };
   }
 
   /**
