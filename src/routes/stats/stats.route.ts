@@ -1,6 +1,5 @@
 import { FastifyPluginAsync, FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
-import { z } from "zod";
 import {
   DashboardStatsResponseSchema,
   PopularPostsQuerySchema,
@@ -12,6 +11,7 @@ import {
 import { requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
 import { StatsService } from "@src/services/stats.service";
+import { ErrorResponseSchema } from "@src/schemas/common";
 
 /**
  * Stats 라우트 플러그인 (Public)
@@ -37,10 +37,15 @@ export function createStatsRoute(
           tags: ["stats"],
           summary: "조회수 기록",
           description:
-            "게시글 조회수를 기록합니다. 동일 IP의 5분 이내 중복 요청은 집계에서 제외됩니다.",
+            "게시글 조회수를 기록합니다. 동일 IP의 5분 이내 중복 요청은 집계에서 제외됩니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.\n\n" +
+            "**Rate limit**: 30회/분",
           body: StatsViewBodySchema,
           response: {
             200: StatsViewResponseSchema,
+            400: ErrorResponseSchema,
+            429: ErrorResponseSchema,
           },
         },
       },
@@ -70,6 +75,7 @@ export function createStatsRoute(
           querystring: PopularPostsQuerySchema,
           response: {
             200: PopularPostsResponseSchema,
+            400: ErrorResponseSchema,
           },
         },
       },
@@ -131,13 +137,10 @@ export function createAdminStatsRoute(
           summary: "대시보드 통계",
           description:
             "오늘/최근 7일/최근 30일 조회수와 총 게시글/댓글 수를 반환합니다.",
+          security: [{ cookieAuth: [] }],
           response: {
             200: DashboardStatsResponseSchema,
-            403: z.object({
-              statusCode: z.number(),
-              error: z.string(),
-              message: z.string(),
-            }),
+            403: ErrorResponseSchema,
           },
         },
       },

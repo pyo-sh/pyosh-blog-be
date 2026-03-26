@@ -37,8 +37,16 @@ export function createAssetRoute(
           tags: ["assets"],
           summary: "Upload asset file(s)",
           description:
-            "이미지 파일을 업로드합니다. Admin 권한이 필요합니다. 단일 또는 다중 업로드 지원.",
-          consumes: ["multipart/form-data"],
+            "이미지 파일을 업로드합니다. Admin 권한이 필요합니다. 단일 또는 다중 업로드 지원.\n\n" +
+            "**Content-Type**: `multipart/form-data`\n\n" +
+            "**폼 필드명**: `files`\n\n" +
+            "**제한사항**:\n" +
+            "- 최대 파일 크기: 10MB\n" +
+            "- 최대 동시 업로드: 5개\n" +
+            "- 허용 MIME 타입: `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `image/svg+xml`\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           response: {
             201: uploadAssetsResponseSchema,
             400: errorResponseSchema,
@@ -79,9 +87,11 @@ export function createAssetRoute(
           summary: "Get asset list",
           description:
             "에셋 목록을 페이지네이션으로 조회합니다. Admin 권한이 필요합니다.",
+          security: [{ cookieAuth: [] }],
           querystring: assetListQuerySchema,
           response: {
             200: assetListResponseSchema,
+            400: errorResponseSchema,
             403: errorResponseSchema,
           },
         },
@@ -125,7 +135,10 @@ export function createAssetRoute(
           tags: ["assets"],
           summary: "Bulk delete assets",
           description:
-            "여러 Asset을 한 번에 삭제합니다. Admin 권한이 필요합니다. DB는 단일 트랜잭션, 파일 삭제는 best-effort.",
+            "여러 Asset을 한 번에 삭제합니다. Admin 권한이 필요합니다. DB는 단일 트랜잭션, 파일 삭제는 best-effort.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           body: bulkDeleteAssetsBodySchema,
           response: {
             204: z.void(),
@@ -151,7 +164,10 @@ export function createAssetRoute(
           tags: ["assets"],
           summary: "Delete asset",
           description:
-            "Asset을 삭제합니다. Admin 권한이 필요합니다. DB 레코드와 실제 파일 모두 삭제됩니다.",
+            "Asset을 삭제합니다. Admin 권한이 필요합니다. DB 레코드와 실제 파일 모두 삭제됩니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           params: assetIdParamSchema,
           response: {
             204: z.void(),

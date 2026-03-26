@@ -16,6 +16,7 @@ import {
 import { CategoryService, CategoryTree } from "./category.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
+import { ErrorResponseSchema } from "@src/schemas/common";
 
 /**
  * CategoryTree의 Date 필드를 ISO 문자열로 재귀 변환
@@ -85,10 +86,16 @@ export function createCategoryRoute(
         schema: {
           tags: ["categories"],
           summary: "Create category",
-          description: "새 카테고리를 생성합니다. Admin 권한이 필요합니다.",
+          description:
+            "새 카테고리를 생성합니다. Admin 권한이 필요합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           body: CategoryCreateBodySchema,
           response: {
             201: CategoryCreateResponseSchema,
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
           },
         },
       },
@@ -120,10 +127,15 @@ export function createCategoryRoute(
           tags: ["categories"],
           summary: "Batch update category tree",
           description:
-            "여러 카테고리의 parentId와 sortOrder를 단일 트랜잭션으로 변경합니다. Admin 권한이 필요합니다.",
+            "여러 카테고리의 parentId와 sortOrder를 단일 트랜잭션으로 변경합니다. Admin 권한이 필요합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           body: CategoryTreeUpdateBodySchema,
           response: {
             200: CategoryTreeUpdateResponseSchema,
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
           },
         },
       },
@@ -143,11 +155,18 @@ export function createCategoryRoute(
         schema: {
           tags: ["categories"],
           summary: "Update category",
-          description: "카테고리 정보를 수정합니다. Admin 권한이 필요합니다.",
+          description:
+            "카테고리 정보를 수정합니다. Admin 권한이 필요합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           params: CategoryIdParamSchema,
           body: CategoryUpdateBodySchema,
           response: {
             200: CategoryUpdateResponseSchema,
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
       },
@@ -182,9 +201,18 @@ export function createCategoryRoute(
           tags: ["categories"],
           summary: "Delete category",
           description:
-            "카테고리를 삭제합니다. action=move면 게시글을 지정 카테고리로 이동, action=trash면 게시글을 휴지통으로 이동합니다. 하위 카테고리가 있으면 삭제할 수 없습니다. Admin 권한이 필요합니다.",
+            "카테고리를 삭제합니다. action=move면 게시글을 지정 카테고리로 이동, action=trash면 게시글을 휴지통으로 이동합니다. 하위 카테고리가 있으면 삭제할 수 없습니다. Admin 권한이 필요합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           params: CategoryIdParamSchema,
           querystring: CategoryDeleteQuerySchema,
+          response: {
+            204: {},
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
+          },
         },
       },
       async (request, reply) => {

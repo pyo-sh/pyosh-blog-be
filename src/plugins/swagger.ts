@@ -9,11 +9,7 @@ import {
 import { env } from "@src/shared/env";
 
 const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
-  if (env.NODE_ENV === "production") {
-    return;
-  }
-
-  // @fastify/swagger 등록 (OpenAPI 스펙 생성)
+  // @fastify/swagger 등록 (OpenAPI 스펙 생성 - 항상 등록)
   await fastify.register(swagger, {
     openapi: {
       openapi: "3.0.0",
@@ -29,8 +25,18 @@ const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
         },
       ],
       tags: [
-        { name: "auth", description: "Authentication endpoints" },
-        { name: "health", description: "Health check endpoints" },
+        { name: "auth", description: "인증 (Admin 로그인, OAuth, CSRF)" },
+        { name: "health", description: "헬스 체크" },
+        { name: "posts", description: "게시글 CRUD" },
+        { name: "comments", description: "댓글 조회/작성/삭제" },
+        { name: "guestbook", description: "방명록 조회/작성/삭제" },
+        { name: "categories", description: "카테고리 관리" },
+        { name: "assets", description: "파일 업로드/관리" },
+        { name: "tags", description: "태그 조회" },
+        { name: "stats", description: "통계 (조회수, 대시보드)" },
+        { name: "user", description: "OAuth 사용자 프로필" },
+        { name: "admin", description: "Admin 전용 엔드포인트 (다른 태그와 함께 사용)" },
+        { name: "seo", description: "sitemap.xml, rss.xml" },
       ],
       components: {
         securitySchemes: {
@@ -46,18 +52,20 @@ const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
     transformObject: createJsonSchemaTransformObject({ schemas: {} }),
   });
 
-  // @fastify/swagger-ui 등록 (Swagger UI 제공)
-  await fastify.register(swaggerUI, {
-    routePrefix: "/docs",
-    uiConfig: {
-      docExpansion: "list",
-      deepLinking: true,
-    },
-    staticCSP: true,
-    transformStaticCSP: (header) => header,
-  });
+  // @fastify/swagger-ui 등록 (Swagger UI - 프로덕션에서 비활성화)
+  if (env.NODE_ENV !== "production") {
+    await fastify.register(swaggerUI, {
+      routePrefix: "/docs",
+      uiConfig: {
+        docExpansion: "list",
+        deepLinking: true,
+      },
+      staticCSP: true,
+      transformStaticCSP: (header) => header,
+    });
 
-  fastify.log.info("[Swagger] Plugin registered - UI available at /docs");
+    fastify.log.info("[Swagger] UI available at /docs");
+  }
 };
 
 export default fp(swaggerPlugin, {

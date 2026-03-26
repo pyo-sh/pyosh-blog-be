@@ -8,12 +8,7 @@ import {
 import { UserService } from "./user.service";
 import { OAuthAccount } from "@src/db/schema/oauth-accounts";
 import { requireAuth } from "@src/hooks/auth.hook";
-
-const ErrorResponseSchema = z.object({
-  statusCode: z.number(),
-  error: z.string(),
-  message: z.string(),
-});
+import { ErrorResponseSchema } from "@src/schemas/common";
 
 /**
  * User 라우트 플러그인 (OAuth 인증 필수)
@@ -30,6 +25,7 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
           tags: ["user"],
           summary: "내 프로필 조회",
           description: "현재 로그인한 OAuth 사용자의 프로필을 조회합니다",
+          security: [{ cookieAuth: [] }],
           response: {
             200: UserProfileResponseSchema,
             401: ErrorResponseSchema,
@@ -55,9 +51,11 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
           summary: "내 프로필 수정",
           description:
             "displayName, avatarUrl만 수정 가능합니다. provider, providerUserId 등은 변경 불가합니다.",
+          security: [{ cookieAuth: [] }],
           body: UpdateMyProfileBodySchema,
           response: {
             200: UserProfileResponseSchema,
+            400: ErrorResponseSchema,
             401: ErrorResponseSchema,
             404: ErrorResponseSchema,
           },
@@ -82,6 +80,7 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
           summary: "회원 탈퇴",
           description:
             "계정을 soft delete하고 세션을 파기합니다. 탈퇴 후 댓글/방명록에서 '탈퇴한 사용자'로 표시됩니다.",
+          security: [{ cookieAuth: [] }],
           response: {
             204: z.void(),
             401: ErrorResponseSchema,

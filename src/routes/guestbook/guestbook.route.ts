@@ -23,6 +23,7 @@ import { optionalAuth, requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
 import { resolveAuthorFromRequest, Author } from "@src/shared/interaction";
 import { HttpError } from "@src/errors/http-error";
+import { ErrorResponseSchema } from "@src/schemas/common";
 
 /**
  * Guestbook 라우트 플러그인 (Public)
@@ -48,6 +49,7 @@ export function createGuestbookRoute(
           querystring: GuestbookQuerySchema,
           response: {
             200: GuestbookListResponseSchema,
+            400: ErrorResponseSchema,
           },
         },
         preHandler: optionalAuth,
@@ -85,13 +87,18 @@ export function createGuestbookRoute(
           tags: ["guestbook"],
           summary: "방명록 작성",
           description:
-            "OAuth 로그인 사용자 또는 게스트가 방명록을 작성합니다. 게스트는 이름, 이메일, 비밀번호를 함께 전달해야 합니다.",
+            "OAuth 로그인 사용자 또는 게스트가 방명록을 작성합니다. 게스트는 이름, 이메일, 비밀번호를 함께 전달해야 합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.\n\n" +
+            "**Rate limit**: 10회/분",
           body: z.union([
             CreateGuestbookGuestBodySchema,
             CreateGuestbookOAuthBodySchema,
           ]),
           response: {
             201: GuestbookEntryResponseSchema,
+            400: ErrorResponseSchema,
+            429: ErrorResponseSchema,
           },
         },
         preHandler: optionalAuth,
@@ -159,11 +166,15 @@ export function createGuestbookRoute(
           tags: ["guestbook"],
           summary: "방명록 삭제",
           description:
-            "본인이 작성한 방명록을 삭제합니다. 게스트 방명록의 경우 비밀번호를 함께 전달해야 합니다.",
+            "본인이 작성한 방명록을 삭제합니다. 게스트 방명록의 경우 비밀번호를 함께 전달해야 합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
           params: GuestbookIdParamSchema,
           body: DeleteGuestbookGuestBodySchema.nullish(),
           response: {
             204: z.void(),
+            400: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
         preHandler: optionalAuth,
@@ -215,9 +226,12 @@ export function createAdminGuestbookRoute(
           summary: "관리자 방명록 목록 조회",
           description:
             "전체 방명록 목록을 페이지네이션과 필터로 조회합니다. 비밀글 마스킹 없이 모든 내용을 반환합니다.",
+          security: [{ cookieAuth: [] }],
           querystring: AdminGuestbookListQuerySchema,
           response: {
             200: AdminGuestbookListResponseSchema,
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
           },
         },
         preHandler: requireAdmin(adminService),
@@ -237,10 +251,15 @@ export function createAdminGuestbookRoute(
           tags: ["admin", "guestbook"],
           summary: "관리자 방명록 벌크 삭제",
           description:
-            "방명록을 비가역적으로 삭제합니다. hide/restore는 PATCH /api/admin/guestbook/bulk를 사용하세요.",
+            "방명록을 비가역적으로 삭제합니다. hide/restore는 PATCH /api/admin/guestbook/bulk를 사용하세요.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           body: AdminGuestbookBulkDeleteBodySchema,
           response: {
             204: z.void(),
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
           },
         },
         preHandler: requireAdmin(adminService),
@@ -260,10 +279,15 @@ export function createAdminGuestbookRoute(
           tags: ["admin", "guestbook"],
           summary: "관리자 방명록 벌크 상태 변경",
           description:
-            "방명록 상태를 가역적으로 변경합니다. hide: 공개 목록에서 숨김, restore: active 복원.",
+            "방명록 상태를 가역적으로 변경합니다. hide: 공개 목록에서 숨김, restore: active 복원.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           body: AdminGuestbookBulkPatchBodySchema,
           response: {
             204: z.void(),
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
           },
         },
         preHandler: requireAdmin(adminService),
@@ -283,11 +307,16 @@ export function createAdminGuestbookRoute(
           tags: ["admin", "guestbook"],
           summary: "관리자 방명록 상태 변경",
           description:
-            "방명록 상태를 가역적으로 변경합니다. hide: active→hidden, restore: hidden→active. 상태 조건 불일치 시 204를 반환하며 no-op 처리됩니다.",
+            "방명록 상태를 가역적으로 변경합니다. hide: active→hidden, restore: hidden→active. 상태 조건 불일치 시 204를 반환하며 no-op 처리됩니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           params: GuestbookIdParamSchema,
           querystring: AdminGuestbookPatchQuerySchema,
           response: {
             204: z.void(),
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
         preHandler: requireAdmin(adminService),
@@ -308,11 +337,16 @@ export function createAdminGuestbookRoute(
           tags: ["admin", "guestbook"],
           summary: "관리자 방명록 삭제",
           description:
-            "방명록을 비가역적으로 삭제합니다. action 쿼리로 soft_delete | hard_delete를 지정합니다.",
+            "방명록을 비가역적으로 삭제합니다. action 쿼리로 soft_delete | hard_delete를 지정합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           params: GuestbookIdParamSchema,
           querystring: AdminGuestbookDeleteQuerySchema,
           response: {
             204: z.void(),
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
         preHandler: requireAdmin(adminService),

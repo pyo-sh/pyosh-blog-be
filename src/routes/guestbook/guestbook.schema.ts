@@ -6,15 +6,15 @@ import { PaginationMetaSchema } from "@src/schemas/common";
  * Path Parameter Schemas
  */
 export const GuestbookIdParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
+  id: z.coerce.number().int().positive().describe("방명록 엔트리 ID"),
 });
 
 /**
  * Query Parameter Schemas
  */
 export const GuestbookQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().positive().max(100).optional().default(20),
+  page: z.coerce.number().int().positive().optional().default(1).describe("페이지 번호"),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20).describe("페이지당 항목 수 (최대 100)"),
 });
 
 /**
@@ -29,9 +29,10 @@ export const CreateGuestbookOAuthBodySchema = z.object({
     .string()
     .trim()
     .min(1, "본문은 필수입니다")
-    .max(2000, "본문은 2000자를 초과할 수 없습니다"),
-  parentId: z.number().int().positive().optional(),
-  isSecret: z.boolean().optional().default(false),
+    .max(2000, "본문은 2000자를 초과할 수 없습니다")
+    .describe("방명록 본문 (최대 2000자)"),
+  parentId: z.number().int().positive().optional().describe("부모 엔트리 ID (답글인 경우)"),
+  isSecret: z.boolean().optional().default(false).describe("비밀 방명록 여부"),
 });
 
 /**
@@ -43,22 +44,25 @@ export const CreateGuestbookGuestBodySchema =
       .string()
       .trim()
       .min(1, "이름은 필수입니다")
-      .max(50, "이름은 50자를 초과할 수 없습니다"),
+      .max(50, "이름은 50자를 초과할 수 없습니다")
+      .describe("게스트 이름 (최대 50자)"),
     guestEmail: z
       .string()
       .email("유효한 이메일 주소를 입력하세요")
-      .max(100, "이메일은 100자를 초과할 수 없습니다"),
+      .max(100, "이메일은 100자를 초과할 수 없습니다")
+      .describe("게스트 이메일"),
     guestPassword: z
       .string()
       .min(4, "비밀번호는 최소 4자 이상이어야 합니다")
-      .max(100, "비밀번호는 100자를 초과할 수 없습니다"),
+      .max(100, "비밀번호는 100자를 초과할 수 없습니다")
+      .describe("게스트 비밀번호 (삭제 시 필요, 최소 4자)"),
   });
 
 /**
  * 게스트 방명록 삭제 스키마
  */
 export const DeleteGuestbookGuestBodySchema = z.object({
-  guestPassword: z.string().min(4, "비밀번호는 최소 4자 이상이어야 합니다"),
+  guestPassword: z.string().min(4, "비밀번호는 최소 4자 이상이어야 합니다").describe("게스트 비밀번호"),
 });
 
 /**
@@ -82,15 +86,15 @@ export type GuestbookEntryDetailSchemaType = {
 
 export const GuestbookEntryDetailSchema = z.lazy(() =>
   z.object({
-    id: z.number(),
-    parentId: z.number().nullable(),
-    body: z.string(),
-    isSecret: z.boolean(),
-    status: z.enum(["active", "deleted"]),
+    id: z.number().describe("방명록 엔트리 ID"),
+    parentId: z.number().nullable().describe("부모 엔트리 ID (루트이면 null)"),
+    body: z.string().describe("방명록 본문"),
+    isSecret: z.boolean().describe("비밀 방명록 여부"),
+    status: z.enum(["active", "deleted"]).describe("방명록 상태"),
     author: CommentAuthorSchema,
-    replies: z.array(GuestbookEntryDetailSchema),
-    createdAt: z.string(), // ISO datetime
-    updatedAt: z.string(), // ISO datetime
+    replies: z.array(GuestbookEntryDetailSchema).describe("답글 목록"),
+    createdAt: z.string().describe("작성일 (ISO 8601)"),
+    updatedAt: z.string().describe("수정일 (ISO 8601)"),
   }),
 );
 
@@ -113,13 +117,13 @@ export const GuestbookEntryResponseSchema = z.object({
  * 관리자 방명록 목록 쿼리 스키마
  */
 export const AdminGuestbookListQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().positive().max(100).optional().default(20),
-  status: z.enum(["active", "deleted", "hidden"]).optional(),
-  authorType: z.enum(["oauth", "guest"]).optional(),
-  q: z.string().optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  page: z.coerce.number().int().positive().optional().default(1).describe("페이지 번호"),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20).describe("페이지당 항목 수 (최대 100)"),
+  status: z.enum(["active", "deleted", "hidden"]).optional().describe("상태 필터"),
+  authorType: z.enum(["oauth", "guest"]).optional().describe("작성자 유형 필터"),
+  q: z.string().optional().describe("검색어"),
+  startDate: z.string().optional().describe("시작일 (ISO 8601)"),
+  endDate: z.string().optional().describe("종료일 (ISO 8601)"),
 });
 
 /**
@@ -127,7 +131,7 @@ export const AdminGuestbookListQuerySchema = z.object({
  * hide는 PATCH /api/admin/guestbook/:id를 사용
  */
 export const AdminGuestbookDeleteQuerySchema = z.object({
-  action: z.enum(["soft_delete", "hard_delete"]),
+  action: z.enum(["soft_delete", "hard_delete"]).describe("삭제 방식 (soft_delete: 복원 가능, hard_delete: 영구 삭제)"),
 });
 
 /**
@@ -136,7 +140,7 @@ export const AdminGuestbookDeleteQuerySchema = z.object({
  * - restore: status=active (hidden 상태만 복원, soft_delete는 별도 undelete 필요)
  */
 export const AdminGuestbookPatchQuerySchema = z.object({
-  action: z.enum(["hide", "restore"]),
+  action: z.enum(["hide", "restore"]).describe("변경할 상태 (hide: 숨김, restore: 복원)"),
 });
 
 /**
@@ -147,8 +151,8 @@ export const AdminGuestbookPatchQuerySchema = z.object({
  * 최대 100개까지 처리 가능
  */
 export const AdminGuestbookBulkDeleteBodySchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1).max(100),
-  action: z.enum(["soft_delete", "hard_delete"]),
+  ids: z.array(z.number().int().positive()).min(1).max(100).describe("대상 방명록 ID 배열 (최대 100개)"),
+  action: z.enum(["soft_delete", "hard_delete"]).describe("삭제 방식"),
 });
 
 /**
@@ -158,22 +162,22 @@ export const AdminGuestbookBulkDeleteBodySchema = z.object({
  * 최대 100개까지 처리 가능
  */
 export const AdminGuestbookBulkPatchBodySchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1).max(100),
-  action: z.enum(["hide", "restore"]),
+  ids: z.array(z.number().int().positive()).min(1).max(100).describe("대상 방명록 ID 배열 (최대 100개)"),
+  action: z.enum(["hide", "restore"]).describe("변경할 상태"),
 });
 
 /**
  * 관리자 방명록 아이템 스키마 (flat, 비밀글 마스킹 없음)
  */
 export const AdminGuestbookItemSchema = z.object({
-  id: z.number(),
-  parentId: z.number().nullable(),
-  body: z.string(),
-  isSecret: z.boolean(),
-  status: z.enum(["active", "deleted", "hidden"]),
+  id: z.number().describe("방명록 엔트리 ID"),
+  parentId: z.number().nullable().describe("부모 엔트리 ID"),
+  body: z.string().describe("방명록 본문"),
+  isSecret: z.boolean().describe("비밀 방명록 여부"),
+  status: z.enum(["active", "deleted", "hidden"]).describe("방명록 상태"),
   author: CommentAuthorSchema,
-  createdAt: z.string(),
-  updatedAt: z.string(),
+  createdAt: z.string().describe("작성일 (ISO 8601)"),
+  updatedAt: z.string().describe("수정일 (ISO 8601)"),
 });
 
 /**
