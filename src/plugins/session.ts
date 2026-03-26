@@ -17,7 +17,7 @@ const sessionPlugin: FastifyPluginAsync = async (fastify) => {
     cookie: {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? "strict" : "lax",
+      sameSite: "lax", // 'strict'은 OAuth 콜백(외부 리다이렉트) 시 쿠키 누락 발생; CSRF 토큰이 주 방어수단
       path: "/",
       maxAge: 24 * 60 * 60 * 1000, // 24시간
     },
