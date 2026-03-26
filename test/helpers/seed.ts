@@ -3,7 +3,9 @@ import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from "./app";
 import { db } from "@src/db/client";
 import {
   adminTable,
+  assetTable,
   categoryTable,
+  NewAsset,
   NewCategory,
   NewOAuthAccount,
   NewPost,
@@ -154,4 +156,30 @@ export async function seedPost(
     .where(eq(postTable.id, Number(result.insertId)));
 
   return post!;
+}
+
+/**
+ * 테스트 Asset 생성
+ */
+export async function seedAsset(
+  overrides?: Partial<NewAsset>,
+): Promise<typeof assetTable.$inferSelect> {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const values: NewAsset = {
+    storageProvider: "local",
+    storageKey: `2026/01/test-${suffix}.png`,
+    mimeType: "image/png",
+    sizeBytes: 1024,
+    width: 100,
+    height: 100,
+    ...overrides,
+  };
+
+  const [result] = await db.insert(assetTable).values(values);
+  const [asset] = await db
+    .select()
+    .from(assetTable)
+    .where(eq(assetTable.id, Number(result.insertId)));
+
+  return asset!;
 }
