@@ -591,6 +591,103 @@ describe("Comment Routes", () => {
       expect(response.statusCode).toBe(200);
       expect(response.json().data[0].body).toBe("비밀 내용 원문");
     });
+
+    it("authorType 필터 적용 → guest/oauth 댓글 구분 반환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const user = await seedOAuthUser({ displayName: "OAuth Writer" });
+      const userCookie = await injectOAuthUser(user.id);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      // OAuth 댓글
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        headers: { cookie: userCookie },
+        payload: { body: "OAuth 댓글" },
+      });
+
+      // 게스트 댓글
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "게스트 댓글",
+          guestName: "게스트",
+          guestEmail: "g@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+
+      // authorType=guest 필터 → 1개 (게스트만)
+      const guestResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?authorType=guest",
+        headers: { cookie: adminCookie },
+      });
+      expect(guestResponse.statusCode).toBe(200);
+      const guestBody = guestResponse.json();
+      expect(guestBody.data).toHaveLength(1);
+      expect(guestBody.data[0].author.type).toBe("guest");
+
+      // authorType=oauth 필터 → 1개 (OAuth만)
+      const oauthResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?authorType=oauth",
+        headers: { cookie: adminCookie },
+      });
+      expect(oauthResponse.statusCode).toBe(200);
+      const oauthBody = oauthResponse.json();
+      expect(oauthBody.data).toHaveLength(1);
+      expect(oauthBody.data[0].author.type).toBe("oauth");
+    });
+
+    it("order 파라미터 → asc/desc 응답 정상 반환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      for (let i = 1; i <= 3; i++) {
+        await app.inject({
+          method: "POST",
+          url: `/api/posts/${post.id}/comments`,
+          payload: {
+            body: `댓글 ${i}`,
+            guestName: `작성자${i}`,
+            guestEmail: `u${i}@example.com`,
+            guestPassword: "pass1234",
+          },
+        });
+      }
+
+      const descResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?order=desc",
+        headers: { cookie: adminCookie },
+      });
+      const ascResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?order=asc",
+        headers: { cookie: adminCookie },
+      });
+
+      expect(descResponse.statusCode).toBe(200);
+      expect(descResponse.json().data).toHaveLength(3);
+
+      expect(ascResponse.statusCode).toBe(200);
+      expect(ascResponse.json().data).toHaveLength(3);
+    });
   });
 
   // ===== GET /api/admin/comments/:id/thread =====
