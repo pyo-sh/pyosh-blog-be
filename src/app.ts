@@ -164,6 +164,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       version: getAppVersion(),
+      memory: getMemoryUsage(),
       database,
     };
   });
