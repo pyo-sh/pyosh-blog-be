@@ -5,11 +5,12 @@ import { z } from "zod";
 import { AdminService } from "./admin.service";
 import { HttpError } from "@src/errors/http-error";
 import { env } from "@src/shared/env";
+import { ErrorResponseSchema } from "@src/schemas/common";
 
 // Zod 스키마 정의
 const AdminLoginSchema = z.object({
-  email: z.string().email("유효한 이메일 주소를 입력하세요"),
-  password: z.string().min(8, "비밀번호는 최소 8자 이상이어야 합니다"),
+  email: z.string().email("유효한 이메일 주소를 입력하세요").describe("관리자 이메일"),
+  password: z.string().min(8, "비밀번호는 최소 8자 이상이어야 합니다").describe("관리자 비밀번호 (최소 8자)"),
 });
 
 /**
@@ -70,10 +71,13 @@ export function createAuthRoute(
           tags: ["auth"],
           summary: "CSRF 토큰 발급",
           description:
-            "state-changing 요청(POST/PUT/DELETE)에 필요한 CSRF 토큰을 발급합니다. 세션에 시크릿을 저장하고 토큰을 반환합니다.",
+            "state-changing 요청(POST/PUT/PATCH/DELETE)에 필요한 CSRF 토큰을 발급합니다. " +
+            "세션에 시크릿을 저장하고 토큰을 반환합니다.\n\n" +
+            "발급된 토큰은 `x-csrf-token` 헤더에 포함하여 요청을 보내야 합니다. " +
+            "세션이 유지되는 동안 토큰이 유효합니다.",
           response: {
             200: z.object({
-              token: z.string(),
+              token: z.string().describe("CSRF 토큰 값"),
             }),
           },
         },
@@ -98,7 +102,9 @@ export function createAuthRoute(
         schema: {
           tags: ["auth"],
           summary: "Admin login",
-          description: "관리자 이메일/비밀번호로 로그인합니다",
+          description:
+            "관리자 이메일/비밀번호로 로그인합니다.\n\n" +
+            "**Rate limit**: 5회/분",
           body: AdminLoginSchema,
           response: {
             200: z.object({
@@ -110,11 +116,8 @@ export function createAuthRoute(
                 lastLoginAt: z.date().nullable(),
               }),
             }),
-            401: z.object({
-              statusCode: z.number(),
-              error: z.string(),
-              message: z.string(),
-            }),
+            401: ErrorResponseSchema,
+            429: ErrorResponseSchema,
           },
         },
       },
@@ -139,7 +142,11 @@ export function createAuthRoute(
         schema: {
           tags: ["auth"],
           summary: "Admin logout",
-          description: "관리자 세션을 종료합니다",
+          description:
+            "관리자 세션을 종료합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           response: {
             204: z.void(),
           },
@@ -181,11 +188,7 @@ export function createAuthRoute(
                 googleEmail: z.string().nullable(),
               }),
             ]),
-            401: z.object({
-              statusCode: z.number(),
-              error: z.string(),
-              message: z.string(),
-            }),
+            401: ErrorResponseSchema,
           },
         },
       },

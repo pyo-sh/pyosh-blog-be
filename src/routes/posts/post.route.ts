@@ -17,6 +17,7 @@ import {
 import { PostService } from "./post.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
+import { ErrorResponseSchema } from "@src/schemas/common";
 
 /**
  * Post 라우트 플러그인 (Public)
@@ -37,6 +38,7 @@ export function createPostRoute(postService: PostService): FastifyPluginAsync {
           querystring: PostListQuerySchema,
           response: {
             200: PostListResponseSchema,
+            400: ErrorResponseSchema,
           },
         },
       },
@@ -105,6 +107,7 @@ export function createPostRoute(postService: PostService): FastifyPluginAsync {
           params: PostSlugParamSchema,
           response: {
             200: PostDetailWithNavigationResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
       },
@@ -157,9 +160,12 @@ export function createAdminPostRoute(
           summary: "Get all posts (Admin)",
           description:
             "모든 게시글 목록을 조회합니다. status, visibility, deleted 상태와 무관하게 조회 가능합니다.",
+          security: [{ cookieAuth: [] }],
           querystring: AdminPostListQuerySchema,
           response: {
             200: PostListResponseSchema,
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
           },
         },
       },
@@ -195,9 +201,12 @@ export function createAdminPostRoute(
           summary: "Get post by ID (Admin)",
           description:
             "ID로 게시글을 조회합니다. 모든 상태의 게시글을 조회할 수 있습니다.",
+          security: [{ cookieAuth: [] }],
           params: PostIdParamSchema,
           response: {
             200: PostDetailResponseSchema,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
       },
@@ -228,10 +237,15 @@ export function createAdminPostRoute(
           tags: ["posts", "admin"],
           summary: "Create post (Admin)",
           description:
-            "새 게시글을 생성합니다. 태그는 자동으로 생성/연결됩니다.",
+            "새 게시글을 생성합니다. 태그는 자동으로 생성/연결됩니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           body: CreatePostBodySchema,
           response: {
             201: PostDetailResponseSchema,
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
           },
         },
       },
@@ -278,10 +292,15 @@ export function createAdminPostRoute(
           tags: ["posts", "admin"],
           summary: "Bulk action on posts (Admin)",
           description:
-            "여러 게시글에 대해 일괄 작업을 수행합니다. 단일 트랜잭션으로 전체 성공 or 전체 실패합니다.",
+            "여러 게시글에 대해 일괄 작업을 수행합니다. 단일 트랜잭션으로 전체 성공 or 전체 실패합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           body: BulkPostActionBodySchema,
           response: {
             204: z.void(),
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
           },
         },
       },
@@ -308,11 +327,17 @@ export function createAdminPostRoute(
           tags: ["posts", "admin"],
           summary: "Update post (Admin)",
           description:
-            "게시글을 수정합니다. 수정할 필드만 전달하면 됩니다. tags를 전달하면 기존 태그를 덮어씁니다.",
+            "게시글을 수정합니다. 수정할 필드만 전달하면 됩니다. tags를 전달하면 기존 태그를 덮어씁니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           params: PostIdParamSchema,
           body: UpdatePostBodySchema,
           response: {
             200: PostDetailResponseSchema,
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
       },
@@ -352,10 +377,15 @@ export function createAdminPostRoute(
           tags: ["posts", "admin"],
           summary: "Delete post (Soft Delete) (Admin)",
           description:
-            "게시글을 Soft Delete합니다. deletedAt 타임스탬프가 설정됩니다.",
+            "게시글을 Soft Delete합니다. deletedAt 타임스탬프가 설정됩니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           params: PostIdParamSchema,
           response: {
             204: z.void(),
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
       },
@@ -376,10 +406,16 @@ export function createAdminPostRoute(
         schema: {
           tags: ["posts", "admin"],
           summary: "Restore deleted post (Admin)",
-          description: "Soft Delete된 게시글을 복원합니다.",
+          description:
+            "Soft Delete된 게시글을 복원합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           params: PostIdParamSchema,
           response: {
             200: PostDetailResponseSchema,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
       },
@@ -410,10 +446,15 @@ export function createAdminPostRoute(
           tags: ["posts", "admin"],
           summary: "Hard delete post (Admin)",
           description:
-            "게시글을 완전히 삭제합니다. 복구할 수 없습니다. 연결된 태그 관계도 삭제됩니다.",
+            "게시글을 완전히 삭제합니다. 복구할 수 없습니다. 연결된 태그 관계도 삭제됩니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
           params: PostIdParamSchema,
           response: {
             204: z.void(),
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
       },
