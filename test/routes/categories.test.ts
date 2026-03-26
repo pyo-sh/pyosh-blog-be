@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
 import {
   seedAdmin,
@@ -7,6 +8,8 @@ import {
   seedPost,
   truncateAll,
 } from "@test/helpers/seed";
+import { db } from "@src/db/client";
+import { postTable } from "@src/db/schema";
 
 describe("Category Routes", () => {
   let app: FastifyInstance;
@@ -284,11 +287,11 @@ describe("Category Routes", () => {
       expect(response.statusCode).toBe(204);
     });
 
-    it("action=trash: 게시글 휴지통 이동 후 삭제 → 204", async () => {
+    it("action=trash: 게시글 휴지통 이동 후 삭제 → 204 + DB 검증", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
       const category = await seedCategory({ name: "Category With Posts" });
-      await seedPost(category.id);
+      const post = await seedPost(category.id);
 
       const response = await app.inject({
         method: "DELETE",
@@ -297,14 +300,21 @@ describe("Category Routes", () => {
       });
 
       expect(response.statusCode).toBe(204);
+
+      const [row] = await db
+        .select()
+        .from(postTable)
+        .where(eq(postTable.id, post.id));
+      expect(row?.deletedAt).not.toBeNull();
+      expect(row?.categoryId).toBeNull();
     });
 
-    it("action=move: 게시글 이동 후 삭제 → 204", async () => {
+    it("action=move: 게시글 이동 후 삭제 → 204 + DB 검증", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
       const target = await seedCategory({ name: "Target Category" });
       const source = await seedCategory({ name: "Source Category" });
-      await seedPost(source.id);
+      const post = await seedPost(source.id);
 
       const response = await app.inject({
         method: "DELETE",
@@ -313,6 +323,12 @@ describe("Category Routes", () => {
       });
 
       expect(response.statusCode).toBe(204);
+
+      const [row] = await db
+        .select()
+        .from(postTable)
+        .where(eq(postTable.id, post.id));
+      expect(row?.categoryId).toBe(target.id);
     });
 
     it("action=move moveTo 없으면 400", async () => {
