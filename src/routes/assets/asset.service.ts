@@ -139,7 +139,7 @@ export class AssetService {
     await this.db.delete(assetTable).where(inArray(assetTable.id, ids));
 
     // 3. 물리 파일 삭제 (best-effort: 실패 시 로그만 남김)
-    await Promise.allSettled(
+    await Promise.all(
       assets.map(async (asset) => {
         try {
           await this.fileStorage.deleteFile(asset.storageKey);
