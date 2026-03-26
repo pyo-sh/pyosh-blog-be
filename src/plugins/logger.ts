@@ -104,11 +104,15 @@ export function buildProdLoggerInstance(): pino.Logger {
     pino.multistream(streams),
   );
 
-  // pino.destination은 기본적으로 async(버퍼) I/O — 프로세스 종료 시 플러시
-  process.on("exit", () => logger.flush());
+  // pino.destination은 기본적으로 async(버퍼) I/O — 프로세스 종료 시 플러시 (once: 중복 등록 방지)
+  process.once("exit", () => logger.flush());
 
   return logger;
 }
+
+type FastifyLoggerConfig =
+  | { loggerInstance: pino.Logger }
+  | { logger: ReturnType<typeof buildLoggerOptions>; disableRequestLogging?: boolean };
 
 /**
  * Fastify 생성자에 전달할 로거 설정 반환
@@ -116,11 +120,7 @@ export function buildProdLoggerInstance(): pino.Logger {
  * - development: logger options + pino-pretty
  * - test: logger options + disableRequestLogging
  */
-export function buildFastifyLoggerConfig(): {
-  logger?: ReturnType<typeof buildLoggerOptions>;
-  loggerInstance?: pino.Logger;
-  disableRequestLogging?: boolean;
-} {
+export function buildFastifyLoggerConfig(): FastifyLoggerConfig {
   const isProd = env.NODE_ENV === NodeEnv.PROD;
   const isTest = env.NODE_ENV === NodeEnv.TEST;
 
