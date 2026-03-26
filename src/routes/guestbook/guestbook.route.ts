@@ -13,6 +13,7 @@ import {
   AdminGuestbookListResponseSchema,
   AdminGuestbookDeleteQuerySchema,
   AdminGuestbookBulkDeleteBodySchema,
+  AdminGuestbookBulkRestoreBodySchema,
 } from "./guestbook.schema";
 import { GuestbookService } from "./guestbook.service";
 import { SettingsService } from "@src/routes/settings/settings.service";
@@ -227,7 +228,7 @@ export function createAdminGuestbookRoute(
       },
     );
 
-    // DELETE /api/admin/guestbook/bulk - 관리자 방명록 벌크 삭제
+    // DELETE /api/admin/guestbook/bulk - 관리자 방명록 벌크 삭제 (hide | soft_delete | hard_delete)
     typedFastify.delete(
       "/guestbook/bulk",
       {
@@ -235,7 +236,7 @@ export function createAdminGuestbookRoute(
           tags: ["admin", "guestbook"],
           summary: "관리자 방명록 벌크 삭제",
           description:
-            "관리자가 여러 방명록을 한 번에 삭제하거나 상태를 변경합니다.",
+            "관리자가 여러 방명록을 한 번에 숨기거나 삭제합니다. 복원은 PATCH /api/admin/guestbook/bulk를 사용하세요.",
           body: AdminGuestbookBulkDeleteBodySchema,
           response: {
             204: z.void(),
@@ -246,6 +247,28 @@ export function createAdminGuestbookRoute(
       async (request, reply) => {
         const { ids, action } = request.body;
         await guestbookService.bulkDeleteEntries(ids, action);
+        return reply.status(204).send();
+      },
+    );
+
+    // PATCH /api/admin/guestbook/bulk - 관리자 방명록 벌크 복원
+    typedFastify.patch(
+      "/guestbook/bulk",
+      {
+        schema: {
+          tags: ["admin", "guestbook"],
+          summary: "관리자 방명록 벌크 복원",
+          description: "숨기거나 삭제된 방명록을 active 상태로 복원합니다.",
+          body: AdminGuestbookBulkRestoreBodySchema,
+          response: {
+            204: z.void(),
+          },
+        },
+        preHandler: requireAdmin(adminService),
+      },
+      async (request, reply) => {
+        const { ids } = request.body;
+        await guestbookService.bulkRestoreEntries(ids);
         return reply.status(204).send();
       },
     );

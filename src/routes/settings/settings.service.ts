@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "@src/db/schema/index";
 import { siteSettingsTable } from "@src/db/schema/settings";
@@ -31,7 +32,8 @@ export class SettingsService {
     if (existing) {
       await this.db
         .update(siteSettingsTable)
-        .set({ guestbookEnabled: enabled });
+        .set({ guestbookEnabled: enabled })
+        .where(eq(siteSettingsTable.id, existing.id));
     } else {
       await this.db
         .insert(siteSettingsTable)

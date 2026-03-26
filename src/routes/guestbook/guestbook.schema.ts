@@ -130,11 +130,19 @@ export const AdminGuestbookDeleteQuerySchema = z.object({
 });
 
 /**
- * 관리자 방명록 벌크 삭제 요청 스키마
+ * 관리자 방명록 벌크 삭제 요청 스키마 (DELETE - 비가역적 액션만)
+ * restore는 PATCH /api/admin/guestbook/bulk를 통해 처리
  */
 export const AdminGuestbookBulkDeleteBodySchema = z.object({
   ids: z.array(z.number().int().positive()).min(1),
-  action: z.enum(["hide", "restore", "soft_delete", "hard_delete"]),
+  action: z.enum(["hide", "soft_delete", "hard_delete"]),
+});
+
+/**
+ * 관리자 방명록 벌크 복원 요청 스키마 (PATCH)
+ */
+export const AdminGuestbookBulkRestoreBodySchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1),
 });
 
 /**
@@ -182,5 +190,8 @@ export type AdminGuestbookDeleteQuery = z.infer<
 >;
 export type AdminGuestbookBulkDeleteBody = z.infer<
   typeof AdminGuestbookBulkDeleteBodySchema
+>;
+export type AdminGuestbookBulkRestoreBody = z.infer<
+  typeof AdminGuestbookBulkRestoreBodySchema
 >;
 export type AdminGuestbookItem = z.infer<typeof AdminGuestbookItemSchema>;

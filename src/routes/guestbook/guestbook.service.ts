@@ -7,6 +7,7 @@ import type {
   AdminGuestbookListQuery,
   AdminGuestbookDeleteQuery,
   AdminGuestbookBulkDeleteBody,
+  AdminGuestbookBulkRestoreBody,
 } from "./guestbook.schema";
 import type { CommentAuthor } from "@src/routes/comments/comment.schema";
 import {
@@ -266,7 +267,8 @@ export class GuestbookService {
       conditions.push(eq(guestbookEntryTable.authorType, query.authorType));
     }
     if (query.q !== undefined) {
-      const pattern = `%${query.q}%`;
+      const escaped = query.q.replace(/[%_\\]/g, "\\$&");
+      const pattern = `%${escaped}%`;
       conditions.push(
         or(
           like(guestbookEntryTable.guestName, pattern),
@@ -360,10 +362,10 @@ export class GuestbookService {
   }
 
   /**
-   * 관리자 방명록 벌크 삭제
+   * 관리자 방명록 벌크 삭제 (비가역적 액션: hide | soft_delete | hard_delete)
    *
    * @param ids 방명록 ID 배열
-   * @param action 삭제 액션 (hide | restore | soft_delete | hard_delete)
+   * @param action 삭제 액션 (hide | soft_delete | hard_delete)
    */
   async bulkDeleteEntries(
     ids: AdminGuestbookBulkDeleteBody["ids"],
@@ -378,11 +380,6 @@ export class GuestbookService {
         .update(guestbookEntryTable)
         .set({ status: "hidden" })
         .where(inArray(guestbookEntryTable.id, ids));
-    } else if (action === "restore") {
-      await this.db
-        .update(guestbookEntryTable)
-        .set({ status: "active", deletedAt: null })
-        .where(inArray(guestbookEntryTable.id, ids));
     } else {
       // soft_delete
       await this.db
@@ -390,6 +387,20 @@ export class GuestbookService {
         .set({ status: "deleted", deletedAt: new Date() })
         .where(inArray(guestbookEntryTable.id, ids));
     }
+  }
+
+  /**
+   * 관리자 방명록 벌크 복원 (status=active 로 되돌림)
+   *
+   * @param ids 방명록 ID 배열
+   */
+  async bulkRestoreEntries(
+    ids: AdminGuestbookBulkRestoreBody["ids"],
+  ): Promise<void> {
+    await this.db
+      .update(guestbookEntryTable)
+      .set({ status: "active", deletedAt: null })
+      .where(inArray(guestbookEntryTable.id, ids));
   }
 
   /**
