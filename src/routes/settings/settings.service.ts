@@ -22,22 +22,12 @@ export class SettingsService {
 
   /**
    * 방명록 활성 상태 변경
+   * 마이그레이션이 id=1 싱글톤 레코드를 보장하므로 직접 UPDATE
    */
   async setGuestbookEnabled(enabled: boolean): Promise<void> {
-    const [existing] = await this.db
-      .select({ id: siteSettingsTable.id })
-      .from(siteSettingsTable)
-      .limit(1);
-
-    if (existing) {
-      await this.db
-        .update(siteSettingsTable)
-        .set({ guestbookEnabled: enabled })
-        .where(eq(siteSettingsTable.id, existing.id));
-    } else {
-      await this.db
-        .insert(siteSettingsTable)
-        .values({ guestbookEnabled: enabled });
-    }
+    await this.db
+      .update(siteSettingsTable)
+      .set({ guestbookEnabled: enabled })
+      .where(eq(siteSettingsTable.id, 1));
   }
 }

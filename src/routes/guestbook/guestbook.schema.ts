@@ -123,30 +123,40 @@ export const AdminGuestbookListQuerySchema = z.object({
 });
 
 /**
- * 관리자 방명록 삭제 액션 쿼리 스키마
+ * 관리자 방명록 단건 삭제 쿼리 스키마 (DELETE - 비가역적 액션만)
+ * hide는 PATCH /api/admin/guestbook/:id를 사용
  */
 export const AdminGuestbookDeleteQuerySchema = z.object({
-  action: z.enum(["hide", "soft_delete", "hard_delete"]),
+  action: z.enum(["soft_delete", "hard_delete"]),
+});
+
+/**
+ * 관리자 방명록 단건 상태 변경 쿼리 스키마 (PATCH - 가역적 액션)
+ */
+export const AdminGuestbookPatchQuerySchema = z.object({
+  action: z.enum(["hide"]),
 });
 
 /**
  * 관리자 방명록 벌크 삭제 요청 스키마 (DELETE - 비가역적 액션만)
- * - soft_delete: status=deleted, deletedAt 설정 (복원 불가)
- * - hard_delete: DB에서 완전 삭제 (복원 불가)
+ * - soft_delete: status=deleted, deletedAt 설정
+ * - hard_delete: DB에서 완전 삭제
  * hide/restore는 PATCH /api/admin/guestbook/bulk를 사용
+ * 최대 100개까지 처리 가능
  */
 export const AdminGuestbookBulkDeleteBodySchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1),
+  ids: z.array(z.number().int().positive()).min(1).max(100),
   action: z.enum(["soft_delete", "hard_delete"]),
 });
 
 /**
  * 관리자 방명록 벌크 상태 변경 요청 스키마 (PATCH - 가역적 액션)
- * - hide: status=hidden (공개 목록에서만 숨김, 복원 가능)
- * - restore: status=active, deletedAt=null (이전 상태로 복원)
+ * - hide: status=hidden (공개 목록에서만 숨김)
+ * - restore: 모든 상태(hidden, deleted)에서 status=active, deletedAt=null로 복원
+ * 최대 100개까지 처리 가능
  */
 export const AdminGuestbookBulkPatchBodySchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1),
+  ids: z.array(z.number().int().positive()).min(1).max(100),
   action: z.enum(["hide", "restore"]),
 });
 
@@ -192,6 +202,9 @@ export type AdminGuestbookListQuery = z.infer<
 >;
 export type AdminGuestbookDeleteQuery = z.infer<
   typeof AdminGuestbookDeleteQuerySchema
+>;
+export type AdminGuestbookPatchQuery = z.infer<
+  typeof AdminGuestbookPatchQuerySchema
 >;
 export type AdminGuestbookBulkDeleteBody = z.infer<
   typeof AdminGuestbookBulkDeleteBodySchema

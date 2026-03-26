@@ -6,6 +6,7 @@ import type {
   AdminGuestbookItem,
   AdminGuestbookListQuery,
   AdminGuestbookDeleteQuery,
+  AdminGuestbookPatchQuery,
   AdminGuestbookBulkDeleteBody,
   AdminGuestbookBulkPatchBody,
 } from "./guestbook.schema";
@@ -324,17 +325,17 @@ export class GuestbookService {
   }
 
   /**
-   * 관리자 방명록 삭제 (액션 기반)
+   * 관리자 방명록 삭제 (비가역적 액션: soft_delete | hard_delete)
    *
    * @param entryId 방명록 ID
-   * @param action 삭제 액션 (hide | soft_delete | hard_delete)
+   * @param action 삭제 액션 (soft_delete | hard_delete)
    */
   async adminDeleteEntry(
     entryId: number,
     action: AdminGuestbookDeleteQuery["action"],
   ): Promise<void> {
     const [entry] = await this.db
-      .select()
+      .select({ id: guestbookEntryTable.id })
       .from(guestbookEntryTable)
       .where(eq(guestbookEntryTable.id, entryId))
       .limit(1);
@@ -347,11 +348,6 @@ export class GuestbookService {
       await this.db
         .delete(guestbookEntryTable)
         .where(eq(guestbookEntryTable.id, entryId));
-    } else if (action === "hide") {
-      await this.db
-        .update(guestbookEntryTable)
-        .set({ status: "hidden" })
-        .where(eq(guestbookEntryTable.id, entryId));
     } else {
       // soft_delete
       await this.db
@@ -359,6 +355,33 @@ export class GuestbookService {
         .set({ status: "deleted", deletedAt: new Date() })
         .where(eq(guestbookEntryTable.id, entryId));
     }
+  }
+
+  /**
+   * 관리자 방명록 단건 상태 변경 (가역적 액션: hide)
+   *
+   * @param entryId 방명록 ID
+   * @param action 상태 변경 액션 (hide)
+   */
+  async adminPatchEntry(
+    entryId: number,
+    action: AdminGuestbookPatchQuery["action"],
+  ): Promise<void> {
+    const [entry] = await this.db
+      .select({ id: guestbookEntryTable.id })
+      .from(guestbookEntryTable)
+      .where(eq(guestbookEntryTable.id, entryId))
+      .limit(1);
+
+    if (!entry) {
+      throw HttpError.notFound("Guestbook entry not found.");
+    }
+
+    // hide
+    await this.db
+      .update(guestbookEntryTable)
+      .set({ status: "hidden" })
+      .where(eq(guestbookEntryTable.id, entryId));
   }
 
   /**

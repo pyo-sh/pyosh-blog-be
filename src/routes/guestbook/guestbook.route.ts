@@ -12,6 +12,7 @@ import {
   AdminGuestbookListQuerySchema,
   AdminGuestbookListResponseSchema,
   AdminGuestbookDeleteQuerySchema,
+  AdminGuestbookPatchQuerySchema,
   AdminGuestbookBulkDeleteBodySchema,
   AdminGuestbookBulkPatchBodySchema,
 } from "./guestbook.schema";
@@ -274,7 +275,32 @@ export function createAdminGuestbookRoute(
       },
     );
 
-    // DELETE /api/admin/guestbook/:id - 관리자 방명록 삭제 (액션 기반)
+    // PATCH /api/admin/guestbook/:id - 관리자 방명록 상태 변경 (가역: hide)
+    typedFastify.patch(
+      "/guestbook/:id",
+      {
+        schema: {
+          tags: ["admin", "guestbook"],
+          summary: "관리자 방명록 상태 변경",
+          description:
+            "방명록 상태를 가역적으로 변경합니다. action=hide: 공개 목록에서 숨김.",
+          params: GuestbookIdParamSchema,
+          querystring: AdminGuestbookPatchQuerySchema,
+          response: {
+            204: z.void(),
+          },
+        },
+        preHandler: requireAdmin(adminService),
+      },
+      async (request, reply) => {
+        const { id } = request.params;
+        const { action } = request.query;
+        await guestbookService.adminPatchEntry(id, action);
+        return reply.status(204).send();
+      },
+    );
+
+    // DELETE /api/admin/guestbook/:id - 관리자 방명록 삭제 (비가역: soft_delete | hard_delete)
     typedFastify.delete(
       "/guestbook/:id",
       {
@@ -282,7 +308,7 @@ export function createAdminGuestbookRoute(
           tags: ["admin", "guestbook"],
           summary: "관리자 방명록 삭제",
           description:
-            "관리자가 방명록을 삭제합니다. action 쿼리로 hide | soft_delete | hard_delete를 지정합니다.",
+            "방명록을 비가역적으로 삭제합니다. action 쿼리로 soft_delete | hard_delete를 지정합니다.",
           params: GuestbookIdParamSchema,
           querystring: AdminGuestbookDeleteQuerySchema,
           response: {
