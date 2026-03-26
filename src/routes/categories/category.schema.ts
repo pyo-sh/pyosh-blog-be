@@ -52,7 +52,8 @@ export const CategoryTreeUpdateBodySchema = z.object({
         sortOrder: z.number().int().min(0),
       }),
     )
-    .min(1, "At least one change is required"),
+    .min(1, "At least one change is required")
+    .max(200, "Too many changes in a single request"),
 });
 
 /**

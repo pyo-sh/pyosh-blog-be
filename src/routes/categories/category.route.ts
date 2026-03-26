@@ -69,7 +69,10 @@ export function createCategoryRoute(
 
         return reply
           .status(200)
-          .header("Cache-Control", "public, max-age=300")
+          .header(
+            "Cache-Control",
+            includeHidden ? "no-store" : "public, max-age=300",
+          )
           .send({ categories: categories.map(serializeCategoryTree) });
       },
     );
