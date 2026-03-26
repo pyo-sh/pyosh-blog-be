@@ -1333,6 +1333,22 @@ describe("Post Routes", () => {
       expect(getRes.json().post.commentStatus).toBe("locked");
     });
 
+    it("action=update: 존재하지 않는 categoryId → 404", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post.id], action: "update", categoryId: 99999 },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
     it("action=update: categoryId, commentStatus 모두 없으면 → 400", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);

@@ -620,6 +620,14 @@ export class PostService {
       }
 
       if (action === "update") {
+        if (input.categoryId !== undefined) {
+          const [cat] = await tx
+            .select({ id: categoryTable.id })
+            .from(categoryTable)
+            .where(eq(categoryTable.id, input.categoryId))
+            .limit(1);
+          if (!cat) throw HttpError.notFound(`Category ${input.categoryId} not found.`);
+        }
         const updateData: Partial<{ categoryId: number; commentStatus: "open" | "locked" | "disabled"; updatedAt: Date }> = {
           updatedAt: new Date(),
         };
