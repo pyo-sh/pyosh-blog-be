@@ -5,17 +5,12 @@ import { z } from "zod";
 import { AdminService } from "./admin.service";
 import { HttpError } from "@src/errors/http-error";
 import { env } from "@src/shared/env";
+import { ErrorResponseSchema } from "@src/schemas/common";
 
 // Zod 스키마 정의
 const AdminLoginSchema = z.object({
   email: z.string().email("유효한 이메일 주소를 입력하세요").describe("관리자 이메일"),
   password: z.string().min(8, "비밀번호는 최소 8자 이상이어야 합니다").describe("관리자 비밀번호 (최소 8자)"),
-});
-
-const ErrorResponseSchema = z.object({
-  statusCode: z.number(),
-  error: z.string(),
-  message: z.string(),
 });
 
 /**
