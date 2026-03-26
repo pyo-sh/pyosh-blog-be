@@ -14,6 +14,7 @@ export * from "./post-tags";
 export * from "./comments";
 export * from "./guestbook";
 export * from "./stats";
+export * from "./settings";
 
 // Relations
 export * from "../relations/index";

@@ -115,9 +115,51 @@ export const GuestbookEntryResponseSchema = z.object({
 export const AdminGuestbookListQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
+  status: z.enum(["active", "deleted", "hidden"]).optional(),
   authorType: z.enum(["oauth", "guest"]).optional(),
+  q: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+});
+
+/**
+ * 관리자 방명록 단건 삭제 쿼리 스키마 (DELETE - 비가역적 액션만)
+ * hide는 PATCH /api/admin/guestbook/:id를 사용
+ */
+export const AdminGuestbookDeleteQuerySchema = z.object({
+  action: z.enum(["soft_delete", "hard_delete"]),
+});
+
+/**
+ * 관리자 방명록 단건 상태 변경 쿼리 스키마 (PATCH - 가역적 액션)
+ * - hide: status=hidden (공개 목록에서 숨김)
+ * - restore: status=active (hidden 상태만 복원, soft_delete는 별도 undelete 필요)
+ */
+export const AdminGuestbookPatchQuerySchema = z.object({
+  action: z.enum(["hide", "restore"]),
+});
+
+/**
+ * 관리자 방명록 벌크 삭제 요청 스키마 (DELETE - 비가역적 액션만)
+ * - soft_delete: status=deleted, deletedAt 설정
+ * - hard_delete: DB에서 완전 삭제
+ * hide/restore는 PATCH /api/admin/guestbook/bulk를 사용
+ * 최대 100개까지 처리 가능
+ */
+export const AdminGuestbookBulkDeleteBodySchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1).max(100),
+  action: z.enum(["soft_delete", "hard_delete"]),
+});
+
+/**
+ * 관리자 방명록 벌크 상태 변경 요청 스키마 (PATCH - 가역적 액션)
+ * - hide: active 상태 엔트리를 status=hidden으로 변경
+ * - restore: hidden 상태 엔트리만 status=active로 복원 (soft_delete 복원은 별도 undelete 필요)
+ * 최대 100개까지 처리 가능
+ */
+export const AdminGuestbookBulkPatchBodySchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1).max(100),
+  action: z.enum(["hide", "restore"]),
 });
 
 /**
@@ -128,7 +170,7 @@ export const AdminGuestbookItemSchema = z.object({
   parentId: z.number().nullable(),
   body: z.string(),
   isSecret: z.boolean(),
-  status: z.enum(["active", "deleted"]),
+  status: z.enum(["active", "deleted", "hidden"]),
   author: CommentAuthorSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -159,5 +201,17 @@ export type DeleteGuestbookGuestBody = z.infer<
 export type GuestbookEntryDetail = GuestbookEntryDetailSchemaType;
 export type AdminGuestbookListQuery = z.infer<
   typeof AdminGuestbookListQuerySchema
+>;
+export type AdminGuestbookDeleteQuery = z.infer<
+  typeof AdminGuestbookDeleteQuerySchema
+>;
+export type AdminGuestbookPatchQuery = z.infer<
+  typeof AdminGuestbookPatchQuerySchema
+>;
+export type AdminGuestbookBulkDeleteBody = z.infer<
+  typeof AdminGuestbookBulkDeleteBodySchema
+>;
+export type AdminGuestbookBulkPatchBody = z.infer<
+  typeof AdminGuestbookBulkPatchBodySchema
 >;
 export type AdminGuestbookItem = z.infer<typeof AdminGuestbookItemSchema>;
