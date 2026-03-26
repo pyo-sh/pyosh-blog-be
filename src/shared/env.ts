@@ -42,13 +42,13 @@ const envSchema = z
     LOGIN_SUCCESS_PATH: z.string().min(1),
     LOGIN_FAILURE_PATH: z.string().min(1),
 
-    // Google OAuth
-    GOOGLE_CLIENT_ID: z.string().min(1),
-    GOOGLE_CLIENT_SECRET: z.string().min(1),
+    // Google OAuth (optional — omit to disable Google login)
+    GOOGLE_CLIENT_ID: z.string().default(""),
+    GOOGLE_CLIENT_SECRET: z.string().default(""),
 
-    // GitHub OAuth
-    GITHUB_CLIENT_ID: z.string().min(1),
-    GITHUB_CLIENT_SECRET: z.string().min(1),
+    // GitHub OAuth (optional — omit to disable GitHub login)
+    GITHUB_CLIENT_ID: z.string().default(""),
+    GITHUB_CLIENT_SECRET: z.string().default(""),
   })
   .transform((data) => {
     // CLIENT_URL 자동 생성

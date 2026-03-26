@@ -14,13 +14,12 @@ export async function requireAuth(request: FastifyRequest) {
 
 /**
  * 선택적 인증 확인 (인증되지 않아도 통과)
- * request.user가 있으면 인증된 상태, 없으면 비인증 상태
+ * 인증된 경우 request.user에 OAuthAccount, 미인증 시 null로 설정
  */
 export async function optionalAuth(request: FastifyRequest) {
-  // request.user가 있으면 인증된 상태, 없어도 통과
-  request.log.debug(
-    request.user ? "Authenticated request" : "Unauthenticated request",
-  );
+  if (!request.user) {
+    request.user = null;
+  }
 }
 
 /**
