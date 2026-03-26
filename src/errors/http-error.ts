@@ -74,6 +74,10 @@ export class HttpError extends Error {
     return new HttpError(HttpStatus.NOT_FOUND, message);
   }
 
+  static payloadTooLarge(message: string) {
+    return new HttpError(HttpStatus.PAYLOAD_TOO_LARGE, message);
+  }
+
   static conflict(message: string) {
     return new HttpError(HttpStatus.CONFLICT, message);
   }

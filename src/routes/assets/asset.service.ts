@@ -1,10 +1,9 @@
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, inArray, sql, desc } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
-import type { MultipartFile } from "@fastify/multipart";
 import { assetTable, type Asset } from "@src/db/schema/assets";
 import * as schema from "@src/db/schema/index";
 import { HttpError } from "@src/errors/http-error";
-import { FileStorageService } from "@src/services/file-storage.service";
+import { FileStorageService, type BufferedFile } from "@src/services/file-storage.service";
 import {
   buildPaginatedResponse,
   calculateOffset,
@@ -49,13 +48,13 @@ export class AssetService {
 
   /**
    * 단일 파일 업로드
-   * @param file MultipartFile 객체
+   * @param buffered 미리 버퍼링된 파일 데이터
    * @returns 생성된 asset 정보
    */
-  async uploadAsset(file: MultipartFile): Promise<UploadedAsset> {
-    // 1. 파일 저장
-    const { storageKey, mimeType, sizeBytes } =
-      await this.fileStorage.saveFile(file);
+  async uploadAsset(buffered: BufferedFile): Promise<UploadedAsset> {
+    // 1. 파일 저장 (크기/타입 검증 포함, 이미지 크기 추출)
+    const { storageKey, mimeType, sizeBytes, width, height } =
+      await this.fileStorage.saveFile(buffered);
 
     // 2. DB 레코드 생성
     const [asset] = await this.db
@@ -65,6 +64,8 @@ export class AssetService {
         storageKey,
         mimeType,
         sizeBytes,
+        width: width ?? null,
+        height: height ?? null,
       })
       .$returningId();
 
@@ -76,10 +77,10 @@ export class AssetService {
 
   /**
    * 다중 파일 업로드
-   * @param files MultipartFile 배열
+   * @param files 미리 버퍼링된 파일 데이터 배열
    * @returns 생성된 asset 배열
    */
-  async uploadAssets(files: MultipartFile[]): Promise<UploadedAsset[]> {
+  async uploadAssets(files: BufferedFile[]): Promise<UploadedAsset[]> {
     return Promise.all(files.map((file) => this.uploadAsset(file)));
   }
 
@@ -119,6 +120,34 @@ export class AssetService {
 
     // 3. DB 레코드 삭제
     await this.db.delete(assetTable).where(eq(assetTable.id, id));
+  }
+
+  /**
+   * Asset 벌크 삭제 (단일 트랜잭션 DB 삭제, 파일은 best-effort)
+   * @param ids asset ID 배열
+   */
+  async deleteAssets(ids: number[]): Promise<void> {
+    if (ids.length === 0) return;
+
+    // 1. 삭제할 asset storageKey 목록 조회 (파일 삭제용)
+    const assets = await this.db
+      .select({ id: assetTable.id, storageKey: assetTable.storageKey })
+      .from(assetTable)
+      .where(inArray(assetTable.id, ids));
+
+    // 2. 단일 트랜잭션으로 DB 레코드 삭제
+    await this.db.delete(assetTable).where(inArray(assetTable.id, ids));
+
+    // 3. 물리 파일 삭제 (best-effort: 실패 시 로그만 남김)
+    await Promise.allSettled(
+      assets.map(async (asset) => {
+        try {
+          await this.fileStorage.deleteFile(asset.storageKey);
+        } catch (error) {
+          console.error(`Failed to delete file: ${asset.storageKey}`, error);
+        }
+      }),
+    );
   }
 
   /**

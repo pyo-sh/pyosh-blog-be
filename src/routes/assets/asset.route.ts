@@ -7,10 +7,12 @@ import {
   assetListResponseSchema,
   uploadAssetsResponseSchema,
   assetResponseSchema,
+  bulkDeleteAssetsBodySchema,
   errorResponseSchema,
 } from "./asset.schema";
 import { AssetService } from "./asset.service";
 import { HttpError } from "@src/errors/http-error";
+import { FileStorageService } from "@src/services/file-storage.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
 
@@ -45,20 +47,20 @@ export function createAssetRoute(
         },
       },
       async (request, reply) => {
-        // 파일 수신 확인
-        const files = await request.files();
-        const uploadedFiles = [];
+        // 파일 수신 및 버퍼링
+        // multipart 스트림은 iterator 루프 내에서 즉시 소비해야 hang을 방지할 수 있음
+        const bufferedFiles = [];
 
-        for await (const file of files) {
-          uploadedFiles.push(file);
+        for await (const file of request.files()) {
+          bufferedFiles.push(await FileStorageService.bufferFile(file));
         }
 
-        if (uploadedFiles.length === 0) {
+        if (bufferedFiles.length === 0) {
           throw HttpError.badRequest("No file to upload.");
         }
 
         // 파일 업로드 처리
-        const assets = await assetService.uploadAssets(uploadedFiles);
+        const assets = await assetService.uploadAssets(bufferedFiles);
 
         return reply.status(201).send({
           assets,
@@ -110,6 +112,32 @@ export function createAssetRoute(
         const asset = await assetService.getAssetById(id);
 
         return reply.status(200).send(asset);
+      },
+    );
+
+    // DELETE /api/assets/bulk - Asset 벌크 삭제 (Admin)
+    typedFastify.delete(
+      "/bulk",
+      {
+        preHandler: requireAdmin(adminService),
+        schema: {
+          tags: ["assets"],
+          summary: "Bulk delete assets",
+          description:
+            "여러 Asset을 한 번에 삭제합니다. Admin 권한이 필요합니다. DB는 단일 트랜잭션, 파일 삭제는 best-effort.",
+          body: bulkDeleteAssetsBodySchema,
+          response: {
+            204: z.void(),
+            400: errorResponseSchema,
+            403: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const { ids } = request.body;
+        await assetService.deleteAssets(ids);
+
+        return reply.status(204).send();
       },
     );
 
