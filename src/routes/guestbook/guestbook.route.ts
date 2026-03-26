@@ -11,18 +11,23 @@ import {
   GuestbookEntryResponseSchema,
   AdminGuestbookListQuerySchema,
   AdminGuestbookListResponseSchema,
+  AdminGuestbookDeleteQuerySchema,
+  AdminGuestbookBulkDeleteBodySchema,
 } from "./guestbook.schema";
 import { GuestbookService } from "./guestbook.service";
+import { SettingsService } from "@src/routes/settings/settings.service";
 import { OAuthAccount } from "@src/db/schema/oauth-accounts";
 import { optionalAuth, requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
 import { resolveAuthorFromRequest, Author } from "@src/shared/interaction";
+import { HttpError } from "@src/errors/http-error";
 
 /**
  * Guestbook 라우트 플러그인 (Public)
  */
 export function createGuestbookRoute(
   guestbookService: GuestbookService,
+  settingsService: SettingsService,
 ): FastifyPluginAsync {
   const guestbookRoute: FastifyPluginAsync = async (
     fastify: FastifyInstance,
@@ -90,6 +95,12 @@ export function createGuestbookRoute(
         preHandler: optionalAuth,
       },
       async (request, reply) => {
+        // 방명록 활성 상태 확인
+        const enabled = await settingsService.getGuestbookEnabled();
+        if (!enabled) {
+          throw HttpError.forbidden("Guestbook is currently disabled.");
+        }
+
         let author: Author;
         let input: {
           body: string;
@@ -216,15 +227,40 @@ export function createAdminGuestbookRoute(
       },
     );
 
-    // DELETE /api/admin/guestbook/:id - 관리자 방명록 강제 삭제
+    // DELETE /api/admin/guestbook/bulk - 관리자 방명록 벌크 삭제
+    typedFastify.delete(
+      "/guestbook/bulk",
+      {
+        schema: {
+          tags: ["admin", "guestbook"],
+          summary: "관리자 방명록 벌크 삭제",
+          description:
+            "관리자가 여러 방명록을 한 번에 삭제하거나 상태를 변경합니다.",
+          body: AdminGuestbookBulkDeleteBodySchema,
+          response: {
+            204: z.void(),
+          },
+        },
+        preHandler: requireAdmin(adminService),
+      },
+      async (request, reply) => {
+        const { ids, action } = request.body;
+        await guestbookService.bulkDeleteEntries(ids, action);
+        return reply.status(204).send();
+      },
+    );
+
+    // DELETE /api/admin/guestbook/:id - 관리자 방명록 삭제 (액션 기반)
     typedFastify.delete(
       "/guestbook/:id",
       {
         schema: {
           tags: ["admin", "guestbook"],
           summary: "관리자 방명록 삭제",
-          description: "관리자가 모든 방명록을 삭제할 수 있습니다.",
+          description:
+            "관리자가 방명록을 삭제합니다. action 쿼리로 hide | soft_delete | hard_delete를 지정합니다.",
           params: GuestbookIdParamSchema,
+          querystring: AdminGuestbookDeleteQuerySchema,
           response: {
             204: z.void(),
           },
@@ -233,9 +269,8 @@ export function createAdminGuestbookRoute(
       },
       async (request, reply) => {
         const { id } = request.params;
-
-        await guestbookService.deleteEntry(id, null, true);
-
+        const { action } = request.query;
+        await guestbookService.adminDeleteEntry(id, action);
         return reply.status(204).send();
       },
     );

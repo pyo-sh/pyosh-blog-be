@@ -115,9 +115,26 @@ export const GuestbookEntryResponseSchema = z.object({
 export const AdminGuestbookListQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
+  status: z.enum(["active", "deleted", "hidden"]).optional(),
   authorType: z.enum(["oauth", "guest"]).optional(),
+  q: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+});
+
+/**
+ * 관리자 방명록 삭제 액션 쿼리 스키마
+ */
+export const AdminGuestbookDeleteQuerySchema = z.object({
+  action: z.enum(["hide", "soft_delete", "hard_delete"]),
+});
+
+/**
+ * 관리자 방명록 벌크 삭제 요청 스키마
+ */
+export const AdminGuestbookBulkDeleteBodySchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1),
+  action: z.enum(["hide", "restore", "soft_delete", "hard_delete"]),
 });
 
 /**
@@ -128,7 +145,7 @@ export const AdminGuestbookItemSchema = z.object({
   parentId: z.number().nullable(),
   body: z.string(),
   isSecret: z.boolean(),
-  status: z.enum(["active", "deleted"]),
+  status: z.enum(["active", "deleted", "hidden"]),
   author: CommentAuthorSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -159,5 +176,11 @@ export type DeleteGuestbookGuestBody = z.infer<
 export type GuestbookEntryDetail = GuestbookEntryDetailSchemaType;
 export type AdminGuestbookListQuery = z.infer<
   typeof AdminGuestbookListQuerySchema
+>;
+export type AdminGuestbookDeleteQuery = z.infer<
+  typeof AdminGuestbookDeleteQuerySchema
+>;
+export type AdminGuestbookBulkDeleteBody = z.infer<
+  typeof AdminGuestbookBulkDeleteBodySchema
 >;
 export type AdminGuestbookItem = z.infer<typeof AdminGuestbookItemSchema>;

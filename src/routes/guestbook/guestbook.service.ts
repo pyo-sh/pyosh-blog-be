@@ -1,10 +1,12 @@
-import { eq, and, isNull, sql, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, sql, gte, lte, or, like, inArray } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import type {
   GuestbookEntryDetail,
   GuestbookQuery,
   AdminGuestbookItem,
   AdminGuestbookListQuery,
+  AdminGuestbookDeleteQuery,
+  AdminGuestbookBulkDeleteBody,
 } from "./guestbook.schema";
 import type { CommentAuthor } from "@src/routes/comments/comment.schema";
 import {
@@ -244,9 +246,9 @@ export class GuestbookService {
   }
 
   /**
-   * 관리자용 전체 방명록 목록 조회 (페이지네이션 + 필터)
+   * 관리자용 전체 방명록 목록 조회 (페이지네이션 + 필터 + 검색)
    *
-   * @param query 쿼리 파라미터 (page, limit, authorType, startDate, endDate)
+   * @param query 쿼리 파라미터 (page, limit, status, authorType, q, startDate, endDate)
    * @returns 페이지네이션된 방명록 목록 (비밀글 마스킹 없음)
    */
   async getAdminGuestbook(
@@ -257,8 +259,20 @@ export class GuestbookService {
     const offset = calculateOffset(page, limit);
 
     const conditions = [];
+    if (query.status !== undefined) {
+      conditions.push(eq(guestbookEntryTable.status, query.status));
+    }
     if (query.authorType !== undefined) {
       conditions.push(eq(guestbookEntryTable.authorType, query.authorType));
+    }
+    if (query.q !== undefined) {
+      const pattern = `%${query.q}%`;
+      conditions.push(
+        or(
+          like(guestbookEntryTable.guestName, pattern),
+          like(guestbookEntryTable.body, pattern),
+        ),
+      );
     }
     if (query.startDate !== undefined) {
       conditions.push(
@@ -296,7 +310,7 @@ export class GuestbookService {
           parentId: enriched.parentId,
           body: enriched.body,
           isSecret: enriched.isSecret,
-          status: enriched.status as "active" | "deleted",
+          status: enriched.status as "active" | "deleted" | "hidden",
           author: enriched.author,
           createdAt: enriched.createdAt.toISOString(),
           updatedAt: enriched.updatedAt.toISOString(),
@@ -305,6 +319,77 @@ export class GuestbookService {
     );
 
     return buildPaginatedResponse(items, total, page, limit);
+  }
+
+  /**
+   * 관리자 방명록 삭제 (액션 기반)
+   *
+   * @param entryId 방명록 ID
+   * @param action 삭제 액션 (hide | soft_delete | hard_delete)
+   */
+  async adminDeleteEntry(
+    entryId: number,
+    action: AdminGuestbookDeleteQuery["action"],
+  ): Promise<void> {
+    const [entry] = await this.db
+      .select()
+      .from(guestbookEntryTable)
+      .where(eq(guestbookEntryTable.id, entryId))
+      .limit(1);
+
+    if (!entry) {
+      throw HttpError.notFound("Guestbook entry not found.");
+    }
+
+    if (action === "hard_delete") {
+      await this.db
+        .delete(guestbookEntryTable)
+        .where(eq(guestbookEntryTable.id, entryId));
+    } else if (action === "hide") {
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "hidden" })
+        .where(eq(guestbookEntryTable.id, entryId));
+    } else {
+      // soft_delete
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "deleted", deletedAt: new Date() })
+        .where(eq(guestbookEntryTable.id, entryId));
+    }
+  }
+
+  /**
+   * 관리자 방명록 벌크 삭제
+   *
+   * @param ids 방명록 ID 배열
+   * @param action 삭제 액션 (hide | restore | soft_delete | hard_delete)
+   */
+  async bulkDeleteEntries(
+    ids: AdminGuestbookBulkDeleteBody["ids"],
+    action: AdminGuestbookBulkDeleteBody["action"],
+  ): Promise<void> {
+    if (action === "hard_delete") {
+      await this.db
+        .delete(guestbookEntryTable)
+        .where(inArray(guestbookEntryTable.id, ids));
+    } else if (action === "hide") {
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "hidden" })
+        .where(inArray(guestbookEntryTable.id, ids));
+    } else if (action === "restore") {
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "active", deletedAt: null })
+        .where(inArray(guestbookEntryTable.id, ids));
+    } else {
+      // soft_delete
+      await this.db
+        .update(guestbookEntryTable)
+        .set({ status: "deleted", deletedAt: new Date() })
+        .where(inArray(guestbookEntryTable.id, ids));
+    }
   }
 
   /**
