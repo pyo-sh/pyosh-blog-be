@@ -76,11 +76,12 @@ export class StatsService {
       return true;
     }
 
-    // KST(UTC+9) 기준 날짜 사용
+    // KST(UTC+9) 기준 날짜 사용. postId=0은 사이트 전체 조회수 센티넬 값
+    // (NULL은 MySQL unique index에서 NULL≠NULL 처리되어 중복키 업데이트가 동작하지 않음)
     await this.db
       .insert(statsDailyTable)
       .values({
-        postId: postId ?? null,
+        postId: postId ?? 0,
         date: sql`DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))`,
         pageviews: 1,
         uniques: 1,
@@ -118,7 +119,7 @@ export class StatsService {
   }
 
   /**
-   * 사이트 전체 누적 조회수 (postId IS NULL 행의 합산)
+   * 사이트 전체 누적 조회수 (postId=0 센티넬 행의 합산)
    */
   async getTotalViews(): Promise<number> {
     const [result] = await this.db
@@ -126,7 +127,7 @@ export class StatsService {
         total: sql<number>`coalesce(sum(${statsDailyTable.pageviews}), 0)`,
       })
       .from(statsDailyTable)
-      .where(isNull(statsDailyTable.postId));
+      .where(eq(statsDailyTable.postId, 0));
 
     return Number(result?.total ?? 0);
   }

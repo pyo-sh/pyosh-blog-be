@@ -236,8 +236,8 @@ describe("Stats Routes", () => {
       yesterday.setDate(yesterday.getDate() - 1);
 
       await db.insert(statsDailyTable).values([
-        { postId: null, date: today, pageviews: 50, uniques: 30 },
-        { postId: null, date: yesterday, pageviews: 70, uniques: 40 },
+        { postId: 0, date: today, pageviews: 50, uniques: 30 },
+        { postId: 0, date: yesterday, pageviews: 70, uniques: 40 },
       ]);
 
       const response = await app.inject({
@@ -255,7 +255,7 @@ describe("Stats Routes", () => {
       const today = new Date();
 
       await db.insert(statsDailyTable).values([
-        { postId: null, date: today, pageviews: 20, uniques: 10 },
+        { postId: 0, date: today, pageviews: 20, uniques: 10 },
         { postId: post.id, date: today, pageviews: 100, uniques: 50 },
       ]);
 
