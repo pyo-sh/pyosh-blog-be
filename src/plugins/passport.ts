@@ -30,129 +30,135 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
     return account || null;
   });
 
-  // Google OAuth Strategy
-  fastifyPassport.use(
-    "google",
-    new GoogleStrategy(
-      {
-        clientID: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
-        callbackURL: "/api/auth/google/callback",
-      },
-      async (_accessToken, _refreshToken, profile, done) => {
-        try {
-          const {
-            name,
-            email: googleEmail,
-            picture,
-          } = profile._json as {
-            name: string;
-            email: string;
-            picture: string;
-          };
+  // Google OAuth Strategy (only register if credentials are configured)
+  if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
+    fastifyPassport.use(
+      "google",
+      new GoogleStrategy(
+        {
+          clientID: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+          callbackURL: "/api/auth/google/callback",
+        },
+        async (_accessToken, _refreshToken, profile, done) => {
+          try {
+            const {
+              name,
+              email: googleEmail,
+              picture,
+            } = profile._json as {
+              name: string;
+              email: string;
+              picture: string;
+            };
 
-          const googleId = profile.id;
+            const googleId = profile.id;
 
-          // 기존 계정 찾기
-          const [existingAccount] = await db
-            .select()
-            .from(oauthAccountTable)
-            .where(
-              and(
-                eq(oauthAccountTable.provider, "google"),
-                eq(oauthAccountTable.providerUserId, googleId),
-              ),
-            )
-            .limit(1);
+            // 기존 계정 찾기
+            const [existingAccount] = await db
+              .select()
+              .from(oauthAccountTable)
+              .where(
+                and(
+                  eq(oauthAccountTable.provider, "google"),
+                  eq(oauthAccountTable.providerUserId, googleId),
+                ),
+              )
+              .limit(1);
 
-          if (existingAccount) {
-            return done(null, existingAccount);
+            if (existingAccount) {
+              return done(null, existingAccount);
+            }
+
+            // 새 계정 생성
+            const [result] = await db.insert(oauthAccountTable).values({
+              provider: "google",
+              providerUserId: googleId,
+              email: googleEmail,
+              displayName: name,
+              avatarUrl: picture,
+            });
+
+            const [newAccount] = await db
+              .select()
+              .from(oauthAccountTable)
+              .where(eq(oauthAccountTable.id, Number(result.insertId)))
+              .limit(1);
+
+            return done(null, newAccount);
+          } catch (error) {
+            return done(error as Error);
           }
+        },
+      ),
+    );
+    fastify.log.info("[Passport] Google strategy registered");
+  }
 
-          // 새 계정 생성
-          const [result] = await db.insert(oauthAccountTable).values({
-            provider: "google",
-            providerUserId: googleId,
-            email: googleEmail,
-            displayName: name,
-            avatarUrl: picture,
-          });
+  // GitHub OAuth Strategy (only register if credentials are configured)
+  if (env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
+    fastifyPassport.use(
+      "github",
+      new GitHubStrategy(
+        {
+          clientID: env.GITHUB_CLIENT_ID,
+          clientSecret: env.GITHUB_CLIENT_SECRET,
+          callbackURL: "/api/auth/github/callback",
+        },
+        async (_accessToken, _refreshToken, profile, done) => {
+          try {
+            const {
+              avatar_url: url,
+              name,
+              login,
+            } = profile._json as {
+              login: string;
+              avatar_url: string;
+              name: string;
+            };
 
-          const [newAccount] = await db
-            .select()
-            .from(oauthAccountTable)
-            .where(eq(oauthAccountTable.id, Number(result.insertId)))
-            .limit(1);
+            const githubId = profile.id;
 
-          return done(null, newAccount);
-        } catch (error) {
-          return done(error as Error);
-        }
-      },
-    ),
-  );
+            // 기존 계정 찾기
+            const [existingAccount] = await db
+              .select()
+              .from(oauthAccountTable)
+              .where(
+                and(
+                  eq(oauthAccountTable.provider, "github"),
+                  eq(oauthAccountTable.providerUserId, githubId),
+                ),
+              )
+              .limit(1);
 
-  // GitHub OAuth Strategy
-  fastifyPassport.use(
-    "github",
-    new GitHubStrategy(
-      {
-        clientID: env.GITHUB_CLIENT_ID,
-        clientSecret: env.GITHUB_CLIENT_SECRET,
-        callbackURL: "/api/auth/github/callback",
-      },
-      async (_accessToken, _refreshToken, profile, done) => {
-        try {
-          const {
-            avatar_url: url,
-            name,
-            login,
-          } = profile._json as {
-            login: string;
-            avatar_url: string;
-            name: string;
-          };
+            if (existingAccount) {
+              return done(null, existingAccount);
+            }
 
-          const githubId = profile.id;
+            // 새 계정 생성
+            const [result] = await db.insert(oauthAccountTable).values({
+              provider: "github",
+              providerUserId: githubId,
+              email: null,
+              displayName: name ?? login,
+              avatarUrl: url,
+            });
 
-          // 기존 계정 찾기
-          const [existingAccount] = await db
-            .select()
-            .from(oauthAccountTable)
-            .where(
-              and(
-                eq(oauthAccountTable.provider, "github"),
-                eq(oauthAccountTable.providerUserId, githubId),
-              ),
-            )
-            .limit(1);
+            const [newAccount] = await db
+              .select()
+              .from(oauthAccountTable)
+              .where(eq(oauthAccountTable.id, Number(result.insertId)))
+              .limit(1);
 
-          if (existingAccount) {
-            return done(null, existingAccount);
+            return done(null, newAccount);
+          } catch (error) {
+            return done(error as Error);
           }
-
-          // 새 계정 생성
-          const [result] = await db.insert(oauthAccountTable).values({
-            provider: "github",
-            providerUserId: githubId,
-            email: null,
-            displayName: name ?? login,
-            avatarUrl: url,
-          });
-
-          const [newAccount] = await db
-            .select()
-            .from(oauthAccountTable)
-            .where(eq(oauthAccountTable.id, Number(result.insertId)))
-            .limit(1);
-
-          return done(null, newAccount);
-        } catch (error) {
-          return done(error as Error);
-        }
-      },
-    ),
-  );
+        },
+      ),
+    );
+    fastify.log.info("[Passport] GitHub strategy registered");
+  }
 
   fastify.log.info("[Passport] Plugin registered");
 };
