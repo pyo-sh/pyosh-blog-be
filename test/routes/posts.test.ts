@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
 import {
   seedAdmin,
@@ -7,6 +8,8 @@ import {
   seedPost,
   truncateAll,
 } from "@test/helpers/seed";
+import { db } from "@src/db/client";
+import { tagTable } from "@src/db/schema";
 
 describe("Post Routes", () => {
   let app: FastifyInstance;
@@ -1125,6 +1128,348 @@ describe("Post Routes", () => {
       expect(body.data[0].commentCount).toBeDefined();
       expect(typeof body.data[0].totalPageviews).toBe("number");
       expect(typeof body.data[0].commentCount).toBe("number");
+    });
+  });
+
+  // ===== DELETE /api/admin/posts/:id/hard =====
+
+  describe("DELETE /api/admin/posts/:id/hard", () => {
+    it("Hard Delete → 204, 게시글 영구 삭제", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/admin/posts/${post.id}/hard`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(204);
+
+      // Admin GET → 404
+      const getResponse = await app.inject({
+        method: "GET",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+      });
+      expect(getResponse.statusCode).toBe(404);
+    });
+
+    it("Hard Delete → 태그가 다른 게시글에 없으면 고아 태그 삭제", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      // 태그 있는 게시글 생성
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Tagged Post",
+          contentMd: "# Content",
+          categoryId: category.id,
+          tags: ["orphan-tag"],
+        },
+      });
+      const postId = createRes.json().post.id;
+
+      // Hard Delete
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/admin/posts/${postId}/hard`,
+        headers: { cookie },
+      });
+      expect(response.statusCode).toBe(204);
+
+      // 태그 DB에서 직접 조회 → 없어야 함
+      const rows = await db
+        .select()
+        .from(tagTable)
+        .where(eq(tagTable.slug, "orphan-tag"));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("Hard Delete → 태그가 다른 게시글에 있으면 유지", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      // 두 게시글에 같은 태그
+      const res1 = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Post 1",
+          contentMd: "# Content",
+          categoryId: category.id,
+          tags: ["shared-tag"],
+        },
+      });
+      await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Post 2",
+          contentMd: "# Content",
+          categoryId: category.id,
+          tags: ["shared-tag"],
+        },
+      });
+      const postId = res1.json().post.id;
+
+      // 첫 번째 게시글 Hard Delete
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/admin/posts/${postId}/hard`,
+        headers: { cookie },
+      });
+      expect(response.statusCode).toBe(204);
+
+      // 태그 DB에서 직접 조회 → 두 번째 게시글에 남아 있어야 함
+      const rows = await db
+        .select()
+        .from(tagTable)
+        .where(eq(tagTable.slug, "shared-tag"));
+      expect(rows).toHaveLength(1);
+    });
+
+    it("존재하지 않는 게시글 Hard Delete → 404", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/api/admin/posts/99999/hard",
+        headers: { cookie },
+      });
+      expect(response.statusCode).toBe(404);
+    });
+  });
+
+  // ===== PUT /api/admin/posts/:id/restore =====
+
+  describe("PUT /api/admin/posts/:id/restore", () => {
+    it("복원 성공 → 200, deletedAt이 null", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      // Soft Delete
+      await app.inject({
+        method: "DELETE",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+      });
+
+      // Restore
+      const response = await app.inject({
+        method: "PUT",
+        url: `/api/admin/posts/${post.id}/restore`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().post.deletedAt).toBeNull();
+    });
+  });
+
+  // ===== PATCH /api/admin/posts/bulk =====
+
+  describe("PATCH /api/admin/posts/bulk", () => {
+    it("action=update: categoryId 일괄 변경 → 204", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const cat1 = await seedCategory({ name: "Cat1" });
+      const cat2 = await seedCategory({ name: "Cat2" });
+
+      const post1 = await seedPost(cat1.id);
+      const post2 = await seedPost(cat1.id);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post1.id, post2.id], action: "update", categoryId: cat2.id },
+      });
+
+      expect(response.statusCode).toBe(204);
+
+      const getRes = await app.inject({
+        method: "GET",
+        url: `/api/admin/posts/${post1.id}`,
+        headers: { cookie },
+      });
+      expect(getRes.json().post.categoryId).toBe(cat2.id);
+    });
+
+    it("action=update: commentStatus 일괄 변경 → 204", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const post1 = await seedPost(category.id);
+      const post2 = await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post1.id, post2.id], action: "update", commentStatus: "locked" },
+      });
+
+      expect(response.statusCode).toBe(204);
+
+      const getRes = await app.inject({
+        method: "GET",
+        url: `/api/admin/posts/${post1.id}`,
+        headers: { cookie },
+      });
+      expect(getRes.json().post.commentStatus).toBe("locked");
+    });
+
+    it("action=update: categoryId, commentStatus 모두 없으면 → 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post.id], action: "update" },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("action=soft_delete: 일괄 소프트 삭제 → 204", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const post1 = await seedPost(category.id);
+      const post2 = await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post1.id, post2.id], action: "soft_delete" },
+      });
+
+      expect(response.statusCode).toBe(204);
+
+      // includeDeleted=true로 조회 시 deletedAt이 있어야 함
+      const listRes = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts?includeDeleted=true",
+        headers: { cookie },
+      });
+      const data = listRes.json().data;
+      const deleted = data.filter(
+        (p: { id: number; deletedAt: string | null }) =>
+          (p.id === post1.id || p.id === post2.id) && p.deletedAt !== null,
+      );
+      expect(deleted).toHaveLength(2);
+    });
+
+    it("action=restore: 일괄 복원 → 204", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const post1 = await seedPost(category.id);
+      const post2 = await seedPost(category.id);
+
+      // 먼저 소프트 삭제
+      await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post1.id, post2.id], action: "soft_delete" },
+      });
+
+      // 복원
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post1.id, post2.id], action: "restore" },
+      });
+
+      expect(response.statusCode).toBe(204);
+
+      const getRes = await app.inject({
+        method: "GET",
+        url: `/api/admin/posts/${post1.id}`,
+        headers: { cookie },
+      });
+      expect(getRes.json().post.deletedAt).toBeNull();
+    });
+
+    it("action=hard_delete: 일괄 영구 삭제 → 204", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const post1 = await seedPost(category.id);
+      const post2 = await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post1.id, post2.id], action: "hard_delete" },
+      });
+
+      expect(response.statusCode).toBe(204);
+
+      const getRes = await app.inject({
+        method: "GET",
+        url: `/api/admin/posts/${post1.id}`,
+        headers: { cookie },
+      });
+      expect(getRes.statusCode).toBe(404);
+    });
+
+    it("ids 중 하나라도 존재하지 않으면 전체 실패 → 404", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post.id, 99999], action: "soft_delete" },
+      });
+
+      expect(response.statusCode).toBe(404);
+
+      // post는 삭제되지 않아야 함 (트랜잭션 롤백)
+      const getRes = await app.inject({
+        method: "GET",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+      });
+      expect(getRes.json().post.deletedAt).toBeNull();
+    });
+
+    it("비인증 → 403", async () => {
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        payload: { ids: [1], action: "soft_delete" },
+      });
+      expect(response.statusCode).toBe(403);
     });
   });
 

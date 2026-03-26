@@ -557,6 +557,7 @@ export class PostService {
 
   /**
    * 게시글 Hard Delete (Admin용)
+   * 연쇄 삭제: 댓글 → 조회수 통계 → 태그 관계 → 고아 태그 → 게시글
    */
   async hardDeletePost(id: number): Promise<void> {
     await this.db.transaction(async (tx) => {
@@ -571,11 +572,106 @@ export class PostService {
         throw HttpError.notFound("Post not found.");
       }
 
-      // 2. post_tag_tb 연결 삭제
+      // 2. post_tag_tb 연결에서 사용된 tagId 수집 (고아 태그 감지용)
+      const linkedTags = await tx
+        .select({ tagId: postTagTable.tagId })
+        .from(postTagTable)
+        .where(eq(postTagTable.postId, id));
+      const linkedTagIds = linkedTags.map((r) => r.tagId);
+
+      // 3. 댓글 삭제
+      await tx.delete(commentTable).where(eq(commentTable.postId, id));
+
+      // 4. 조회수 통계 삭제
+      await tx.delete(statsDailyTable).where(eq(statsDailyTable.postId, id));
+
+      // 5. post_tag_tb 연결 삭제
       await tx.delete(postTagTable).where(eq(postTagTable.postId, id));
 
-      // 3. post_tb 레코드 삭제
+      // 6. post_tb 레코드 삭제
       await tx.delete(postTable).where(eq(postTable.id, id));
+
+      // 7. 고아 태그 삭제 (다른 게시글에서 사용하지 않는 태그)
+      if (linkedTagIds.length > 0) {
+        const stillUsed = await tx
+          .select({ tagId: postTagTable.tagId })
+          .from(postTagTable)
+          .where(inArray(postTagTable.tagId, linkedTagIds));
+        const stillUsedIds = new Set(stillUsed.map((r) => r.tagId));
+        const orphanTagIds = linkedTagIds.filter((tagId) => !stillUsedIds.has(tagId));
+        if (orphanTagIds.length > 0) {
+          await tx.delete(tagTable).where(inArray(tagTable.id, orphanTagIds));
+        }
+      }
+    });
+  }
+
+  /**
+   * 게시글 벌크 작업 (단일 트랜잭션)
+   */
+  async bulkUpdatePosts(input: {
+    ids: number[];
+    action: "update" | "soft_delete" | "restore" | "hard_delete";
+    categoryId?: number;
+    commentStatus?: "open" | "locked" | "disabled";
+  }): Promise<void> {
+    const { ids, action } = input;
+
+    await this.db.transaction(async (tx) => {
+      // 모든 대상 게시글 존재 확인
+      const found = await tx
+        .select({ id: postTable.id })
+        .from(postTable)
+        .where(inArray(postTable.id, ids));
+
+      if (found.length !== ids.length) {
+        throw HttpError.notFound("One or more posts not found.");
+      }
+
+      if (action === "update") {
+        const updateData: Partial<{ categoryId: number; commentStatus: "open" | "locked" | "disabled"; updatedAt: Date }> = {
+          updatedAt: new Date(),
+        };
+        if (input.categoryId !== undefined) updateData.categoryId = input.categoryId;
+        if (input.commentStatus !== undefined) updateData.commentStatus = input.commentStatus;
+        await tx.update(postTable).set(updateData).where(inArray(postTable.id, ids));
+      } else if (action === "soft_delete") {
+        await tx
+          .update(postTable)
+          .set({ deletedAt: new Date() })
+          .where(inArray(postTable.id, ids));
+      } else if (action === "restore") {
+        await tx
+          .update(postTable)
+          .set({ deletedAt: null })
+          .where(inArray(postTable.id, ids));
+      } else if (action === "hard_delete") {
+        // 연결된 tagId 수집 (고아 태그 감지용)
+        const linkedTags = await tx
+          .select({ tagId: postTagTable.tagId })
+          .from(postTagTable)
+          .where(inArray(postTagTable.postId, ids));
+        const linkedTagIds = [...new Set(linkedTags.map((r) => r.tagId))];
+
+        // 댓글, 통계, 태그 관계, 게시글 순서로 삭제
+        await tx.delete(commentTable).where(inArray(commentTable.postId, ids));
+        await tx.delete(statsDailyTable).where(inArray(statsDailyTable.postId, ids));
+        await tx.delete(postTagTable).where(inArray(postTagTable.postId, ids));
+        await tx.delete(postTable).where(inArray(postTable.id, ids));
+
+        // 고아 태그 삭제
+        if (linkedTagIds.length > 0) {
+          const stillUsed = await tx
+            .select({ tagId: postTagTable.tagId })
+            .from(postTagTable)
+            .where(inArray(postTagTable.tagId, linkedTagIds));
+          const stillUsedIds = new Set(stillUsed.map((r) => r.tagId));
+          const orphanTagIds = linkedTagIds.filter((tagId) => !stillUsedIds.has(tagId));
+          if (orphanTagIds.length > 0) {
+            await tx.delete(tagTable).where(inArray(tagTable.id, orphanTagIds));
+          }
+        }
+      }
     });
   }
 
