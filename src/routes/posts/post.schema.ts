@@ -109,6 +109,27 @@ export const UpdatePostBodySchema = z.object({
   publishedAt: z.string().datetime().optional(),
 });
 
+export const BulkPostActionBodySchema = z
+  .object({
+    ids: z.array(z.number().int().positive()).min(1).max(100),
+    action: z.enum(["update", "soft_delete", "restore", "hard_delete"]),
+    categoryId: z.number().int().positive().optional(),
+    commentStatus: z.enum(["open", "locked", "disabled"]).optional(),
+  })
+  .refine(
+    (data) =>
+      data.action !== "update" ||
+      data.categoryId !== undefined ||
+      data.commentStatus !== undefined,
+    { message: "action=update requires at least one of categoryId or commentStatus" },
+  )
+  .refine(
+    (data) =>
+      data.action === "update" ||
+      (data.categoryId === undefined && data.commentStatus === undefined),
+    { message: "categoryId and commentStatus are only valid for action=update" },
+  );
+
 /**
  * Response Schemas
  */
@@ -204,3 +225,4 @@ export type PostListQuery = z.infer<typeof PostListQuerySchema>;
 export type AdminPostListQuery = z.infer<typeof AdminPostListQuerySchema>;
 export type CreatePostBody = z.infer<typeof CreatePostBodySchema>;
 export type UpdatePostBody = z.infer<typeof UpdatePostBodySchema>;
+export type BulkPostActionBody = z.infer<typeof BulkPostActionBodySchema>;

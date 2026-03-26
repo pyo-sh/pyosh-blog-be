@@ -8,6 +8,7 @@ import {
   AdminPostListQuerySchema,
   CreatePostBodySchema,
   UpdatePostBodySchema,
+  BulkPostActionBodySchema,
   PostListResponseSchema,
   PostDetailResponseSchema,
   PostDetailWithNavigationResponseSchema,
@@ -265,6 +266,36 @@ export function createAdminPostRoute(
             deletedAt: post.deletedAt?.toISOString() ?? null,
           },
         });
+      },
+    );
+
+    // PATCH /api/admin/posts/bulk - 게시글 벌크 작업 (Admin)
+    typedFastify.patch(
+      "/bulk",
+      {
+        preHandler: requireAdmin(adminService),
+        schema: {
+          tags: ["posts", "admin"],
+          summary: "Bulk action on posts (Admin)",
+          description:
+            "여러 게시글에 대해 일괄 작업을 수행합니다. 단일 트랜잭션으로 전체 성공 or 전체 실패합니다.",
+          body: BulkPostActionBodySchema,
+          response: {
+            204: z.void(),
+          },
+        },
+      },
+      async (request, reply) => {
+        const body = request.body;
+
+        await postService.bulkUpdatePosts({
+          ids: body.ids,
+          action: body.action,
+          categoryId: body.categoryId,
+          commentStatus: body.commentStatus,
+        });
+
+        return reply.status(204).send();
       },
     );
 
