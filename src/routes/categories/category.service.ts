@@ -314,8 +314,42 @@ export class CategoryService {
   /**
    * 카테고리 트리 배치 변경 (단일 트랜잭션)
    * - parentId와 sortOrder를 동시에 업데이트
+   * - 트랜잭션 전에 각 항목의 순환 참조 여부를 검증
    */
   async updateCategoryTree(items: CategoryTreeItem[]): Promise<void> {
+    // 트랜잭션 전 유효성 검증 (현재 DB 상태 기준)
+    for (const item of items) {
+      if (item.parentId === null) continue;
+
+      // 자기 자신을 부모로 설정하는 경우
+      if (item.parentId === item.id) {
+        throw HttpError.badRequest(
+          `Category ${item.id} cannot be its own parent.`,
+        );
+      }
+
+      // 자신의 하위 카테고리를 부모로 설정하는 경우
+      const isDescendant = await this.isDescendantOf(item.id, item.parentId);
+      if (isDescendant) {
+        throw HttpError.badRequest(
+          `Category ${item.id}: cannot set a descendant as parent.`,
+        );
+      }
+
+      // 부모 카테고리 존재 확인
+      const [parent] = await this.db
+        .select()
+        .from(categoryTable)
+        .where(eq(categoryTable.id, item.parentId))
+        .limit(1);
+
+      if (!parent) {
+        throw HttpError.badRequest(
+          `Parent category ${item.parentId} not found.`,
+        );
+      }
+    }
+
     await this.db.transaction(async (tx) => {
       for (const item of items) {
         await tx
@@ -346,18 +380,18 @@ export class CategoryService {
       throw HttpError.notFound("Category not found.");
     }
 
-    // 2. 하위 카테고리 존재 여부 확인
-    const [childCount] = await this.db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(categoryTable)
-      .where(eq(categoryTable.parentId, id));
-
-    if (childCount && childCount.count > 0) {
-      throw HttpError.conflict("Cannot delete category with subcategories.");
-    }
-
-    // 3. 단일 트랜잭션: 게시글 처리 + 카테고리 삭제
+    // 2. 단일 트랜잭션: 하위 카테고리 확인 + 게시글 처리 + 카테고리 삭제
     await this.db.transaction(async (tx) => {
+      // 하위 카테고리 존재 여부 확인 (트랜잭션 내에서 TOCTOU 방지)
+      const [childCount] = await tx
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(categoryTable)
+        .where(eq(categoryTable.parentId, id));
+
+      if (childCount && childCount.count > 0) {
+        throw HttpError.conflict("Cannot delete category with subcategories.");
+      }
+
       if (action === "move") {
         if (!moveTo) {
           throw HttpError.badRequest("moveTo is required when action is move.");
