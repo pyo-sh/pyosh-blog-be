@@ -1,3 +1,5 @@
+import { mkdirSync } from "fs";
+import { resolve } from "path";
 import pino from "pino";
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
@@ -46,7 +48,7 @@ const REQ_SERIALIZER = {
  * - 개발: pino-pretty (human-readable)
  * - 테스트: JSON, warn 레벨
  */
-export function buildLoggerOptions() {
+function buildLoggerOptions() {
   const level = getLogLevel();
   const isDev = env.NODE_ENV === NodeEnv.DEV;
 
@@ -74,15 +76,23 @@ export function buildLoggerOptions() {
 /**
  * 프로덕션 pino 인스턴스 빌더
  * - stdout: info 레벨 이상 (JSON)
- * - logs/error.log: error 레벨만 파일 기록
+ * - logs/error.log: error 레벨만 파일 기록 (LOG_FILE 환경변수로 경로 재정의 가능)
+ * - pino.destination 버퍼 유실 방지: process.on('exit') 플러시 등록
  */
 export function buildProdLoggerInstance(): pino.Logger {
+  const logFile =
+    process.env.LOG_FILE ?? resolve(process.cwd(), "logs/error.log");
+  const logDir = resolve(logFile, "..");
+  mkdirSync(logDir, { recursive: true });
+
+  const errorDest = pino.destination(logFile);
+
   const streams: pino.StreamEntry[] = [
     { level: "info", stream: process.stdout },
-    { level: "error", stream: pino.destination("logs/error.log") },
+    { level: "error", stream: errorDest },
   ];
 
-  return pino(
+  const logger = pino(
     {
       level: "info",
       redact: {
@@ -93,6 +103,11 @@ export function buildProdLoggerInstance(): pino.Logger {
     },
     pino.multistream(streams),
   );
+
+  // pino.destination은 기본적으로 async(버퍼) I/O — 프로세스 종료 시 플러시
+  process.on("exit", () => logger.flush());
+
+  return logger;
 }
 
 /**
