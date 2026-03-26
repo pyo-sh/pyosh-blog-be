@@ -605,16 +605,17 @@ export class PostService {
     categoryId?: number;
     commentStatus?: "open" | "locked" | "disabled";
   }): Promise<void> {
-    const { ids, action } = input;
+    const { action } = input;
+    const uniqueIds = [...new Set(input.ids)];
 
     await this.db.transaction(async (tx) => {
       // 모든 대상 게시글 존재 확인
       const found = await tx
         .select({ id: postTable.id })
         .from(postTable)
-        .where(inArray(postTable.id, ids));
+        .where(inArray(postTable.id, uniqueIds));
 
-      if (found.length !== ids.length) {
+      if (found.length !== uniqueIds.length) {
         throw HttpError.notFound("One or more posts not found.");
       }
 
@@ -624,30 +625,30 @@ export class PostService {
         };
         if (input.categoryId !== undefined) updateData.categoryId = input.categoryId;
         if (input.commentStatus !== undefined) updateData.commentStatus = input.commentStatus;
-        await tx.update(postTable).set(updateData).where(inArray(postTable.id, ids));
+        await tx.update(postTable).set(updateData).where(inArray(postTable.id, uniqueIds));
       } else if (action === "soft_delete") {
         await tx
           .update(postTable)
           .set({ deletedAt: new Date() })
-          .where(inArray(postTable.id, ids));
+          .where(inArray(postTable.id, uniqueIds));
       } else if (action === "restore") {
         await tx
           .update(postTable)
           .set({ deletedAt: null })
-          .where(inArray(postTable.id, ids));
+          .where(inArray(postTable.id, uniqueIds));
       } else if (action === "hard_delete") {
         // 연결된 tagId 수집 (고아 태그 감지용)
         const linkedTags = await tx
           .select({ tagId: postTagTable.tagId })
           .from(postTagTable)
-          .where(inArray(postTagTable.postId, ids));
+          .where(inArray(postTagTable.postId, uniqueIds));
         const linkedTagIds = [...new Set(linkedTags.map((r) => r.tagId))];
 
         // 댓글, 통계, 태그 관계, 게시글 순서로 삭제
-        await tx.delete(commentTable).where(inArray(commentTable.postId, ids));
-        await tx.delete(statsDailyTable).where(inArray(statsDailyTable.postId, ids));
-        await tx.delete(postTagTable).where(inArray(postTagTable.postId, ids));
-        await tx.delete(postTable).where(inArray(postTable.id, ids));
+        await tx.delete(commentTable).where(inArray(commentTable.postId, uniqueIds));
+        await tx.delete(statsDailyTable).where(inArray(statsDailyTable.postId, uniqueIds));
+        await tx.delete(postTagTable).where(inArray(postTagTable.postId, uniqueIds));
+        await tx.delete(postTable).where(inArray(postTable.id, uniqueIds));
 
         // 고아 태그 삭제
         await this.cleanOrphanTags(tx, linkedTagIds);

@@ -1439,6 +1439,39 @@ describe("Post Routes", () => {
       expect(getRes.statusCode).toBe(404);
     });
 
+    it("중복 ids 허용 — 존재하는 게시글이면 204", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post.id, post.id], action: "soft_delete" },
+      });
+
+      expect(response.statusCode).toBe(204);
+    });
+
+    it("action!=update에서 categoryId 전달 시 → 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+      const cat2 = await seedCategory({ name: "Cat2" });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post.id], action: "soft_delete", categoryId: cat2.id },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
     it("ids 중 하나라도 존재하지 않으면 전체 실패 → 404", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);

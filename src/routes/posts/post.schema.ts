@@ -122,6 +122,12 @@ export const BulkPostActionBodySchema = z
       data.categoryId !== undefined ||
       data.commentStatus !== undefined,
     { message: "action=update requires at least one of categoryId or commentStatus" },
+  )
+  .refine(
+    (data) =>
+      data.action === "update" ||
+      (data.categoryId === undefined && data.commentStatus === undefined),
+    { message: "categoryId and commentStatus are only valid for action=update" },
   );
 
 /**
