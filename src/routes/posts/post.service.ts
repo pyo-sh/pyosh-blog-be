@@ -299,7 +299,7 @@ export class PostService {
     // 키워드 검색 (filter에 따라 검색 범위 결정)
     if (query.q) {
       const term = `%${query.q}%`;
-      const filter = query.filter ?? "title_content";
+      const filter = query.filter;
 
       if (filter === "title") {
         conditions.push(like(postTable.title, term));
@@ -469,6 +469,7 @@ export class PostService {
    */
   async getPostSlugs(): Promise<PostSlugItem[]> {
     const rows = await this.db
+      // TODO: 포스트 수가 많아질 경우 cursor 기반 페이지네이션 추가 필요 (Google Sitemap: 50,000 URLs/file 제한)
       .select({ slug: postTable.slug, updatedAt: postTable.updatedAt })
       .from(postTable)
       .where(
@@ -611,13 +612,17 @@ export class PostService {
     const statsMap = new Map(statsRows.map((r) => [r.postId, Number(r.total)]));
     const commentMap = new Map(commentRows.map((r) => [r.postId, Number(r.count)]));
 
-    return posts.map(({ contentMd: _c, ...post }) => ({
-      ...post,
-      category: catMap.get(post.categoryId)!,
-      tags: tagsMap.get(post.id) ?? [],
-      totalPageviews: statsMap.get(post.id) ?? 0,
-      commentCount: commentMap.get(post.id) ?? 0,
-    }));
+    return posts.map(({ contentMd: _c, ...post }) => {
+      const category = catMap.get(post.categoryId);
+      if (!category) throw new Error(`Category ${post.categoryId} not found for post ${post.id}`);
+      return {
+        ...post,
+        category,
+        tags: tagsMap.get(post.id) ?? [],
+        totalPageviews: statsMap.get(post.id) ?? 0,
+        commentCount: commentMap.get(post.id) ?? 0,
+      };
+    });
   }
 
   /**
@@ -676,8 +681,11 @@ export class PostService {
       .limit(1);
 
     let parentId = direct?.parentId ?? null;
+    const MAX_DEPTH = 10;
+    let depth = 0;
 
-    while (parentId != null && !visited.has(parentId)) {
+    while (parentId != null && !visited.has(parentId) && depth < MAX_DEPTH) {
+      depth++;
       visited.add(parentId);
       const [parent] = await db
         .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug, parentId: categoryTable.parentId })

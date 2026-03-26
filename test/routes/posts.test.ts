@@ -547,6 +547,155 @@ describe("Post Routes", () => {
 
   // ===== GET /api/posts - filter param =====
 
+  describe("GET /api/posts - filter 파라미터 (tag/category/comment)", () => {
+    it("filter=tag 로 태그 이름 검색", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Post with Drizzle tag",
+          contentMd: "# Content",
+          categoryId: category.id,
+          status: "published",
+          visibility: "public",
+          tags: ["drizzle-orm"],
+        },
+      });
+      await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Post with React tag",
+          contentMd: "# Content",
+          categoryId: category.id,
+          status: "published",
+          visibility: "public",
+          tags: ["react"],
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=drizzle&filter=tag",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe("Post with Drizzle tag");
+    });
+
+    it("filter=tag, 매칭 태그 없음 → 빈 배열", async () => {
+      const category = await seedCategory();
+      await seedPost(category.id, { status: "published", visibility: "public" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=nonexistenttag&filter=tag",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(0);
+    });
+
+    it("filter=category 로 카테고리 이름 검색", async () => {
+      const backend = await seedCategory({ name: "Backend Development" });
+      const frontend = await seedCategory({ name: "Frontend Development" });
+
+      await seedPost(backend.id, { status: "published", visibility: "public" });
+      await seedPost(frontend.id, { status: "published", visibility: "public" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=Backend&filter=category",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].category.id).toBe(backend.id);
+    });
+
+    it("filter=category, 매칭 카테고리 없음 → 빈 배열", async () => {
+      const category = await seedCategory({ name: "Existing Category" });
+      await seedPost(category.id, { status: "published", visibility: "public" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=NonExistentCategory&filter=category",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(0);
+    });
+
+    it("filter=comment 로 댓글 본문 검색", async () => {
+      const category = await seedCategory();
+      const postA = await seedPost(category.id, {
+        title: "Post A",
+        status: "published",
+        visibility: "public",
+      });
+      const postB = await seedPost(category.id, {
+        title: "Post B",
+        status: "published",
+        visibility: "public",
+      });
+
+      // postA에 "unique keyword" 포함 댓글 추가
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${postA.id}/comments`,
+        payload: {
+          body: "This is a unique keyword comment",
+          guestName: "Tester",
+          guestEmail: "t@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      // postB에는 다른 댓글
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${postB.id}/comments`,
+        payload: {
+          body: "Different comment here",
+          guestName: "Tester",
+          guestEmail: "t@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=unique+keyword&filter=comment",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe("Post A");
+    });
+
+    it("filter=comment, 매칭 댓글 없음 → 빈 배열", async () => {
+      const category = await seedCategory();
+      await seedPost(category.id, { status: "published", visibility: "public" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=nomatchcomment&filter=comment",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(0);
+    });
+  });
+
   describe("GET /api/posts - filter 파라미터", () => {
     it("filter=title 로 제목에서만 검색", async () => {
       const category = await seedCategory();
