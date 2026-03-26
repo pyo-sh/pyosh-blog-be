@@ -191,6 +191,65 @@ describe("Category Routes", () => {
 
       expect(response.statusCode).toBe(403);
     });
+
+    it("직접 순환 참조 → 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const a = await seedCategory({ name: "A" });
+      const b = await seedCategory({ name: "B", parentId: a.id });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/categories/tree",
+        headers: { cookie },
+        payload: {
+          changes: [
+            { id: a.id, parentId: b.id, sortOrder: 0 },
+            { id: b.id, parentId: a.id, sortOrder: 1 },
+          ],
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("부모-자식 위치 교환은 허용 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const a = await seedCategory({ name: "A" });
+      const b = await seedCategory({ name: "B", parentId: a.id });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/categories/tree",
+        headers: { cookie },
+        payload: {
+          changes: [
+            { id: b.id, parentId: null, sortOrder: 0 },
+            { id: a.id, parentId: b.id, sortOrder: 1 },
+          ],
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    it("자기 자신을 부모로 설정 → 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const a = await seedCategory({ name: "A" });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/categories/tree",
+        headers: { cookie },
+        payload: {
+          changes: [{ id: a.id, parentId: a.id, sortOrder: 0 }],
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
   });
 
   // ===== DELETE /api/categories/:id =====

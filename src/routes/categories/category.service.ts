@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import {
   Category,
@@ -463,12 +463,19 @@ export class CategoryService {
           .set({ categoryId: moveTo! })
           .where(eq(postTable.categoryId, id));
       } else {
-        // 게시글 휴지통 이동 (soft delete, 미삭제 게시글만)
+        // 미삭제 게시글: soft delete + categoryId 초기화
         await tx
           .update(postTable)
-          .set({ deletedAt: new Date() })
+          .set({ deletedAt: new Date(), categoryId: null })
           .where(
             and(eq(postTable.categoryId, id), isNull(postTable.deletedAt)),
+          );
+        // 이미 soft delete된 게시글: categoryId만 초기화 (복구 시 유효한 categoryId 보장)
+        await tx
+          .update(postTable)
+          .set({ categoryId: null })
+          .where(
+            and(eq(postTable.categoryId, id), isNotNull(postTable.deletedAt)),
           );
       }
 

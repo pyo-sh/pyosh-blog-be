@@ -36,6 +36,13 @@
       "when": 1772006400000,
       "tag": "0004_post_tb_extend",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1772006500000,
+      "tag": "0005_post_nullable_category",
+      "breakpoints": true
     }
   ]
 }
