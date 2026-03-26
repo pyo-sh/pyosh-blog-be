@@ -565,7 +565,12 @@ export class CommentService {
       await this.db
         .update(commentTable)
         .set({ status: "deleted", deletedAt: new Date() })
-        .where(inArray(commentTable.id, ids));
+        .where(
+          and(
+            inArray(commentTable.id, ids),
+            eq(commentTable.status, "active"),
+          ),
+        );
     } else {
       // hard_delete: 자식 댓글도 cascade 삭제 (atomic)
       await this.db.transaction(async (tx) => {
