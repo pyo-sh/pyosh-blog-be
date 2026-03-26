@@ -621,7 +621,7 @@ export class PostService {
 
     return posts.map(({ contentMd: _c, ...post }) => {
       const category = catMap.get(post.categoryId);
-      if (!category) throw new Error(`Category ${post.categoryId} not found for post ${post.id}`);
+      if (!category) throw HttpError.notFound(`Category ${post.categoryId} not found for post ${post.id}`);
       return {
         ...post,
         category,
