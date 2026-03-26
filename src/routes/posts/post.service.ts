@@ -20,9 +20,13 @@ export interface CreatePostInput {
   title: string;
   contentMd: string;
   categoryId: number;
+  summary?: string;
+  description?: string;
   thumbnailUrl?: string | null;
   visibility?: "public" | "private";
   status?: "draft" | "published" | "archived";
+  commentStatus?: "open" | "locked" | "disabled";
+  isPinned?: boolean;
   tags?: string[];
   publishedAt?: Date;
 }
@@ -34,9 +38,13 @@ export interface UpdatePostInput {
   title?: string;
   contentMd?: string;
   categoryId?: number;
+  summary?: string | null;
+  description?: string | null;
   thumbnailUrl?: string | null;
   visibility?: "public" | "private";
   status?: "draft" | "published" | "archived";
+  commentStatus?: "open" | "locked" | "disabled";
+  isPinned?: boolean;
   tags?: string[];
   publishedAt?: Date;
 }
@@ -144,9 +152,13 @@ export class PostService {
         slug,
         contentMd: input.contentMd,
         categoryId: input.categoryId,
+        summary: input.summary ?? null,
+        description: input.description ?? null,
         thumbnailUrl: input.thumbnailUrl ?? null,
         visibility: input.visibility ?? "public",
         status: input.status ?? "draft",
+        commentStatus: input.commentStatus ?? "open",
+        isPinned: input.isPinned ?? false,
         publishedAt,
       };
 

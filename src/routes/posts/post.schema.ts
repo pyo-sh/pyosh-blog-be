@@ -73,12 +73,19 @@ export const CreatePostBodySchema = z.object({
   title: z.string().min(1).max(200),
   contentMd: z.string().min(1),
   categoryId: z.number().int().positive(),
+  summary: z.string().trim().max(200).optional(),
+  description: z.string().trim().max(300).optional(),
   thumbnailUrl: ThumbnailUrlInputSchema.optional(),
   visibility: z.enum(["public", "private"]).optional().default("public"),
   status: z
     .enum(["draft", "published", "archived"])
     .optional()
     .default("draft"),
+  commentStatus: z
+    .enum(["open", "locked", "disabled"])
+    .optional()
+    .default("open"),
+  isPinned: z.boolean().optional().default(false),
   tags: z.array(z.string().min(1).max(30)).optional(),
   publishedAt: z.string().datetime().optional(),
 });
@@ -87,9 +94,13 @@ export const UpdatePostBodySchema = z.object({
   title: z.string().min(1).max(200).optional(),
   contentMd: z.string().min(1).optional(),
   categoryId: z.number().int().positive().optional(),
+  summary: z.string().trim().max(200).nullable().optional(),
+  description: z.string().trim().max(300).nullable().optional(),
   thumbnailUrl: ThumbnailUrlInputSchema.optional(),
   visibility: z.enum(["public", "private"]).optional(),
   status: z.enum(["draft", "published", "archived"]).optional(),
+  commentStatus: z.enum(["open", "locked", "disabled"]).optional(),
+  isPinned: z.boolean().optional(),
   tags: z.array(z.string().min(1).max(30)).optional(),
   publishedAt: z.string().datetime().optional(),
 });
@@ -115,10 +126,15 @@ export const PostDetailSchema = z.object({
   title: z.string(),
   slug: z.string(),
   contentMd: z.string(),
+  summary: z.string().nullable(),
+  description: z.string().nullable(),
   thumbnailUrl: z.string().nullable(),
   visibility: z.enum(["public", "private"]),
   status: z.enum(["draft", "published", "archived"]),
+  commentStatus: z.enum(["open", "locked", "disabled"]),
+  isPinned: z.boolean(),
   publishedAt: z.string().nullable(), // ISO datetime string
+  contentModifiedAt: z.string().nullable(), // ISO datetime string
   createdAt: z.string(), // ISO datetime string
   updatedAt: z.string(), // ISO datetime string
   deletedAt: z.string().nullable(), // ISO datetime string
