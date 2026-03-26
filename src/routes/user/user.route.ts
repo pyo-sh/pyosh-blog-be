@@ -33,6 +33,7 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
           response: {
             200: UserProfileResponseSchema,
             401: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
         preHandler: requireAuth,
@@ -58,13 +59,14 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
           response: {
             200: UserProfileResponseSchema,
             401: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
         preHandler: requireAuth,
       },
       async (request, reply) => {
         const oauthAccountId = (request.user as OAuthAccount).id;
-        const data = UpdateMyProfileBodySchema.parse(request.body);
+        const data = request.body;
         const profile = await userService.updateMyProfile(oauthAccountId, data);
 
         return reply.status(200).send(profile);
@@ -83,6 +85,7 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
           response: {
             204: z.void(),
             401: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
         preHandler: requireAuth,
