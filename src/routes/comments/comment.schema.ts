@@ -59,6 +59,14 @@ export const DeleteCommentGuestBodySchema = z.object({
 });
 
 /**
+ * Public 댓글 목록 쿼리 스키마
+ */
+export const CommentsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(50).optional().default(10),
+});
+
+/**
  * Response Schemas
  */
 
@@ -109,10 +117,22 @@ export const CommentDetailSchema = z.lazy(() =>
 );
 
 /**
- * 댓글 목록 응답 스키마
+ * Public 댓글 목록 페이지네이션 메타 스키마
+ */
+export const CommentsPaginationMetaSchema = z.object({
+  page: z.number(),
+  limit: z.number(),
+  totalCount: z.number(),
+  totalRootComments: z.number(),
+  totalPages: z.number(),
+});
+
+/**
+ * 댓글 목록 응답 스키마 (페이지네이션 포함)
  */
 export const CommentsResponseSchema = z.object({
   data: z.array(CommentDetailSchema),
+  meta: CommentsPaginationMetaSchema,
 });
 
 /**
@@ -129,13 +149,16 @@ export const AdminCommentListQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
   postId: z.coerce.number().int().positive().optional(),
+  status: z.enum(["active", "deleted", "hidden"]).optional(),
   authorType: z.enum(["oauth", "guest"]).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  sort: z.enum(["created_at"]).optional().default("created_at"),
+  order: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
 /**
- * 관리자 댓글 아이템 스키마 (flat, 비밀글 마스킹 없음)
+ * 관리자 댓글 아이템 스키마 (flat, 비밀글 마스킹 없음, post.title 포함)
  */
 export const AdminCommentItemSchema = z.object({
   id: z.number(),
@@ -147,6 +170,7 @@ export const AdminCommentItemSchema = z.object({
   status: z.enum(["active", "deleted", "hidden"]),
   author: CommentAuthorSchema,
   replyToName: z.string().nullable(),
+  post: z.object({ id: z.number(), title: z.string() }),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -157,6 +181,36 @@ export const AdminCommentItemSchema = z.object({
 export const AdminCommentListResponseSchema = z.object({
   data: z.array(AdminCommentItemSchema),
   meta: PaginationMetaSchema,
+});
+
+/**
+ * 관리자 댓글 스레드 응답 스키마 (부모 + 답글)
+ */
+export const AdminCommentThreadResponseSchema = z.object({
+  parent: AdminCommentItemSchema,
+  replies: z.array(AdminCommentItemSchema),
+});
+
+/**
+ * 관리자 댓글 삭제 쿼리 스키마
+ */
+export const AdminCommentDeleteQuerySchema = z.object({
+  action: z.enum(["soft_delete", "hard_delete"]).default("soft_delete"),
+});
+
+/**
+ * 관리자 댓글 복원 응답 스키마
+ */
+export const AdminCommentRestoreResponseSchema = z.object({
+  success: z.literal(true),
+});
+
+/**
+ * 관리자 벌크 삭제/복원 요청 바디 스키마
+ */
+export const AdminCommentBulkBodySchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1),
+  action: z.enum(["restore", "soft_delete", "hard_delete"]),
 });
 
 /**
@@ -173,7 +227,12 @@ export type CreateCommentGuestBody = z.infer<
 export type DeleteCommentGuestBody = z.infer<
   typeof DeleteCommentGuestBodySchema
 >;
+export type CommentsQuery = z.infer<typeof CommentsQuerySchema>;
 export type CommentAuthor = z.infer<typeof CommentAuthorSchema>;
 export type CommentDetail = CommentDetailSchemaType;
 export type AdminCommentListQuery = z.infer<typeof AdminCommentListQuerySchema>;
 export type AdminCommentItem = z.infer<typeof AdminCommentItemSchema>;
+export type AdminCommentDeleteQuery = z.infer<
+  typeof AdminCommentDeleteQuerySchema
+>;
+export type AdminCommentBulkBody = z.infer<typeof AdminCommentBulkBodySchema>;
