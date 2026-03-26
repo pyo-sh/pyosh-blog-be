@@ -479,7 +479,7 @@ export class CategoryService {
         // 미삭제 게시글: soft delete + categoryId 초기화
         await tx
           .update(postTable)
-          .set({ deletedAt: new Date(), categoryId: null })
+          .set({ deletedAt: sql`NOW()`, categoryId: null })
           .where(
             and(eq(postTable.categoryId, id), isNull(postTable.deletedAt)),
           );
