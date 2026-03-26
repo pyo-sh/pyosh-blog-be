@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const StatsViewBodySchema = z.object({
-  postId: z.coerce.number().int().positive(),
+  postId: z.coerce.number().int().positive().optional(),
 });
 
 export const PopularPostsQuerySchema = z.object({
@@ -26,12 +26,21 @@ export const PopularPostsResponseSchema = z.object({
   data: z.array(PostStatsSchema),
 });
 
+export const TotalViewsResponseSchema = z.object({
+  totalPageviews: z.number(),
+});
+
 export const DashboardStatsResponseSchema = z.object({
   todayPageviews: z.number(),
   weekPageviews: z.number(),
   monthPageviews: z.number(),
   totalPosts: z.number(),
   totalComments: z.number(),
+  postsByStatus: z.object({
+    draft: z.number(),
+    published: z.number(),
+    archived: z.number(),
+  }),
 });
 
 export type StatsViewBody = z.infer<typeof StatsViewBodySchema>;
