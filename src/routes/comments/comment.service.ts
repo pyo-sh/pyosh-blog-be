@@ -1,4 +1,4 @@
-import { eq, and, isNull, sql, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, sql, gte, lte, asc, desc, inArray } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import type {
   CommentDetail,
@@ -23,6 +23,7 @@ import { hashPassword } from "@src/shared/password";
 import {
   buildPaginatedResponse,
   calculateOffset,
+  calculateTotalPages,
   PaginatedResponse,
 } from "@src/shared/pagination";
 
@@ -42,6 +43,20 @@ export interface CreateCommentInput {
 export interface GetCommentsOptions {
   viewerUserId?: number | null;
   viewerIsAdmin?: boolean;
+}
+
+/**
+ * Public 댓글 목록 페이지네이션 결과
+ */
+export interface CommentListResult {
+  data: CommentDetail[];
+  meta: {
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalRootComments: number;
+    totalPages: number;
+  };
 }
 
 /**
@@ -210,62 +225,105 @@ export class CommentService {
   }
 
   /**
-   * 게시글의 댓글 목록 조회 (계층 구조)
+   * 게시글의 댓글 목록 조회 (계층 구조, 페이지네이션)
    *
    * @param postId 게시글 ID
+   * @param page 페이지 번호 (루트 댓글 기준)
+   * @param limit 페이지당 루트 댓글 수
    * @param options 조회 옵션 (viewerUserId, viewerIsAdmin)
-   * @returns 댓글 목록 (계층 구조)
+   * @returns 댓글 목록 (계층 구조) + 페이지네이션 메타
    */
   async getCommentsByPostId(
     postId: number,
+    page: number,
+    limit: number,
     options?: GetCommentsOptions,
-  ): Promise<CommentDetail[]> {
-    // 1. 댓글 조회 (active 상태만, 삭제되지 않은 것)
-    const comments = await this.db
-      .select()
-      .from(commentTable)
-      .where(
-        and(
-          eq(commentTable.postId, postId),
-          eq(commentTable.status, "active"),
-          isNull(commentTable.deletedAt),
-        ),
-      )
-      .orderBy(commentTable.createdAt);
-
-    // 2. 각 댓글에 작성자 정보 보강
-    const commentsWithAuthor: CommentWithAuthor[] = await Promise.all(
-      comments.map((comment) => this.enrichCommentWithAuthor(comment)),
-    );
-
-    // 3. 비밀글 마스킹
+  ): Promise<CommentListResult> {
+    const offset = calculateOffset(page, limit);
     const viewerUserId = options?.viewerUserId ?? null;
     const isAdmin = options?.viewerIsAdmin ?? false;
 
+    const activeCondition = and(
+      eq(commentTable.postId, postId),
+      eq(commentTable.status, "active"),
+      isNull(commentTable.deletedAt),
+    );
+
+    // 1. 루트 댓글 수 + 전체 댓글 수 병렬 조회
+    const [rootCountResult, totalCountResult] = await Promise.all([
+      this.db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(and(activeCondition, isNull(commentTable.parentId))),
+      this.db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(activeCondition),
+    ]);
+
+    const totalRootComments = rootCountResult[0]?.count ?? 0;
+    const totalCount = totalCountResult[0]?.count ?? 0;
+    const totalPages = calculateTotalPages(totalRootComments, limit);
+
+    // 2. 페이지네이션된 루트 댓글 조회
+    const rootComments = await this.db
+      .select()
+      .from(commentTable)
+      .where(and(activeCondition, isNull(commentTable.parentId)))
+      .orderBy(asc(commentTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    if (rootComments.length === 0) {
+      return {
+        data: [],
+        meta: { page, limit, totalCount, totalRootComments, totalPages },
+      };
+    }
+
+    // 3. 루트 댓글의 replies 조회
+    const rootIds = rootComments.map((c) => c.id);
+    const replies = await this.db
+      .select()
+      .from(commentTable)
+      .where(and(activeCondition, inArray(commentTable.parentId, rootIds)))
+      .orderBy(asc(commentTable.createdAt));
+
+    // 4. 작성자 정보 보강
+    const allComments = [...rootComments, ...replies];
+    const commentsWithAuthor: CommentWithAuthor[] = await Promise.all(
+      allComments.map((comment) => this.enrichCommentWithAuthor(comment)),
+    );
+
+    // 5. 비밀글 마스킹
     const maskedComments = commentsWithAuthor.map((comment) =>
       maskSecretContent(comment, viewerUserId, isAdmin),
     );
 
-    // 4. 계층 구조 변환
+    // 6. 계층 구조 변환 (루트만 반환, replies는 각 루트의 children에 포함)
     const hierarchicalComments = buildHierarchy(maskedComments);
 
-    // 5. CommentDetail 타입으로 변환 (replies 포함)
-    return hierarchicalComments.map((comment) =>
-      this.mapToCommentDetail(comment),
-    );
+    return {
+      data: hierarchicalComments.map((comment) =>
+        this.mapToCommentDetail(comment),
+      ),
+      meta: { page, limit, totalCount, totalRootComments, totalPages },
+    };
   }
 
   /**
-   * 댓글 삭제 (Soft delete)
+   * 댓글 삭제 (Soft delete 또는 Hard delete)
    *
    * @param commentId 댓글 ID
    * @param author 작성자 정보
    * @param isAdmin 관리자 여부
+   * @param hardDelete Hard delete 여부 (관리자 전용)
    */
   async deleteComment(
     commentId: number,
     author: Author | null,
     isAdmin: boolean,
+    hardDelete = false,
   ): Promise<void> {
     // 1. 댓글 존재 확인
     const [comment] = await this.db
@@ -281,13 +339,51 @@ export class CommentService {
     // 2. 삭제 권한 확인
     await verifyDeletePermission(comment, author, isAdmin);
 
-    // 3. Soft delete (status='deleted', deletedAt 설정)
+    if (hardDelete && isAdmin) {
+      // Hard delete: 자식 댓글 cascade 삭제 후 본 댓글 삭제 (atomic)
+      await this.db.transaction(async (tx) => {
+        await tx
+          .delete(commentTable)
+          .where(eq(commentTable.parentId, commentId));
+        await tx
+          .delete(commentTable)
+          .where(eq(commentTable.id, commentId));
+      });
+    } else {
+      // Soft delete (status='deleted', deletedAt 설정)
+      await this.db
+        .update(commentTable)
+        .set({
+          status: "deleted",
+          deletedAt: new Date(),
+        })
+        .where(eq(commentTable.id, commentId));
+    }
+  }
+
+  /**
+   * 댓글 복원 (deleted → active)
+   *
+   * @param commentId 댓글 ID
+   */
+  async restoreComment(commentId: number): Promise<void> {
+    const [comment] = await this.db
+      .select()
+      .from(commentTable)
+      .where(eq(commentTable.id, commentId))
+      .limit(1);
+
+    if (!comment) {
+      throw HttpError.notFound("Comment not found.");
+    }
+
+    if (comment.status !== "deleted") {
+      throw HttpError.badRequest("Comment is not deleted.");
+    }
+
     await this.db
       .update(commentTable)
-      .set({
-        status: "deleted",
-        deletedAt: new Date(),
-      })
+      .set({ status: "active", deletedAt: null })
       .where(eq(commentTable.id, commentId));
   }
 
@@ -315,8 +411,8 @@ export class CommentService {
   /**
    * 관리자용 전체 댓글 목록 조회 (페이지네이션 + 필터)
    *
-   * @param query 쿼리 파라미터 (page, limit, postId, authorType, startDate, endDate)
-   * @returns 페이지네이션된 댓글 목록 (비밀글 마스킹 없음)
+   * @param query 쿼리 파라미터
+   * @returns 페이지네이션된 댓글 목록 (비밀글 마스킹 없음, post.title 포함)
    */
   async getAdminComments(
     query: AdminCommentListQuery,
@@ -324,10 +420,14 @@ export class CommentService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const offset = calculateOffset(page, limit);
+    const order = query.order ?? "desc";
 
     const conditions = [];
     if (query.postId !== undefined) {
       conditions.push(eq(commentTable.postId, query.postId));
+    }
+    if (query.status !== undefined) {
+      conditions.push(eq(commentTable.status, query.status));
     }
     if (query.authorType !== undefined) {
       conditions.push(eq(commentTable.authorType, query.authorType));
@@ -340,13 +440,17 @@ export class CommentService {
     }
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const orderBy =
+      order === "asc"
+        ? asc(commentTable.createdAt)
+        : desc(commentTable.createdAt);
 
     const [comments, [{ total }]] = await Promise.all([
       this.db
         .select()
         .from(commentTable)
         .where(where)
-        .orderBy(commentTable.createdAt)
+        .orderBy(orderBy)
         .limit(limit)
         .offset(offset),
 
@@ -356,26 +460,151 @@ export class CommentService {
         .where(where),
     ]);
 
+    // Batch-fetch posts to avoid N+1 queries
+    const postIds = [...new Set(comments.map((c) => c.postId))];
+    const postRows =
+      postIds.length > 0
+        ? await this.db
+            .select({ id: postTable.id, title: postTable.title })
+            .from(postTable)
+            .where(inArray(postTable.id, postIds))
+        : [];
+    const postMap = new Map(postRows.map((p) => [p.id, p]));
+
     const items: AdminCommentItem[] = await Promise.all(
       comments.map(async (comment) => {
         const enriched = await this.enrichCommentWithAuthor(comment);
-        return {
-          id: enriched.id,
-          postId: enriched.postId,
-          parentId: enriched.parentId,
-          depth: enriched.depth,
-          body: enriched.body,
-          isSecret: enriched.isSecret,
-          status: enriched.status as "active" | "deleted" | "hidden",
-          author: enriched.author,
-          replyToName: enriched.replyToName,
-          createdAt: enriched.createdAt.toISOString(),
-          updatedAt: enriched.updatedAt.toISOString(),
+        const post = postMap.get(comment.postId) ?? {
+          id: comment.postId,
+          title: "(삭제된 게시글)",
         };
+        return this.mapToAdminCommentItem(enriched, post);
       }),
     );
 
     return buildPaginatedResponse(items, total, page, limit);
+  }
+
+  /**
+   * 관리자용 댓글 스레드 조회 (부모 + 모든 답글)
+   *
+   * @param commentId 댓글 ID
+   * @returns 부모 댓글 + 답글 목록
+   */
+  async getAdminCommentThread(commentId: number): Promise<{
+    parent: AdminCommentItem;
+    replies: AdminCommentItem[];
+  }> {
+    const [comment] = await this.db
+      .select()
+      .from(commentTable)
+      .where(eq(commentTable.id, commentId))
+      .limit(1);
+
+    if (!comment) {
+      throw HttpError.notFound("Comment not found.");
+    }
+
+    // 루트 댓글로 정규화 (답글이 전달된 경우 부모로 이동)
+    let root = comment;
+    if (comment.parentId !== null) {
+      const [parent] = await this.db
+        .select()
+        .from(commentTable)
+        .where(eq(commentTable.id, comment.parentId))
+        .limit(1);
+      if (!parent) {
+        throw HttpError.notFound("Root comment not found.");
+      }
+      root = parent;
+    }
+
+    const replies = await this.db
+      .select()
+      .from(commentTable)
+      .where(eq(commentTable.parentId, root.id))
+      .orderBy(asc(commentTable.createdAt));
+
+    const post = await this.getPostSummary(root.postId);
+    const enrichedRoot = await this.enrichCommentWithAuthor(root);
+    const enrichedReplies = await Promise.all(
+      replies.map((r) => this.enrichCommentWithAuthor(r)),
+    );
+
+    return {
+      parent: this.mapToAdminCommentItem(enrichedRoot, post),
+      replies: enrichedReplies.map((r) =>
+        this.mapToAdminCommentItem(r, post),
+      ),
+    };
+  }
+
+  /**
+   * 관리자 벌크 작업 (restore / soft_delete / hard_delete)
+   *
+   * @param ids 대상 댓글 ID 목록
+   * @param action 수행할 작업
+   */
+  async bulkOperateComments(
+    ids: number[],
+    action: "restore" | "soft_delete" | "hard_delete",
+  ): Promise<void> {
+    if (ids.length === 0) return;
+
+    if (action === "restore") {
+      await this.db
+        .update(commentTable)
+        .set({ status: "active", deletedAt: null })
+        .where(
+          and(
+            inArray(commentTable.id, ids),
+            eq(commentTable.status, "deleted"),
+          ),
+        );
+    } else if (action === "soft_delete") {
+      await this.db
+        .update(commentTable)
+        .set({ status: "deleted", deletedAt: new Date() })
+        .where(
+          and(
+            inArray(commentTable.id, ids),
+            eq(commentTable.status, "active"),
+          ),
+        );
+    } else {
+      // hard_delete: 자식 댓글도 cascade 삭제 (atomic)
+      await this.db.transaction(async (tx) => {
+        const childRows = await tx
+          .select({ id: commentTable.id })
+          .from(commentTable)
+          .where(inArray(commentTable.parentId, ids));
+
+        const childIds = childRows.map((c) => c.id);
+        if (childIds.length > 0) {
+          await tx
+            .delete(commentTable)
+            .where(inArray(commentTable.id, childIds));
+        }
+        await tx
+          .delete(commentTable)
+          .where(inArray(commentTable.id, ids));
+      });
+    }
+  }
+
+  /**
+   * 게시글 요약 정보 조회 (private)
+   */
+  private async getPostSummary(
+    postId: number,
+  ): Promise<{ id: number; title: string }> {
+    const [post] = await this.db
+      .select({ id: postTable.id, title: postTable.title })
+      .from(postTable)
+      .where(eq(postTable.id, postId))
+      .limit(1);
+
+    return post ?? { id: postId, title: "(삭제된 게시글)" };
   }
 
   /**
@@ -410,7 +639,6 @@ export class CommentService {
           avatarUrl: isDeleted ? undefined : (account.avatarUrl ?? undefined),
         };
       } else {
-        // 사용자를 찾을 수 없으면 기본값
         author = {
           type: "oauth",
           name: "알 수 없음",
@@ -434,9 +662,6 @@ export class CommentService {
 
   /**
    * CommentWithAuthor를 CommentDetail로 변환 (private)
-   *
-   * @param comment 작성자 정보가 포함된 댓글
-   * @returns CommentDetail
    */
   private mapToCommentDetail(comment: CommentWithAuthor): CommentDetail {
     return {
@@ -452,6 +677,29 @@ export class CommentService {
       replies: (comment.children ?? []).map((child) =>
         this.mapToCommentDetail(child),
       ),
+      createdAt: comment.createdAt.toISOString(),
+      updatedAt: comment.updatedAt.toISOString(),
+    };
+  }
+
+  /**
+   * CommentWithAuthor를 AdminCommentItem으로 변환 (private)
+   */
+  private mapToAdminCommentItem(
+    comment: CommentWithAuthor,
+    post: { id: number; title: string },
+  ): AdminCommentItem {
+    return {
+      id: comment.id,
+      postId: comment.postId,
+      parentId: comment.parentId,
+      depth: comment.depth,
+      body: comment.body,
+      isSecret: comment.isSecret,
+      status: comment.status as "active" | "deleted" | "hidden",
+      author: comment.author,
+      replyToName: comment.replyToName,
+      post,
       createdAt: comment.createdAt.toISOString(),
       updatedAt: comment.updatedAt.toISOString(),
     };

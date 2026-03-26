@@ -185,7 +185,7 @@ describe("Comment Routes", () => {
   // ===== GET /api/posts/:postId/comments =====
 
   describe("GET /api/posts/:postId/comments", () => {
-    it("댓글 목록 조회 → 계층 구조 확인", async () => {
+    it("댓글 목록 조회 → 계층 구조 + 페이지네이션 메타 확인", async () => {
       const category = await seedCategory();
       const post = await seedPost(category.id, {
         status: "published",
@@ -232,6 +232,58 @@ describe("Comment Routes", () => {
       expect(body.data[0].replies).toHaveLength(1); // 대댓글 포함
       expect(body.data[0].replies[0].depth).toBe(1);
       expect(body.data[0].replies[0].body).toBe("대댓글");
+
+      // 페이지네이션 메타 확인
+      expect(body.meta).toBeDefined();
+      expect(body.meta.page).toBe(1);
+      expect(body.meta.limit).toBe(10);
+      expect(body.meta.totalCount).toBe(2); // 루트 + 대댓글
+      expect(body.meta.totalRootComments).toBe(1);
+      expect(body.meta.totalPages).toBe(1);
+    });
+
+    it("페이지네이션 동작 확인 (page, limit)", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      // 루트 댓글 3개 작성
+      for (let i = 1; i <= 3; i++) {
+        await app.inject({
+          method: "POST",
+          url: `/api/posts/${post.id}/comments`,
+          payload: {
+            body: `댓글 ${i}`,
+            guestName: `작성자${i}`,
+            guestEmail: `user${i}@example.com`,
+            guestPassword: "pass1234",
+          },
+        });
+      }
+
+      // page=1, limit=2
+      const page1 = await app.inject({
+        method: "GET",
+        url: `/api/posts/${post.id}/comments?page=1&limit=2`,
+      });
+
+      expect(page1.statusCode).toBe(200);
+      const page1Body = page1.json();
+      expect(page1Body.data).toHaveLength(2);
+      expect(page1Body.meta.totalRootComments).toBe(3);
+      expect(page1Body.meta.totalPages).toBe(2);
+
+      // page=2, limit=2
+      const page2 = await app.inject({
+        method: "GET",
+        url: `/api/posts/${post.id}/comments?page=2&limit=2`,
+      });
+
+      expect(page2.statusCode).toBe(200);
+      const page2Body = page2.json();
+      expect(page2Body.data).toHaveLength(1);
     });
 
     it("비밀 댓글 마스킹 확인", async () => {
@@ -363,7 +415,7 @@ describe("Comment Routes", () => {
       expect(response.statusCode).toBe(403);
     });
 
-    it("전체 댓글 목록 조회 → 페이지네이션 구조 확인", async () => {
+    it("전체 댓글 목록 조회 → 페이지네이션 구조 + post.title 확인", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
 
@@ -371,6 +423,7 @@ describe("Comment Routes", () => {
       const post = await seedPost(category.id, {
         status: "published",
         visibility: "public",
+        title: "테스트 게시글",
       });
 
       // 댓글 2개 작성
@@ -407,6 +460,55 @@ describe("Comment Routes", () => {
       expect(body.data).toHaveLength(2);
       expect(body.meta.total).toBe(2);
       expect(body.meta.page).toBe(1);
+      // post.title 포함 확인
+      expect(body.data[0].post).toBeDefined();
+      expect(body.data[0].post.title).toBe("테스트 게시글");
+    });
+
+    it("status 필터 적용 → deleted 댓글만 반환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const createResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "삭제될 댓글",
+          guestName: "작성자",
+          guestEmail: "a@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const comment = createResponse.json().data;
+
+      // 댓글 soft delete
+      await app.inject({
+        method: "DELETE",
+        url: `/api/admin/comments/${comment.id}?action=soft_delete`,
+        headers: { cookie: adminCookie },
+      });
+
+      // status=active 필터 → 0개
+      const activeResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?status=active",
+        headers: { cookie: adminCookie },
+      });
+      expect(activeResponse.json().data).toHaveLength(0);
+
+      // status=deleted 필터 → 1개
+      const deletedResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?status=deleted",
+        headers: { cookie: adminCookie },
+      });
+      expect(deletedResponse.json().data).toHaveLength(1);
     });
 
     it("postId 필터 적용 → 해당 게시글 댓글만 반환", async () => {
@@ -491,10 +593,312 @@ describe("Comment Routes", () => {
     });
   });
 
+  // ===== GET /api/admin/comments/:id/thread =====
+
+  describe("GET /api/admin/comments/:id/thread", () => {
+    it("루트 댓글 ID로 스레드 조회 → 부모 + 답글 반환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      // 루트 댓글
+      const rootResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "루트 댓글",
+          guestName: "부모",
+          guestEmail: "parent@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const rootComment = rootResponse.json().data;
+
+      // 답글 2개
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "답글 1",
+          parentId: rootComment.id,
+          guestName: "자식1",
+          guestEmail: "child1@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "답글 2",
+          parentId: rootComment.id,
+          guestName: "자식2",
+          guestEmail: "child2@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/admin/comments/${rootComment.id}/thread`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.parent).toBeDefined();
+      expect(body.parent.id).toBe(rootComment.id);
+      expect(body.replies).toHaveLength(2);
+    });
+
+    it("답글 ID로 스레드 조회 → 루트 부모로 정규화", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      // 루트 댓글
+      const rootResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "루트 댓글",
+          guestName: "부모",
+          guestEmail: "parent@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const rootComment = rootResponse.json().data;
+
+      // 답글
+      const replyResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "답글",
+          parentId: rootComment.id,
+          guestName: "자식",
+          guestEmail: "child@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const replyComment = replyResponse.json().data;
+
+      // 답글 ID로 스레드 조회 → parent.id는 루트 ID
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/admin/comments/${replyComment.id}/thread`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.parent.id).toBe(rootComment.id);
+      expect(body.replies).toHaveLength(1);
+    });
+
+    it("존재하지 않는 댓글 ID → 404", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments/99999/thread",
+        headers: { cookie: adminCookie },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+  });
+
+  // ===== PUT /api/admin/comments/:id/restore =====
+
+  describe("PUT /api/admin/comments/:id/restore", () => {
+    it("삭제된 댓글 복원 → 200 + success:true", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      // 댓글 작성 후 삭제
+      const createResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "복원될 댓글",
+          guestName: "작성자",
+          guestEmail: "a@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const comment = createResponse.json().data;
+
+      await app.inject({
+        method: "DELETE",
+        url: `/api/admin/comments/${comment.id}?action=soft_delete`,
+        headers: { cookie: adminCookie },
+      });
+
+      // 복원
+      const restoreResponse = await app.inject({
+        method: "PUT",
+        url: `/api/admin/comments/${comment.id}/restore`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(restoreResponse.statusCode).toBe(200);
+      expect(restoreResponse.json().success).toBe(true);
+
+      // active 상태로 복원됐는지 확인
+      const listResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?status=active",
+        headers: { cookie: adminCookie },
+      });
+      expect(listResponse.json().data).toHaveLength(1);
+    });
+
+    it("삭제되지 않은 댓글 복원 시도 → 400", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const createResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "활성 댓글",
+          guestName: "작성자",
+          guestEmail: "a@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const comment = createResponse.json().data;
+
+      const restoreResponse = await app.inject({
+        method: "PUT",
+        url: `/api/admin/comments/${comment.id}/restore`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(restoreResponse.statusCode).toBe(400);
+    });
+  });
+
   // ===== DELETE /api/admin/comments/:id =====
 
   describe("DELETE /api/admin/comments/:id", () => {
-    it("관리자 강제 삭제 → 204", async () => {
+    it("soft_delete → 204, 관리자 목록에서 deleted 상태로 조회 가능", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const createResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "소프트 삭제될 댓글",
+          guestName: "작성자",
+          guestEmail: "writer@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const comment = createResponse.json().data;
+
+      const deleteResponse = await app.inject({
+        method: "DELETE",
+        url: `/api/admin/comments/${comment.id}?action=soft_delete`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(deleteResponse.statusCode).toBe(204);
+
+      // 관리자 목록에서 deleted로 조회 가능
+      const listResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?status=deleted",
+        headers: { cookie: adminCookie },
+      });
+      expect(listResponse.json().data).toHaveLength(1);
+    });
+
+    it("hard_delete → 204, 대댓글 포함 완전 삭제", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const rootResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "루트 댓글",
+          guestName: "부모",
+          guestEmail: "parent@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const rootComment = rootResponse.json().data;
+
+      // 답글 작성
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "답글",
+          parentId: rootComment.id,
+          guestName: "자식",
+          guestEmail: "child@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+
+      // hard_delete
+      const deleteResponse = await app.inject({
+        method: "DELETE",
+        url: `/api/admin/comments/${rootComment.id}?action=hard_delete`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(deleteResponse.statusCode).toBe(204);
+
+      // 관리자 목록에서도 사라짐 (hard delete)
+      const listResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments",
+        headers: { cookie: adminCookie },
+      });
+      expect(listResponse.json().data).toHaveLength(0);
+    });
+
+    it("기본 action (soft_delete) → 204", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
 
@@ -523,6 +927,156 @@ describe("Comment Routes", () => {
       });
 
       expect(deleteResponse.statusCode).toBe(204);
+    });
+  });
+
+  // ===== DELETE /api/admin/comments/bulk =====
+
+  describe("DELETE /api/admin/comments/bulk", () => {
+    it("벌크 soft_delete → 204, deleted 상태로 전환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const ids: number[] = [];
+      for (let i = 1; i <= 3; i++) {
+        const r = await app.inject({
+          method: "POST",
+          url: `/api/posts/${post.id}/comments`,
+          payload: {
+            body: `댓글 ${i}`,
+            guestName: `작성자${i}`,
+            guestEmail: `u${i}@example.com`,
+            guestPassword: "pass1234",
+          },
+        });
+        ids.push(r.json().data.id);
+      }
+
+      const bulkResponse = await app.inject({
+        method: "DELETE",
+        url: "/api/admin/comments/bulk",
+        headers: { cookie: adminCookie },
+        payload: { ids, action: "soft_delete" },
+      });
+
+      expect(bulkResponse.statusCode).toBe(204);
+
+      const listResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?status=deleted",
+        headers: { cookie: adminCookie },
+      });
+      expect(listResponse.json().data).toHaveLength(3);
+    });
+
+    it("벌크 restore → 204, active 상태로 복원", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const ids: number[] = [];
+      for (let i = 1; i <= 2; i++) {
+        const r = await app.inject({
+          method: "POST",
+          url: `/api/posts/${post.id}/comments`,
+          payload: {
+            body: `댓글 ${i}`,
+            guestName: `작성자${i}`,
+            guestEmail: `u${i}@example.com`,
+            guestPassword: "pass1234",
+          },
+        });
+        ids.push(r.json().data.id);
+      }
+
+      // 먼저 soft_delete
+      await app.inject({
+        method: "DELETE",
+        url: "/api/admin/comments/bulk",
+        headers: { cookie: adminCookie },
+        payload: { ids, action: "soft_delete" },
+      });
+
+      // 복원
+      const restoreResponse = await app.inject({
+        method: "DELETE",
+        url: "/api/admin/comments/bulk",
+        headers: { cookie: adminCookie },
+        payload: { ids, action: "restore" },
+      });
+
+      expect(restoreResponse.statusCode).toBe(204);
+
+      const listResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?status=active",
+        headers: { cookie: adminCookie },
+      });
+      expect(listResponse.json().data).toHaveLength(2);
+    });
+
+    it("벌크 hard_delete → 204, 대댓글 cascade 삭제", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const rootResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "루트 댓글",
+          guestName: "부모",
+          guestEmail: "parent@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+      const rootComment = rootResponse.json().data;
+
+      // 답글 추가
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "답글",
+          parentId: rootComment.id,
+          guestName: "자식",
+          guestEmail: "child@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+
+      const bulkResponse = await app.inject({
+        method: "DELETE",
+        url: "/api/admin/comments/bulk",
+        headers: { cookie: adminCookie },
+        payload: { ids: [rootComment.id], action: "hard_delete" },
+      });
+
+      expect(bulkResponse.statusCode).toBe(204);
+
+      // 루트 + 대댓글 모두 삭제됨
+      const listResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments",
+        headers: { cookie: adminCookie },
+      });
+      expect(listResponse.json().data).toHaveLength(0);
     });
   });
 });

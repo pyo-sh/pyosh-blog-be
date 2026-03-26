@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   PostIdParamSchema,
   CommentIdParamSchema,
+  CommentsQuerySchema,
   CreateCommentOAuthBodySchema,
   CreateCommentGuestBodySchema,
   DeleteCommentGuestBodySchema,
@@ -11,6 +12,10 @@ import {
   CommentResponseSchema,
   AdminCommentListQuerySchema,
   AdminCommentListResponseSchema,
+  AdminCommentThreadResponseSchema,
+  AdminCommentDeleteQuerySchema,
+  AdminCommentRestoreResponseSchema,
+  AdminCommentBulkBodySchema,
 } from "./comment.schema";
 import { CommentService } from "./comment.service";
 import { OAuthAccount } from "@src/db/schema/oauth-accounts";
@@ -27,7 +32,7 @@ export function createCommentRoute(
   const commentRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/posts/:postId/comments - 댓글 목록 조회 (Public)
+    // GET /api/posts/:postId/comments - 댓글 목록 조회 (Public, 페이지네이션)
     typedFastify.get(
       "/posts/:postId/comments",
       {
@@ -35,8 +40,9 @@ export function createCommentRoute(
           tags: ["comments"],
           summary: "게시글 댓글 조회",
           description:
-            "게시글의 댓글 목록을 계층 구조로 조회합니다. 비밀 댓글은 작성자와 관리자만 볼 수 있습니다.",
+            "게시글의 댓글 목록을 계층 구조로 조회합니다. 페이지네이션은 루트 댓글 기준이며, 비밀 댓글은 작성자와 관리자만 볼 수 있습니다.",
           params: PostIdParamSchema,
+          querystring: CommentsQuerySchema,
           response: {
             200: CommentsResponseSchema,
           },
@@ -45,20 +51,20 @@ export function createCommentRoute(
       },
       async (request, reply) => {
         const { postId } = request.params;
+        const { page, limit } = request.query;
 
-        // 현재 사용자 정보 추출
         const viewerUserId =
           (request.user as OAuthAccount | undefined)?.id ?? null;
         const viewerIsAdmin = Boolean(request.admin);
 
-        const comments = await commentService.getCommentsByPostId(postId, {
-          viewerUserId,
-          viewerIsAdmin,
-        });
+        const result = await commentService.getCommentsByPostId(
+          postId,
+          page,
+          limit,
+          { viewerUserId, viewerIsAdmin },
+        );
 
-        return reply.status(200).send({
-          data: comments,
-        });
+        return reply.status(200).send(result);
       },
     );
 
@@ -100,7 +106,6 @@ export function createCommentRoute(
           isSecret?: boolean;
         };
 
-        // OAuth 사용자인지 확인
         if (request.user) {
           // OAuth 사용자
           author = {
@@ -169,12 +174,11 @@ export function createCommentRoute(
 
         let author: Author | null = resolveAuthorFromRequest(request);
 
-        // OAuth 사용자가 아니고, body에 guestPassword가 있으면 게스트 사용자로 처리
         if (!author && request.body) {
           const body = DeleteCommentGuestBodySchema.parse(request.body);
           author = {
             type: "guest",
-            name: "", // 삭제 시에는 이름/이메일 불필요
+            name: "",
             email: "",
             password: body.guestPassword,
           };
@@ -225,15 +229,85 @@ export function createAdminCommentRoute(
       },
     );
 
-    // DELETE /api/admin/comments/:id - 관리자 댓글 강제 삭제
+    // GET /api/admin/comments/:id/thread - 스레드 조회 (부모 + 모든 답글)
+    typedFastify.get(
+      "/comments/:id/thread",
+      {
+        schema: {
+          tags: ["admin", "comments"],
+          summary: "관리자 댓글 스레드 조회",
+          description: "부모 댓글과 모든 답글을 반환합니다.",
+          params: CommentIdParamSchema,
+          response: {
+            200: AdminCommentThreadResponseSchema,
+          },
+        },
+        preHandler: requireAdmin(adminService),
+      },
+      async (request, reply) => {
+        const { id } = request.params;
+        const result = await commentService.getAdminCommentThread(id);
+        return reply.status(200).send(result);
+      },
+    );
+
+    // PUT /api/admin/comments/:id/restore - 댓글 복원 (deleted → active)
+    typedFastify.put(
+      "/comments/:id/restore",
+      {
+        schema: {
+          tags: ["admin", "comments"],
+          summary: "관리자 댓글 복원",
+          description: "삭제된 댓글을 active 상태로 복원합니다.",
+          params: CommentIdParamSchema,
+          response: {
+            200: AdminCommentRestoreResponseSchema,
+          },
+        },
+        preHandler: requireAdmin(adminService),
+      },
+      async (request, reply) => {
+        const { id } = request.params;
+        await commentService.restoreComment(id);
+        return reply.status(200).send({ success: true as const });
+      },
+    );
+
+    // DELETE /api/admin/comments/bulk - 벌크 삭제/복원
+    // Static path '/bulk' takes priority over '/:id' in find-my-way; ordering is for readability only.
+    typedFastify.delete(
+      "/comments/bulk",
+      {
+        schema: {
+          tags: ["admin", "comments"],
+          summary: "관리자 댓글 벌크 작업",
+          description:
+            "여러 댓글을 한 번에 복원, 소프트 삭제, 또는 하드 삭제합니다.",
+          body: AdminCommentBulkBodySchema,
+          response: {
+            204: z.void(),
+          },
+        },
+        preHandler: requireAdmin(adminService),
+      },
+      async (request, reply) => {
+        const { ids, action } = request.body;
+        await commentService.bulkOperateComments(ids, action);
+        return reply.status(204).send();
+      },
+    );
+
+    // DELETE /api/admin/comments/:id - 관리자 댓글 삭제 (soft/hard)
     typedFastify.delete(
       "/comments/:id",
       {
         schema: {
           tags: ["admin", "comments"],
           summary: "관리자 댓글 삭제",
-          description: "관리자가 모든 댓글을 삭제할 수 있습니다.",
+          description:
+            "관리자가 댓글을 삭제합니다. ?action=soft_delete(기본) 또는 ?action=hard_delete.",
           params: CommentIdParamSchema,
+          querystring: AdminCommentDeleteQuerySchema,
           response: {
             204: z.void(),
           },
@@ -242,8 +316,14 @@ export function createAdminCommentRoute(
       },
       async (request, reply) => {
         const { id } = request.params;
+        const { action } = request.query;
 
-        await commentService.deleteComment(id, null, true);
+        await commentService.deleteComment(
+          id,
+          null,
+          true,
+          action === "hard_delete",
+        );
 
         return reply.status(204).send();
       },
