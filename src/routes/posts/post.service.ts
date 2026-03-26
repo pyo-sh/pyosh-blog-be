@@ -347,10 +347,16 @@ export class PostService {
           return buildPaginatedResponse([], page, limit, 0);
         }
         conditions.push(inArray(postTable.id, postIds));
+      } else {
+        // filter가 undefined인 경우 (직접 서비스 호출 등) title+content 검색으로 폴백
+        conditions.push(
+          or(like(postTable.title, term), like(postTable.contentMd, term))!,
+        );
       }
     }
 
     // tag 필터 (tag slug 기반)
+    // 참고: filter=tag + tagSlug를 동시에 사용하면 두 조건이 AND로 결합됩니다.
     if (query.tagSlug) {
       const [tag] = await this.db
         .select({ id: tagTable.id })
@@ -469,7 +475,7 @@ export class PostService {
    */
   async getPostSlugs(): Promise<PostSlugItem[]> {
     const rows = await this.db
-      // TODO: 포스트 수가 많아질 경우 cursor 기반 페이지네이션 추가 필요 (Google Sitemap: 50,000 URLs/file 제한)
+      // TODO: cursor 기반 페이지네이션으로 전환 필요. Google Sitemap 50,000 URLs/file 제한에 맞춰 임시 상한 적용.
       .select({ slug: postTable.slug, updatedAt: postTable.updatedAt })
       .from(postTable)
       .where(
@@ -479,7 +485,8 @@ export class PostService {
           isNull(postTable.deletedAt),
         ),
       )
-      .orderBy(desc(postTable.updatedAt));
+      .orderBy(desc(postTable.updatedAt))
+      .limit(50000);
 
     return rows;
   }
