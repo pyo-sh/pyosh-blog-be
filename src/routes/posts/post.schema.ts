@@ -43,6 +43,10 @@ export const PostListQuerySchema = z.object({
   categoryId: z.coerce.number().int().positive().optional(),
   tagSlug: z.string().min(1).optional(),
   q: z.string().min(1).max(200).optional(),
+  filter: z
+    .enum(["title_content", "title", "content", "tag", "category", "comment"])
+    .optional()
+    .default("title_content"),
   status: z.enum(["draft", "published", "archived"]).optional(),
   visibility: z.enum(["public", "private"]).optional(),
   sort: z
@@ -120,12 +124,20 @@ export const PostCategorySchema = z.object({
   slug: z.string(),
 });
 
-export const PostDetailSchema = z.object({
+const PostAncestorSchema = z.object({
+  name: z.string(),
+  slug: z.string(),
+});
+
+export const PostDetailCategorySchema = PostCategorySchema.extend({
+  ancestors: z.array(PostAncestorSchema),
+});
+
+const PostBaseFields = {
   id: z.number(),
   categoryId: z.number(),
   title: z.string(),
   slug: z.string(),
-  contentMd: z.string(),
   summary: z.string().nullable(),
   description: z.string().nullable(),
   thumbnailUrl: z.string().nullable(),
@@ -138,8 +150,20 @@ export const PostDetailSchema = z.object({
   createdAt: z.string(), // ISO datetime string
   updatedAt: z.string(), // ISO datetime string
   deletedAt: z.string().nullable(), // ISO datetime string
-  category: PostCategorySchema,
   tags: z.array(PostTagSchema),
+  totalPageviews: z.number(),
+  commentCount: z.number(),
+};
+
+export const PostDetailSchema = z.object({
+  ...PostBaseFields,
+  contentMd: z.string(),
+  category: PostDetailCategorySchema,
+});
+
+export const PostListItemSchema = z.object({
+  ...PostBaseFields,
+  category: PostCategorySchema,
 });
 
 export const PostNavigationSchema = z.object({
@@ -147,8 +171,17 @@ export const PostNavigationSchema = z.object({
   title: z.string(),
 });
 
+export const PostSlugsResponseSchema = z.object({
+  slugs: z.array(
+    z.object({
+      slug: z.string(),
+      updatedAt: z.string(),
+    }),
+  ),
+});
+
 export const PostListResponseSchema = z.object({
-  data: z.array(PostDetailSchema),
+  data: z.array(PostListItemSchema),
   meta: PaginationMetaSchema,
 });
 
