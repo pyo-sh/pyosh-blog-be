@@ -400,10 +400,8 @@ export class PostService {
       .limit(limit)
       .offset(offset);
 
-    // 각 post에 category, tags, 집계 정보 추가 (목록용 - contentMd/ancestors 제외)
-    const postsWithDetails = await Promise.all(
-      posts.map((post) => this.enrichPostListItemWithDetails(post)),
-    );
+    // 각 post에 category, tags, 집계 정보 추가 (목록용 - contentMd/ancestors 제외, 배치)
+    const postsWithDetails = await this.enrichPostListItems(posts);
 
     return buildPaginatedResponse(postsWithDetails, page, limit, total);
   }
@@ -574,6 +572,55 @@ export class PostService {
   }
 
   /**
+   * 게시글 목록 일괄 조회 (4개 쿼리로 N개 포스트 처리, contentMd/ancestors 제외)
+   */
+  private async enrichPostListItems(posts: Post[]): Promise<PostListItem[]> {
+    if (posts.length === 0) return [];
+
+    const postIds = posts.map((p) => p.id);
+    const categoryIds = [...new Set(posts.map((p) => p.categoryId))];
+
+    const [categories, allPostTags, statsRows, commentRows] = await Promise.all([
+      this.db
+        .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug })
+        .from(categoryTable)
+        .where(inArray(categoryTable.id, categoryIds)),
+      this.db
+        .select({ postId: postTagTable.postId, id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
+        .from(postTagTable)
+        .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
+        .where(inArray(postTagTable.postId, postIds)),
+      this.db
+        .select({ postId: statsDailyTable.postId, total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)` })
+        .from(statsDailyTable)
+        .where(inArray(statsDailyTable.postId, postIds))
+        .groupBy(statsDailyTable.postId),
+      this.db
+        .select({ postId: commentTable.postId, count: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(and(inArray(commentTable.postId, postIds), isNull(commentTable.deletedAt)))
+        .groupBy(commentTable.postId),
+    ]);
+
+    const catMap = new Map(categories.map((c) => [c.id, c]));
+    const tagsMap = new Map<number, PostTag[]>();
+    for (const t of allPostTags) {
+      if (!tagsMap.has(t.postId)) tagsMap.set(t.postId, []);
+      tagsMap.get(t.postId)!.push({ id: t.id, name: t.name, slug: t.slug });
+    }
+    const statsMap = new Map(statsRows.map((r) => [r.postId, Number(r.total)]));
+    const commentMap = new Map(commentRows.map((r) => [r.postId, Number(r.count)]));
+
+    return posts.map(({ contentMd: _c, ...post }) => ({
+      ...post,
+      category: catMap.get(post.categoryId)!,
+      tags: tagsMap.get(post.id) ?? [],
+      totalPageviews: statsMap.get(post.id) ?? 0,
+      commentCount: commentMap.get(post.id) ?? 0,
+    }));
+  }
+
+  /**
    * 게시글 상세 정보 조회 (category ancestors + 집계 포함)
    */
   private async enrichPostWithDetails(post: Post): Promise<PostDetail> {
@@ -600,18 +647,12 @@ export class PostService {
           .from(commentTable)
           .where(and(eq(commentTable.postId, post.id), isNull(commentTable.deletedAt)))
           .then((rows) => Number(rows[0]?.count ?? 0)),
-        this.db
-          .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug, parentId: categoryTable.parentId })
-          .from(categoryTable)
-          .then((rows) => rows),
+        this.fetchCategoryAncestors(post.categoryId, this.db),
       ]);
 
     return {
       ...post,
-      category: {
-        ...category,
-        ancestors: this.buildAncestors(category.id, ancestors),
-      },
+      category: { ...category, ancestors },
       tags: postTags,
       totalPageviews,
       commentCount,
@@ -619,61 +660,34 @@ export class PostService {
   }
 
   /**
-   * 게시글 목록 항목 조회 (contentMd/ancestors 제외, 집계 포함)
+   * 카테고리 ancestors 조회 - parentId 체인을 순회 (전체 테이블 스캔 없음, 순환 참조 방지)
    */
-  private async enrichPostListItemWithDetails(post: Post): Promise<PostListItem> {
-    const { contentMd: _contentMd, ...postWithoutContent } = post;
-
-    const [category, postTags, totalPageviews, commentCount] =
-      await Promise.all([
-        this.db
-          .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug })
-          .from(categoryTable)
-          .where(eq(categoryTable.id, post.categoryId))
-          .limit(1)
-          .then((rows) => rows[0]),
-        this.db
-          .select({ id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
-          .from(postTagTable)
-          .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
-          .where(eq(postTagTable.postId, post.id)),
-        this.db
-          .select({ total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)` })
-          .from(statsDailyTable)
-          .where(eq(statsDailyTable.postId, post.id))
-          .then((rows) => Number(rows[0]?.total ?? 0)),
-        this.db
-          .select({ count: sql<number>`COUNT(*)` })
-          .from(commentTable)
-          .where(and(eq(commentTable.postId, post.id), isNull(commentTable.deletedAt)))
-          .then((rows) => Number(rows[0]?.count ?? 0)),
-      ]);
-
-    return {
-      ...postWithoutContent,
-      category,
-      tags: postTags,
-      totalPageviews,
-      commentCount,
-    };
-  }
-
-  /**
-   * 카테고리 ancestors 빌드 (루트부터 부모까지, 직속 카테고리 제외)
-   */
-  private buildAncestors(
+  private async fetchCategoryAncestors(
     categoryId: number,
-    allCategories: { id: number; name: string; slug: string; parentId: number | null }[],
-  ): { name: string; slug: string }[] {
-    const categoryMap = new Map(allCategories.map((c) => [c.id, c]));
+    db: MySql2Database<typeof schema>,
+  ): Promise<{ name: string; slug: string }[]> {
     const ancestors: { name: string; slug: string }[] = [];
+    const visited = new Set<number>([categoryId]);
 
-    let current = categoryMap.get(categoryId);
-    while (current?.parentId != null) {
-      const parent = categoryMap.get(current.parentId);
+    const [direct] = await db
+      .select({ parentId: categoryTable.parentId })
+      .from(categoryTable)
+      .where(eq(categoryTable.id, categoryId))
+      .limit(1);
+
+    let parentId = direct?.parentId ?? null;
+
+    while (parentId != null && !visited.has(parentId)) {
+      visited.add(parentId);
+      const [parent] = await db
+        .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug, parentId: categoryTable.parentId })
+        .from(categoryTable)
+        .where(eq(categoryTable.id, parentId))
+        .limit(1);
+
       if (!parent) break;
       ancestors.unshift({ name: parent.name, slug: parent.slug });
-      current = parent;
+      parentId = parent.parentId;
     }
 
     return ancestors;
@@ -696,7 +710,7 @@ export class PostService {
       throw HttpError.notFound("게시글을 찾을 수 없습니다");
     }
 
-    const [category, postTags, totalPageviews, commentCount, allCategories] =
+    const [category, postTags, totalPageviews, commentCount, ancestors] =
       await Promise.all([
         tx
           .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug })
@@ -719,18 +733,12 @@ export class PostService {
           .from(commentTable)
           .where(and(eq(commentTable.postId, post.id), isNull(commentTable.deletedAt)))
           .then((rows) => Number(rows[0]?.count ?? 0)),
-        tx
-          .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug, parentId: categoryTable.parentId })
-          .from(categoryTable)
-          .then((rows) => rows),
+        this.fetchCategoryAncestors(post.categoryId, tx),
       ]);
 
     return {
       ...post,
-      category: {
-        ...category,
-        ancestors: this.buildAncestors(category.id, allCategories),
-      },
+      category: { ...category, ancestors },
       tags: postTags,
       totalPageviews,
       commentCount,
