@@ -317,14 +317,10 @@ export class CategoryService {
    * - parentId와 sortOrder를 동시에 업데이트
    * - 배치의 목표 상태(target state)를 기준으로 순환 참조 검증
    *   (현재 DB 상태 기준으로 검증하면 유효한 부모-자식 위치 교환이 거부됨)
-   *
-   * NOTE: 중복 ID 검증, 존재 확인, 순환 참조 검증은 트랜잭션 외부에서 수행됩니다.
-   * 두 Admin이 동시에 요청하면 검증 통과 후 순서대로 적용되어 의도치 않은 순환이
-   * 생길 수 있는 TOCTOU 윈도우가 있습니다. Admin 전용 엔드포인트이므로 실질적
-   * 위험은 낮으며, DB 레벨 제약이 없는 한 완전한 방어는 불가합니다.
+   * - 전체 카테고리 조회를 FOR SHARE 잠금으로 트랜잭션 내에서 수행하여 TOCTOU 방지
    */
   async updateCategoryTree(items: CategoryTreeItem[]): Promise<void> {
-    // 1. 중복 ID 검증
+    // 1. 중복 ID 검증 (입력 유효성 검사 - 트랜잭션 외부)
     const seenIds = new Set<number>();
     for (const item of items) {
       if (seenIds.has(item.id)) {
@@ -333,71 +329,74 @@ export class CategoryService {
       seenIds.add(item.id);
     }
 
-    // 2. 전체 카테고리 목록을 DB에서 한 번만 조회
-    const allCategories = await this.db
-      .select({ id: categoryTable.id, parentId: categoryTable.parentId })
-      .from(categoryTable);
-
-    // 3. 현재 DB 상태로 부모 맵 구성
-    const targetMap = new Map<number, number | null>(
-      allCategories.map((c) => [c.id, c.parentId]),
-    );
-    const existingIds = new Set(allCategories.map((c) => c.id));
-
-    // 4. item.id 존재 여부 사전 검증 (targetMap 갱신 전에 수행)
-    for (const item of items) {
-      if (!existingIds.has(item.id)) {
-        throw HttpError.badRequest(`Category ${item.id} not found.`);
-      }
-    }
-
-    // 5. 배치 변경 사항을 반영해 목표 상태 맵 갱신
-    for (const item of items) {
-      targetMap.set(item.id, item.parentId);
-    }
-
-    // 6. 목표 상태에서 각 항목 유효성 검증
-    for (const item of items) {
-      if (item.parentId === null) continue;
-
-      // 자기 자신을 부모로 설정하는 경우
-      if (item.parentId === item.id) {
-        throw HttpError.badRequest(
-          `Category ${item.id} cannot be its own parent.`,
-        );
-      }
-
-      // 부모 카테고리 존재 확인
-      if (!existingIds.has(item.parentId)) {
-        throw HttpError.badRequest(
-          `Parent category ${item.parentId} not found.`,
-        );
-      }
-
-      // 목표 상태에서 순환 참조 여부 확인 (DB 추가 조회 없이 in-memory 탐색)
-      let current: number | null = item.parentId;
-      const visited = new Set<number>();
-      let hasCycle = false;
-
-      while (current !== null) {
-        if (current === item.id) {
-          hasCycle = true;
-          break;
-        }
-        if (visited.has(current)) break;
-        visited.add(current);
-        current = targetMap.get(current) ?? null;
-      }
-
-      if (hasCycle) {
-        throw HttpError.badRequest(
-          `Category ${item.id}: cannot set a descendant as parent.`,
-        );
-      }
-    }
-
-    // 7. 트랜잭션으로 일괄 업데이트
+    // 2. 트랜잭션 내에서 검증 및 배치 업데이트
     await this.db.transaction(async (tx) => {
+      // 전체 카테고리 목록을 FOR SHARE 잠금으로 조회
+      // (동시 삭제 요청이 TOCTOU로 잘못된 parentId를 허용하지 않도록 방지)
+      const allCategories = await tx
+        .select({ id: categoryTable.id, parentId: categoryTable.parentId })
+        .from(categoryTable)
+        .for("share");
+
+      // 현재 DB 상태로 부모 맵 구성
+      const targetMap = new Map<number, number | null>(
+        allCategories.map((c) => [c.id, c.parentId]),
+      );
+      const existingIds = new Set(allCategories.map((c) => c.id));
+
+      // item.id 존재 여부 검증 (targetMap 갱신 전에 수행)
+      for (const item of items) {
+        if (!existingIds.has(item.id)) {
+          throw HttpError.badRequest(`Category ${item.id} not found.`);
+        }
+      }
+
+      // 배치 변경 사항을 반영해 목표 상태 맵 갱신
+      for (const item of items) {
+        targetMap.set(item.id, item.parentId);
+      }
+
+      // 목표 상태에서 각 항목 유효성 검증
+      for (const item of items) {
+        if (item.parentId === null) continue;
+
+        // 자기 자신을 부모로 설정하는 경우
+        if (item.parentId === item.id) {
+          throw HttpError.badRequest(
+            `Category ${item.id} cannot be its own parent.`,
+          );
+        }
+
+        // 부모 카테고리 존재 확인
+        if (!existingIds.has(item.parentId)) {
+          throw HttpError.badRequest(
+            `Parent category ${item.parentId} not found.`,
+          );
+        }
+
+        // 목표 상태에서 순환 참조 여부 확인 (DB 추가 조회 없이 in-memory 탐색)
+        let current: number | null = item.parentId;
+        const visited = new Set<number>();
+        let hasCycle = false;
+
+        while (current !== null) {
+          if (current === item.id) {
+            hasCycle = true;
+            break;
+          }
+          if (visited.has(current)) break;
+          visited.add(current);
+          current = targetMap.get(current) ?? null;
+        }
+
+        if (hasCycle) {
+          throw HttpError.badRequest(
+            `Category ${item.id}: cannot set a descendant as parent.`,
+          );
+        }
+      }
+
+      // 일괄 업데이트
       for (const item of items) {
         await tx
           .update(categoryTable)

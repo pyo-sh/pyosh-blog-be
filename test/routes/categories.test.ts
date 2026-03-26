@@ -359,6 +359,20 @@ describe("Category Routes", () => {
       expect(response.statusCode).toBe(400);
     });
 
+    it("action=move moveTo가 존재하지 않는 카테고리면 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory({ name: "Category" });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/categories/${category.id}?action=move&moveTo=999999`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
     it("action=move moveTo가 삭제 대상과 동일하면 400", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
