@@ -22,6 +22,16 @@ describe("Tag Routes", () => {
   });
 
   describe("GET /api/tags", () => {
+    it("게시글이 없으면 빈 배열 반환", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/tags",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ tags: [] });
+    });
+
     it("공개 발행 게시글 기준 태그 목록 + postCount 반환", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
