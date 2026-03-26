@@ -131,6 +131,74 @@ describe("Post Routes", () => {
 
       expect(response.statusCode).toBe(403);
     });
+
+    it("slug가 제목에서 자동 생성된다 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Hello World Post",
+          contentMd: "# Hello",
+          categoryId: category.id,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json();
+      expect(body.post.slug).toMatch(/hello-world-post/);
+    });
+
+    it("중복 slug는 suffix로 유니크하게 생성된다 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const first = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: { title: "Duplicate Title", contentMd: "# A", categoryId: category.id },
+      });
+      const second = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: { title: "Duplicate Title", contentMd: "# B", categoryId: category.id },
+      });
+
+      expect(first.statusCode).toBe(201);
+      expect(second.statusCode).toBe(201);
+      const slug1 = first.json().post.slug as string;
+      const slug2 = second.json().post.slug as string;
+      expect(slug1).not.toBe(slug2);
+    });
+
+    it("status=published + publishedAt 없음 → publishedAt 자동 설정 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Auto Publish",
+          contentMd: "# Content",
+          categoryId: category.id,
+          status: "published",
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json();
+      expect(body.post.publishedAt).not.toBeNull();
+    });
   });
 
   // ===== GET /api/posts =====
@@ -425,6 +493,146 @@ describe("Post Routes", () => {
       expect(body.post.tags).toHaveLength(1);
       expect(body.post.tags[0].name).toBe("updated-tag");
     });
+
+    it("contentMd 수정 시 contentModifiedAt 갱신 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+        payload: { contentMd: "# Updated Content" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.post.contentModifiedAt).not.toBeNull();
+    });
+
+    it("tags=[] 전달 시 태그 전체 제거 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      // 태그가 있는 게시글 생성
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Tagged Post",
+          contentMd: "# Hello",
+          categoryId: category.id,
+          tags: ["tag-a", "tag-b"],
+        },
+      });
+      const postId = createRes.json().post.id as number;
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/posts/${postId}`,
+        headers: { cookie },
+        payload: { tags: [] },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().post.tags).toHaveLength(0);
+    });
+
+    it("존재하지 않는 ID → 404", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/99999",
+        headers: { cookie },
+        payload: { title: "Nope" },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("비인증 → 403", async () => {
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/1",
+        payload: { title: "Nope" },
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+  });
+
+  // ===== GET /api/admin/posts/:id =====
+
+  describe("GET /api/admin/posts/:id", () => {
+    it("상세 조회 성공 — contentMd 포함 PostDetail 반환 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "draft",
+        visibility: "private",
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.post.id).toBe(post.id);
+      expect(body.post.contentMd).toBeDefined();
+      expect(body.post.category).toBeDefined();
+      expect(body.post.tags).toBeDefined();
+    });
+
+    it("category ancestors 반환 — 중첩 카테고리", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const parent = await seedCategory({ name: "Parent", slug: "parent-cat" });
+      const child = await seedCategory({ name: "Child", slug: "child-cat", parentId: parent.id });
+      const post = await seedPost(child.id);
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.post.category.name).toBe("Child");
+      expect(body.post.category.ancestors).toHaveLength(1);
+      expect(body.post.category.ancestors[0].name).toBe("Parent");
+    });
+
+    it("존재하지 않는 ID → 404", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts/99999",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("비인증 → 403", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts/1",
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
   });
 
   // ===== DELETE /api/admin/posts/:id =====
@@ -499,6 +707,106 @@ describe("Post Routes", () => {
 
       const body = response.json();
       expect(body.data).toHaveLength(3);
+    });
+
+    it("status 필터 — status=draft → draft만 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      await seedPost(category.id, { status: "draft" });
+      await seedPost(category.id, { status: "published" });
+      await seedPost(category.id, { status: "archived" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts?status=draft",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].status).toBe("draft");
+    });
+
+    it("visibility 필터 — visibility=private → private만 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      await seedPost(category.id, { visibility: "public" });
+      await seedPost(category.id, { visibility: "private" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts?visibility=private",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].visibility).toBe("private");
+    });
+
+    it("includeDeleted=true → 삭제된 글 포함", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const post = await seedPost(category.id);
+      // soft delete
+      await app.inject({
+        method: "DELETE",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+      });
+
+      const withoutDeleted = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts",
+        headers: { cookie },
+      });
+      const withDeleted = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts?includeDeleted=true",
+        headers: { cookie },
+      });
+
+      expect(withoutDeleted.json().data).toHaveLength(0);
+      expect(withDeleted.json().data).toHaveLength(1);
+    });
+
+    it("페이지네이션 — limit=2, 총 3개 → meta.totalCount=3", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      await seedPost(category.id);
+      await seedPost(category.id);
+      await seedPost(category.id);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts?limit=2&page=1",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.data).toHaveLength(2);
+      expect(body.meta.total).toBe(3);
+      expect(body.meta.totalPages).toBe(2);
+    });
+
+    it("비인증 → 403", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts",
+      });
+
+      expect(response.statusCode).toBe(403);
     });
   });
 
