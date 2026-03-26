@@ -9,7 +9,7 @@ import corsPlugin from "@src/plugins/cors";
 import csrfPlugin from "@src/plugins/csrf";
 import drizzlePlugin from "@src/plugins/drizzle";
 import helmetPlugin from "@src/plugins/helmet";
-import loggerPlugin, { buildLoggerOptions } from "@src/plugins/logger";
+import loggerPlugin, { buildFastifyLoggerConfig } from "@src/plugins/logger";
 import multipartPlugin from "@src/plugins/multipart";
 import passportPlugin from "@src/plugins/passport";
 import rateLimitPlugin from "@src/plugins/rate-limit";
@@ -58,7 +58,7 @@ import { StatsService } from "@src/services/stats.service";
 export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
   const fastify = Fastify({
-    logger: buildLoggerOptions(),
+    ...buildFastifyLoggerConfig(),
   }).withTypeProvider<ZodTypeProvider>();
 
   // Zod validator & serializer 설정

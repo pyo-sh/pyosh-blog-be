@@ -1,3 +1,6 @@
+import { mkdirSync } from "fs";
+import { resolve } from "path";
+import pino from "pino";
 import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
 import { NodeEnv } from "@src/constants/node-env";
@@ -20,28 +23,42 @@ export function getLogLevel(): string {
   }
 }
 
+// 민감 정보 마스킹 경로 (헤더)
+const REDACT_PATHS = [
+  "req.headers.authorization",
+  "req.headers.cookie",
+  "req.headers['set-cookie']",
+  "res.headers['set-cookie']",
+];
+
+// req serializer: body 제외 (password, guestPassword, guestEmail 등 민감 필드 보호)
+const REQ_SERIALIZER = {
+  req(request: { method: string; url: string; ip: string }) {
+    return {
+      method: request.method,
+      url: request.url,
+      ip: request.ip,
+    };
+  },
+};
+
 /**
- * pino 로거 옵션 빌더
+ * pino 로거 옵션 빌더 (dev/test 용)
  * - 민감 정보 redact (Authorization, Cookie, Set-Cookie)
  * - 개발: pino-pretty (human-readable)
- * - 프로덕션: JSON 포맷
+ * - 테스트: JSON, warn 레벨
  */
-export function buildLoggerOptions() {
+function buildLoggerOptions() {
   const level = getLogLevel();
   const isDev = env.NODE_ENV === NodeEnv.DEV;
 
   return {
     level,
-    // 민감 정보 마스킹
     redact: {
-      paths: [
-        "req.headers.authorization",
-        "req.headers.cookie",
-        "req.headers['set-cookie']",
-        "res.headers['set-cookie']",
-      ],
+      paths: REDACT_PATHS,
       censor: "[REDACTED]",
     },
+    serializers: REQ_SERIALIZER,
     // 개발 환경: pino-pretty
     ...(isDev && {
       transport: {
@@ -53,6 +70,67 @@ export function buildLoggerOptions() {
         },
       },
     }),
+  };
+}
+
+/**
+ * 프로덕션 pino 인스턴스 빌더
+ * - stdout: info 레벨 이상 (JSON)
+ * - logs/error.log: error 레벨만 파일 기록 (LOG_FILE 환경변수로 경로 재정의 가능)
+ * - pino.destination 버퍼 유실 방지: process.on('exit') 플러시 등록
+ */
+export function buildProdLoggerInstance(): pino.Logger {
+  const logFile =
+    process.env.LOG_FILE ?? resolve(process.cwd(), "logs/error.log");
+  const logDir = resolve(logFile, "..");
+  mkdirSync(logDir, { recursive: true });
+
+  const errorDest = pino.destination(logFile);
+
+  const streams: pino.StreamEntry[] = [
+    { level: "info", stream: process.stdout },
+    { level: "error", stream: errorDest },
+  ];
+
+  const logger = pino(
+    {
+      level: "info",
+      redact: {
+        paths: REDACT_PATHS,
+        censor: "[REDACTED]",
+      },
+      serializers: REQ_SERIALIZER,
+    },
+    pino.multistream(streams),
+  );
+
+  // pino.destination은 기본적으로 async(버퍼) I/O — 프로세스 종료 시 플러시 (once: 중복 등록 방지)
+  process.once("exit", () => logger.flush());
+
+  return logger;
+}
+
+type FastifyLoggerConfig =
+  | { loggerInstance: pino.Logger }
+  | { logger: ReturnType<typeof buildLoggerOptions>; disableRequestLogging?: boolean };
+
+/**
+ * Fastify 생성자에 전달할 로거 설정 반환
+ * - production: loggerInstance (multistream)
+ * - development: logger options + pino-pretty
+ * - test: logger options + disableRequestLogging
+ */
+export function buildFastifyLoggerConfig(): FastifyLoggerConfig {
+  const isProd = env.NODE_ENV === NodeEnv.PROD;
+  const isTest = env.NODE_ENV === NodeEnv.TEST;
+
+  if (isProd) {
+    return { loggerInstance: buildProdLoggerInstance() };
+  }
+
+  return {
+    logger: buildLoggerOptions(),
+    ...(isTest && { disableRequestLogging: true }),
   };
 }
 
