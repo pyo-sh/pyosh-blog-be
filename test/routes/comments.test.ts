@@ -9,6 +9,7 @@ import {
 import {
   seedAdmin,
   seedCategory,
+  seedComment,
   seedOAuthUser,
   seedPost,
   truncateAll,
@@ -658,22 +659,20 @@ describe("Comment Routes", () => {
         visibility: "public",
       });
 
-      // 1초 간격으로 댓글 생성해서 distinct created_at 보장 (TIMESTAMP precision = 1s)
-      const createdIds: number[] = [];
-      for (let i = 1; i <= 3; i++) {
-        const r = await app.inject({
-          method: "POST",
-          url: `/api/posts/${post.id}/comments`,
-          payload: {
-            body: `댓글 ${i}`,
-            guestName: `작성자${i}`,
-            guestEmail: `u${i}@example.com`,
-            guestPassword: "pass1234",
-          },
-        });
-        createdIds.push(r.json().data.id);
-        if (i < 3) await new Promise((resolve) => setTimeout(resolve, 1100));
-      }
+      // DB 직접 삽입으로 distinct created_at 보장 (TIMESTAMP precision = 1s)
+      const now = Date.now();
+      await seedComment(post.id, {
+        body: "댓글 1",
+        createdAt: new Date(now - 2000),
+      });
+      await seedComment(post.id, {
+        body: "댓글 2",
+        createdAt: new Date(now - 1000),
+      });
+      await seedComment(post.id, {
+        body: "댓글 3",
+        createdAt: new Date(now),
+      });
 
       const descResponse = await app.inject({
         method: "GET",

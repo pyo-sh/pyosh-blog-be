@@ -5,8 +5,10 @@ import {
   adminTable,
   assetTable,
   categoryTable,
+  commentTable,
   NewAsset,
   NewCategory,
+  NewComment,
   NewOAuthAccount,
   NewPost,
   NewTag,
@@ -156,6 +158,35 @@ export async function seedPost(
     .where(eq(postTable.id, Number(result.insertId)));
 
   return post!;
+}
+
+/**
+ * 테스트 Comment 직접 삽입 (createdAt 오버라이드 가능)
+ */
+export async function seedComment(
+  postId: number,
+  overrides?: Partial<NewComment>,
+): Promise<typeof commentTable.$inferSelect> {
+  const values: NewComment = {
+    postId,
+    depth: 0,
+    authorType: "guest",
+    body: "Test comment",
+    isSecret: false,
+    status: "active",
+    guestName: "Test Guest",
+    guestEmail: "guest@example.com",
+    guestPasswordHash: null,
+    ...overrides,
+  };
+
+  const [result] = await db.insert(commentTable).values(values);
+  const [comment] = await db
+    .select()
+    .from(commentTable)
+    .where(eq(commentTable.id, Number(result.insertId)));
+
+  return comment!;
 }
 
 /**
