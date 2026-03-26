@@ -205,6 +205,11 @@ export class PostService {
         updatedAt: new Date(),
       };
 
+      // contentMd가 변경되면 contentModifiedAt 자동 갱신
+      if (input.contentMd !== undefined) {
+        updateData.contentModifiedAt = new Date();
+      }
+
       await tx.update(postTable).set(updateData).where(eq(postTable.id, id));
 
       // 3. 태그 갱신 (undefined vs 빈 배열 구분)

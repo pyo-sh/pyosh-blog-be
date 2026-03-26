@@ -73,8 +73,8 @@ export const CreatePostBodySchema = z.object({
   title: z.string().min(1).max(200),
   contentMd: z.string().min(1),
   categoryId: z.number().int().positive(),
-  summary: z.string().trim().max(200).optional(),
-  description: z.string().trim().max(300).optional(),
+  summary: z.string().trim().min(1).max(200).optional(),
+  description: z.string().trim().min(1).max(300).optional(),
   thumbnailUrl: ThumbnailUrlInputSchema.optional(),
   visibility: z.enum(["public", "private"]).optional().default("public"),
   status: z
