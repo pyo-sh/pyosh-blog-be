@@ -1,4 +1,4 @@
-import { eq, and, isNull, sql, gte, lte, or, like, inArray } from "drizzle-orm";
+import { eq, and, isNull, sql, gte, lte, or, like, inArray, ne } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import type {
   GuestbookEntryDetail,
@@ -335,7 +335,7 @@ export class GuestbookService {
     action: AdminGuestbookDeleteQuery["action"],
   ): Promise<void> {
     const [entry] = await this.db
-      .select({ id: guestbookEntryTable.id })
+      .select({ id: guestbookEntryTable.id, status: guestbookEntryTable.status })
       .from(guestbookEntryTable)
       .where(eq(guestbookEntryTable.id, entryId))
       .limit(1);
@@ -349,7 +349,8 @@ export class GuestbookService {
         .delete(guestbookEntryTable)
         .where(eq(guestbookEntryTable.id, entryId));
     } else {
-      // soft_delete
+      // soft_delete: skip already-deleted entries to preserve original deletedAt
+      if (entry.status === "deleted") return;
       await this.db
         .update(guestbookEntryTable)
         .set({ status: "deleted", deletedAt: new Date() })
@@ -421,11 +422,16 @@ export class GuestbookService {
         .delete(guestbookEntryTable)
         .where(inArray(guestbookEntryTable.id, ids));
     } else {
-      // soft_delete
+      // soft_delete: skip already-deleted entries to preserve original deletedAt
       await this.db
         .update(guestbookEntryTable)
         .set({ status: "deleted", deletedAt: new Date() })
-        .where(inArray(guestbookEntryTable.id, ids));
+        .where(
+          and(
+            inArray(guestbookEntryTable.id, ids),
+            ne(guestbookEntryTable.status, "deleted"),
+          ),
+        );
     }
   }
 
