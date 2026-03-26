@@ -31,6 +31,7 @@ export function createAssetRoute(
     typedFastify.post(
       "/upload",
       {
+        onRequest: fastify.csrfProtection,
         preHandler: requireAdmin(adminService),
         schema: {
           tags: ["assets"],

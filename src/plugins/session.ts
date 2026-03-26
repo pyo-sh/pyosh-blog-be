@@ -10,11 +10,15 @@ const sessionPlugin: FastifyPluginAsync = async (fastify) => {
   await fastify.register(cookie);
 
   // @fastify/session 등록 (Drizzle SessionStore 사용)
+  const isProduction = env.NODE_ENV === "production";
   await fastify.register(session, {
     secret: env.SESSION_SECRET,
     saveUninitialized: false,
     cookie: {
-      secure: env.CLIENT_PROTOCOL === "https",
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "strict" : "lax",
+      path: "/",
       maxAge: 24 * 60 * 60 * 1000, // 24시간
     },
     store: new DrizzleSessionStore(),

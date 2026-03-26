@@ -206,53 +206,60 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(createTagRoute(tagService), {
     prefix: "/api/tags",
   });
-  await fastify.register(createAdminPostRoute(postService, adminService), {
-    prefix: "/api/admin/posts",
-  });
-
-  // Comment routes
+  // Comment routes (public)
   await fastify.register(createCommentRoute(commentService), {
     prefix: "/api",
   });
-  await fastify.register(
-    createAdminCommentRoute(commentService, adminService),
-    {
-      prefix: "/api/admin",
-    },
-  );
 
-  // Guestbook routes
+  // Guestbook routes (public)
   await fastify.register(
     createGuestbookRoute(guestbookService, settingsService),
     {
       prefix: "/api",
     },
   );
-  await fastify.register(
-    createAdminGuestbookRoute(guestbookService, adminService),
-    {
-      prefix: "/api/admin",
-    },
-  );
 
-  // Settings routes
+  // Settings routes (public)
   await fastify.register(createSettingsRoute(settingsService), {
     prefix: "/api/settings",
   });
-  await fastify.register(
-    createAdminSettingsRoute(settingsService, adminService),
-    {
-      prefix: "/api/admin",
-    },
-  );
 
-  // Stats routes
+  // Stats routes (public)
   await fastify.register(createStatsRoute(statsService), {
     prefix: "/api/stats",
   });
-  await fastify.register(createAdminStatsRoute(statsService, adminService), {
-    prefix: "/api/admin/stats",
-  });
+
+  // Admin routes: CSRF 보호 (GET 제외) 일괄 적용
+  await fastify.register(
+    async (adminRoutes) => {
+      adminRoutes.addHook(
+        "onRequest",
+        (request, reply, done) => {
+          if (request.method !== "GET") {
+            return fastify.csrfProtection(request, reply, done);
+          }
+          done();
+        },
+      );
+
+      await adminRoutes.register(createAdminPostRoute(postService, adminService), {
+        prefix: "/posts",
+      });
+      await adminRoutes.register(
+        createAdminCommentRoute(commentService, adminService),
+      );
+      await adminRoutes.register(
+        createAdminGuestbookRoute(guestbookService, adminService),
+      );
+      await adminRoutes.register(
+        createAdminSettingsRoute(settingsService, adminService),
+      );
+      await adminRoutes.register(createAdminStatsRoute(statsService, adminService), {
+        prefix: "/stats",
+      });
+    },
+    { prefix: "/api/admin" },
+  );
   await fastify.register(createSeoRoute());
 
   // User routes (OAuth 인증 필수)
