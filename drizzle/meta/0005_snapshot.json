@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "snapshot_0004",
-  "prevId": "4cc37439-0b23-4813-b493-47006dfa95bd",
+  "id": "bd618725-39b6-481b-8db8-9a41964925ad",
+  "prevId": "1da6a716-22fe-4209-83fe-8af3c6529317",
   "tables": {
     "session_tb": {
       "name": "session_tb",
