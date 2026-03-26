@@ -1,10 +1,7 @@
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "@src/db/schema/index";
-import {
-  oauthAccountTable,
-  OAuthAccount,
-} from "@src/db/schema/oauth-accounts";
+import { oauthAccountTable, OAuthAccount } from "@src/db/schema/oauth-accounts";
 import { HttpError } from "@src/errors/http-error";
 
 export interface UpdateMyProfileData {
@@ -106,11 +103,9 @@ export class UserService {
     const [account] = await this.db
       .select({ deletedAt: oauthAccountTable.deletedAt })
       .from(oauthAccountTable)
-      .where(
-        eq(oauthAccountTable.id, oauthAccountId),
-      )
+      .where(eq(oauthAccountTable.id, oauthAccountId))
       .limit(1);
 
-    return !!account && account.deletedAt === null;
+    return Boolean(account) && account.deletedAt === null;
   }
 }

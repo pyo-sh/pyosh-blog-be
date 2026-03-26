@@ -1,11 +1,11 @@
 import { FastifyPluginAsync, FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { UserService } from "./user.service";
 import {
   UpdateMyProfileBodySchema,
   UserProfileResponseSchema,
 } from "./user.schema";
+import { UserService } from "./user.service";
 import { OAuthAccount } from "@src/db/schema/oauth-accounts";
 import { requireAuth } from "@src/hooks/auth.hook";
 
@@ -40,6 +40,7 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
       async (request, reply) => {
         const oauthAccountId = (request.user as OAuthAccount).id;
         const profile = await userService.getMyProfile(oauthAccountId);
+
         return reply.status(200).send(profile);
       },
     );
@@ -65,6 +66,7 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
         const oauthAccountId = (request.user as OAuthAccount).id;
         const data = UpdateMyProfileBodySchema.parse(request.body);
         const profile = await userService.updateMyProfile(oauthAccountId, data);
+
         return reply.status(200).send(profile);
       },
     );
@@ -89,6 +91,7 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
         const oauthAccountId = (request.user as OAuthAccount).id;
         await userService.deleteMyAccount(oauthAccountId);
         await request.session.destroy();
+
         return reply.status(204).send();
       },
     );
