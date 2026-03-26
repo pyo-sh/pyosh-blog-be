@@ -662,6 +662,8 @@ export class PostService {
         this.fetchCategoryAncestors(post.categoryId, this.db),
       ]);
 
+    if (!category) throw HttpError.notFound(`Category ${post.categoryId} not found for post ${post.id}`);
+
     return {
       ...post,
       category: { ...category, ancestors },
@@ -750,6 +752,8 @@ export class PostService {
           .then((rows) => Number(rows[0]?.count ?? 0)),
         this.fetchCategoryAncestors(post.categoryId, tx),
       ]);
+
+    if (!category) throw HttpError.notFound(`Category ${post.categoryId} not found for post ${post.id}`);
 
     return {
       ...post,
