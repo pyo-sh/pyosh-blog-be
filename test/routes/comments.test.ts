@@ -9,6 +9,7 @@ import {
 import {
   seedAdmin,
   seedCategory,
+  seedComment,
   seedOAuthUser,
   seedPost,
   truncateAll,
@@ -590,6 +591,112 @@ describe("Comment Routes", () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json().data[0].body).toBe("비밀 내용 원문");
+    });
+
+    it("authorType 필터 적용 → guest/oauth 댓글 구분 반환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const user = await seedOAuthUser({ displayName: "OAuth Writer" });
+      const userCookie = await injectOAuthUser(user.id);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      // OAuth 댓글
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        headers: { cookie: userCookie },
+        payload: { body: "OAuth 댓글" },
+      });
+
+      // 게스트 댓글
+      await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "게스트 댓글",
+          guestName: "게스트",
+          guestEmail: "g@example.com",
+          guestPassword: "pass1234",
+        },
+      });
+
+      // authorType=guest 필터 → 1개 (게스트만)
+      const guestResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?authorType=guest",
+        headers: { cookie: adminCookie },
+      });
+      expect(guestResponse.statusCode).toBe(200);
+      const guestBody = guestResponse.json();
+      expect(guestBody.data).toHaveLength(1);
+      expect(guestBody.data[0].author.type).toBe("guest");
+
+      // authorType=oauth 필터 → 1개 (OAuth만)
+      const oauthResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?authorType=oauth",
+        headers: { cookie: adminCookie },
+      });
+      expect(oauthResponse.statusCode).toBe(200);
+      const oauthBody = oauthResponse.json();
+      expect(oauthBody.data).toHaveLength(1);
+      expect(oauthBody.data[0].author.type).toBe("oauth");
+    });
+
+    it("order 파라미터 → asc/desc 정렬 순서 확인", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      // DB 직접 삽입으로 distinct created_at 보장 (TIMESTAMP precision = 1s)
+      const now = Date.now();
+      await seedComment(post.id, {
+        body: "댓글 1",
+        createdAt: new Date(now - 2000),
+      });
+      await seedComment(post.id, {
+        body: "댓글 2",
+        createdAt: new Date(now - 1000),
+      });
+      await seedComment(post.id, {
+        body: "댓글 3",
+        createdAt: new Date(now),
+      });
+
+      const descResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?order=desc",
+        headers: { cookie: adminCookie },
+      });
+      const ascResponse = await app.inject({
+        method: "GET",
+        url: "/api/admin/comments?order=asc",
+        headers: { cookie: adminCookie },
+      });
+
+      expect(descResponse.statusCode).toBe(200);
+      expect(ascResponse.statusCode).toBe(200);
+
+      const descData = descResponse.json().data;
+      const ascData = ascResponse.json().data;
+
+      expect(descData).toHaveLength(3);
+      expect(ascData).toHaveLength(3);
+
+      // desc의 첫 번째 = asc의 마지막, asc의 첫 번째 = desc의 마지막
+      expect(descData[0].id).toBe(ascData[ascData.length - 1].id);
+      expect(ascData[0].id).toBe(descData[descData.length - 1].id);
     });
   });
 
