@@ -275,7 +275,7 @@ export function createAdminGuestbookRoute(
       },
     );
 
-    // PATCH /api/admin/guestbook/:id - 관리자 방명록 상태 변경 (가역: hide)
+    // PATCH /api/admin/guestbook/:id - 관리자 방명록 상태 변경 (가역: hide | restore)
     typedFastify.patch(
       "/guestbook/:id",
       {
@@ -283,7 +283,7 @@ export function createAdminGuestbookRoute(
           tags: ["admin", "guestbook"],
           summary: "관리자 방명록 상태 변경",
           description:
-            "방명록 상태를 가역적으로 변경합니다. action=hide: 공개 목록에서 숨김.",
+            "방명록 상태를 가역적으로 변경합니다. hide: active→hidden, restore: hidden→active. 상태 조건 불일치 시 204를 반환하며 no-op 처리됩니다.",
           params: GuestbookIdParamSchema,
           querystring: AdminGuestbookPatchQuerySchema,
           response: {

@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import * as schema from "@src/db/schema/index";
 import { siteSettingsTable } from "@src/db/schema/settings";
@@ -28,6 +27,6 @@ export class SettingsService {
     await this.db
       .insert(siteSettingsTable)
       .values({ id: 1, guestbookEnabled: enabled })
-      .onDuplicateKeyUpdate({ set: { guestbookEnabled: sql`VALUES(guestbook_enabled)` } });
+      .onDuplicateKeyUpdate({ set: { guestbookEnabled: enabled } });
   }
 }

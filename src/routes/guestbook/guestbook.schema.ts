@@ -153,8 +153,8 @@ export const AdminGuestbookBulkDeleteBodySchema = z.object({
 
 /**
  * 관리자 방명록 벌크 상태 변경 요청 스키마 (PATCH - 가역적 액션)
- * - hide: status=hidden (공개 목록에서만 숨김)
- * - restore: 모든 상태(hidden, deleted)에서 status=active, deletedAt=null로 복원
+ * - hide: active 상태 엔트리를 status=hidden으로 변경
+ * - restore: hidden 상태 엔트리만 status=active로 복원 (soft_delete 복원은 별도 undelete 필요)
  * 최대 100개까지 처리 가능
  */
 export const AdminGuestbookBulkPatchBodySchema = z.object({

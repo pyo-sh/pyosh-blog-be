@@ -359,7 +359,9 @@ export class GuestbookService {
 
   /**
    * 관리자 방명록 단건 상태 변경 (가역적 액션: hide | restore)
-   * restore는 hidden 상태 엔트리만 복원합니다 (soft_delete 복원은 별도 undelete 필요).
+   * - hide: active 상태만 hidden으로 변경 (삭제된 항목에 hide 적용 방지)
+   * - restore: hidden 상태만 active로 복원 (soft_delete 복원은 별도 undelete 필요)
+   * 상태 조건 불일치 시 no-op으로 처리됩니다 (idempotent).
    *
    * @param entryId 방명록 ID
    * @param action 상태 변경 액션 (hide | restore)
@@ -379,10 +381,16 @@ export class GuestbookService {
     }
 
     if (action === "hide") {
+      // Only hide active entries; skip deleted to avoid unintentional state change
       await this.db
         .update(guestbookEntryTable)
         .set({ status: "hidden" })
-        .where(eq(guestbookEntryTable.id, entryId));
+        .where(
+          and(
+            eq(guestbookEntryTable.id, entryId),
+            eq(guestbookEntryTable.status, "active"),
+          ),
+        );
     } else {
       // restore: only undo hide, not soft_delete
       await this.db
@@ -423,8 +431,9 @@ export class GuestbookService {
 
   /**
    * 관리자 방명록 벌크 상태 변경 (가역적 액션: hide | restore)
-   * 존재하지 않는 ID는 묵시적으로 무시됩니다 (idempotent).
-   * restore는 hidden 상태 엔트리만 복원합니다 (soft_delete 복원은 별도 undelete 필요).
+   * 존재하지 않거나 상태 조건 불일치 ID는 묵시적으로 무시됩니다 (idempotent).
+   * - hide: active 상태만 hidden으로 변경 (삭제된 항목에 hide 적용 방지)
+   * - restore: hidden 상태만 active로 복원 (soft_delete 복원은 별도 undelete 필요)
    *
    * @param ids 방명록 ID 배열
    * @param action 상태 변경 액션 (hide | restore)
@@ -434,10 +443,16 @@ export class GuestbookService {
     action: AdminGuestbookBulkPatchBody["action"],
   ): Promise<void> {
     if (action === "hide") {
+      // Only hide active entries; skip deleted to avoid unintentional state change
       await this.db
         .update(guestbookEntryTable)
         .set({ status: "hidden" })
-        .where(inArray(guestbookEntryTable.id, ids));
+        .where(
+          and(
+            inArray(guestbookEntryTable.id, ids),
+            eq(guestbookEntryTable.status, "active"),
+          ),
+        );
     } else {
       // restore: only undo hide, not soft_delete
       await this.db
