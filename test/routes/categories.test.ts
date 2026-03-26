@@ -185,7 +185,7 @@ describe("Category Routes", () => {
         method: "PATCH",
         url: "/api/categories/tree",
         payload: {
-          changes: [],
+          changes: [{ id: 999999, parentId: null, sortOrder: 0 }],
         },
       });
 
