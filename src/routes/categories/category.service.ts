@@ -314,10 +314,27 @@ export class CategoryService {
   /**
    * 카테고리 트리 배치 변경 (단일 트랜잭션)
    * - parentId와 sortOrder를 동시에 업데이트
-   * - 트랜잭션 전에 각 항목의 순환 참조 여부를 검증
+   * - 배치의 목표 상태(target state)를 기준으로 순환 참조 검증
+   *   (현재 DB 상태 기준으로 검증하면 유효한 부모-자식 위치 교환이 거부됨)
    */
   async updateCategoryTree(items: CategoryTreeItem[]): Promise<void> {
-    // 트랜잭션 전 유효성 검증 (현재 DB 상태 기준)
+    // 1. 전체 카테고리 목록을 DB에서 한 번만 조회
+    const allCategories = await this.db
+      .select({ id: categoryTable.id, parentId: categoryTable.parentId })
+      .from(categoryTable);
+
+    // 2. 현재 DB 상태로 부모 맵 구성
+    const targetMap = new Map<number, number | null>(
+      allCategories.map((c) => [c.id, c.parentId]),
+    );
+    const existingIds = new Set(allCategories.map((c) => c.id));
+
+    // 3. 배치 변경 사항을 반영해 목표 상태 맵 갱신
+    for (const item of items) {
+      targetMap.set(item.id, item.parentId);
+    }
+
+    // 4. 목표 상태에서 각 항목 유효성 검증
     for (const item of items) {
       if (item.parentId === null) continue;
 
@@ -328,28 +345,36 @@ export class CategoryService {
         );
       }
 
-      // 자신의 하위 카테고리를 부모로 설정하는 경우
-      const isDescendant = await this.isDescendantOf(item.id, item.parentId);
-      if (isDescendant) {
-        throw HttpError.badRequest(
-          `Category ${item.id}: cannot set a descendant as parent.`,
-        );
-      }
-
       // 부모 카테고리 존재 확인
-      const [parent] = await this.db
-        .select()
-        .from(categoryTable)
-        .where(eq(categoryTable.id, item.parentId))
-        .limit(1);
-
-      if (!parent) {
+      if (!existingIds.has(item.parentId)) {
         throw HttpError.badRequest(
           `Parent category ${item.parentId} not found.`,
         );
       }
+
+      // 목표 상태에서 순환 참조 여부 확인 (DB 추가 조회 없이 in-memory 탐색)
+      let current: number | null = item.parentId;
+      const visited = new Set<number>();
+      let hasCycle = false;
+
+      while (current !== null) {
+        if (current === item.id) {
+          hasCycle = true;
+          break;
+        }
+        if (visited.has(current)) break;
+        visited.add(current);
+        current = targetMap.get(current) ?? null;
+      }
+
+      if (hasCycle) {
+        throw HttpError.badRequest(
+          `Category ${item.id}: cannot set a descendant as parent.`,
+        );
+      }
     }
 
+    // 5. 트랜잭션으로 일괄 업데이트
     await this.db.transaction(async (tx) => {
       for (const item of items) {
         await tx
@@ -393,15 +418,11 @@ export class CategoryService {
       }
 
       if (action === "move") {
-        if (!moveTo) {
-          throw HttpError.badRequest("moveTo is required when action is move.");
-        }
-
-        // 이동 대상 카테고리 존재 확인
+        // 이동 대상 카테고리 존재 확인 (moveTo는 Zod 스키마에서 필수 보장)
         const [targetCategory] = await tx
           .select()
           .from(categoryTable)
-          .where(eq(categoryTable.id, moveTo))
+          .where(eq(categoryTable.id, moveTo!))
           .limit(1);
 
         if (!targetCategory) {
@@ -411,7 +432,7 @@ export class CategoryService {
         // 게시글을 대상 카테고리로 이동
         await tx
           .update(postTable)
-          .set({ categoryId: moveTo })
+          .set({ categoryId: moveTo! })
           .where(eq(postTable.categoryId, id));
       } else {
         // 게시글 휴지통 이동 (soft delete, 미삭제 게시글만)

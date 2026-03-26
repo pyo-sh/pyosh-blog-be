@@ -69,8 +69,12 @@ describe("Category Routes", () => {
       expect(response.statusCode).toBe(200);
 
       const body = response.json();
-      expect(body.categories[0].publishedPostCount).toBe(1);
-      expect(body.categories[0].totalPostCount).toBe(2);
+      const found = body.categories.find(
+        (c: { name: string }) => c.name === "Category With Posts",
+      );
+      expect(found).toBeDefined();
+      expect(found.publishedPostCount).toBe(1);
+      expect(found.totalPostCount).toBe(2);
     });
 
     it("slug 단건 조회 경로 제거됨 → 404", async () => {
