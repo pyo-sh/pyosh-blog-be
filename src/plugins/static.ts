@@ -15,6 +15,8 @@ async function staticPlugin(fastify: FastifyInstance) {
     root: uploadDir,
     prefix: "/uploads/",
     decorateReply: false,
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30일 (밀리초)
+    immutable: true,
   });
 
   fastify.log.info(`Static files serving from: ${uploadDir} at /uploads/`);
