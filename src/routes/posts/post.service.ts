@@ -1,6 +1,8 @@
 import { eq, and, isNull, sql, inArray, lt, gt, desc, asc, like, or } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
+import type { PoolConnection } from "mysql2/promise";
 import { categoryTable } from "@src/db/schema/categories";
+import { connection } from "@src/db/client";
 import { commentTable } from "@src/db/schema/comments";
 import * as schema from "@src/db/schema/index";
 import { postTagTable } from "@src/db/schema/post-tags";
@@ -18,6 +20,7 @@ import { generateSlug, ensureUniqueSlug } from "@src/shared/slug";
 const MAX_PINNED_POSTS = 5;
 const PINNED_POST_LIMIT_ERROR =
   "Pinned post limit exceeded. Maximum 5 pinned posts allowed.";
+const PINNED_POST_LIMIT_LOCK_NAME = "post_pinned_limit";
 
 /**
  * 게시글 생성 입력 데이터
@@ -163,17 +166,22 @@ export class PostService {
    * 게시글 생성 (트랜잭션)
    */
   async createPost(input: CreatePostInput): Promise<PostDetail> {
-    // MySQL REPEATABLE READ isolation 회피: 트랜잭션 시작 전에 태그 조회/생성
-    const tagIds: number[] =
-      input.tags && input.tags.length > 0
-        ? await this.tagService.getOrCreateTags(input.tags)
-        : [];
-
-    return await this.db.transaction(async (tx) => {
+    return await this.withPinnedPostLimitLock(async () => {
       if (input.isPinned === true) {
-        await this.assertPinnedPostCapacity(tx, 1);
+        const pinnedCount = await this.countPinnedPosts(this.db);
+
+        if (pinnedCount + 1 > MAX_PINNED_POSTS) {
+          throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+        }
       }
 
+      // MySQL REPEATABLE READ isolation 회피: 트랜잭션 시작 전에 태그 조회/생성
+      const tagIds: number[] =
+        input.tags && input.tags.length > 0
+          ? await this.tagService.getOrCreateTags(input.tags)
+          : [];
+
+      return await this.db.transaction(async (tx) => {
       // 1. slug 생성 및 중복 확인
       const baseSlug = generateSlug(input.title);
       const slug = await ensureUniqueSlug(baseSlug, async (checkSlug) => {
@@ -220,6 +228,7 @@ export class PostService {
 
       // 5. 생성된 게시글 전체 조회
       return await this.getPostByIdInternal(postId, tx);
+      });
     });
   }
 
@@ -227,13 +236,43 @@ export class PostService {
    * 게시글 수정 (트랜잭션)
    */
   async updatePost(id: number, input: UpdatePostInput): Promise<PostDetail> {
-    // MySQL REPEATABLE READ isolation 회피: 트랜잭션 시작 전에 태그 조회/생성
-    const newTagIds: number[] | undefined =
-      input.tags !== undefined
-        ? await this.tagService.getOrCreateTags(input.tags)
-        : undefined;
+    return await this.withPinnedPostLimitLock(async () => {
+      let existingPostForPinnedCheck:
+        | Pick<Post, "id" | "isPinned">
+        | undefined;
 
-    return await this.db.transaction(async (tx) => {
+      if (input.isPinned === true) {
+        const [existingPost] = await this.db
+          .select({
+            id: postTable.id,
+            isPinned: postTable.isPinned,
+          })
+          .from(postTable)
+          .where(eq(postTable.id, id))
+          .limit(1);
+
+        if (!existingPost) {
+          throw HttpError.notFound("Post not found.");
+        }
+
+        existingPostForPinnedCheck = existingPost;
+
+        if (!existingPost.isPinned) {
+          const pinnedCount = await this.countPinnedPosts(this.db);
+
+          if (pinnedCount + 1 > MAX_PINNED_POSTS) {
+            throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+          }
+        }
+      }
+
+      // MySQL REPEATABLE READ isolation 회피: 트랜잭션 시작 전에 태그 조회/생성
+      const newTagIds: number[] | undefined =
+        input.tags !== undefined
+          ? await this.tagService.getOrCreateTags(input.tags)
+          : undefined;
+
+      return await this.db.transaction(async (tx) => {
       // 1. 게시글 존재 확인
       const existing = await tx
         .select()
@@ -247,8 +286,13 @@ export class PostService {
 
       const [currentPost] = existing;
 
-      if (input.isPinned === true && !currentPost.isPinned) {
-        await this.assertPinnedPostCapacity(tx, 1);
+      if (
+        input.isPinned === true &&
+        existingPostForPinnedCheck !== undefined &&
+        !existingPostForPinnedCheck.isPinned &&
+        currentPost.isPinned
+      ) {
+        throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
       }
 
       // 2. 게시글 수정
@@ -279,6 +323,7 @@ export class PostService {
 
       // 4. 수정된 게시글 전체 조회
       return await this.getPostByIdInternal(id, tx);
+      });
     });
   }
 
@@ -599,9 +644,8 @@ export class PostService {
    * 게시글 복원
    */
   async restorePost(id: number): Promise<PostDetail> {
-    return await this.db.transaction(async (tx) => {
-      // 1. 게시글 존재 확인
-      const [post] = await tx
+    return await this.withPinnedPostLimitLock(async () => {
+      const [post] = await this.db
         .select()
         .from(postTable)
         .where(eq(postTable.id, id))
@@ -612,17 +656,23 @@ export class PostService {
       }
 
       if (post.isPinned && post.deletedAt !== null) {
-        await this.assertPinnedPostCapacity(tx, 1);
+        const pinnedCount = await this.countPinnedPosts(this.db);
+
+        if (pinnedCount + 1 > MAX_PINNED_POSTS) {
+          throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+        }
       }
 
-      // 2. 복원
-      await tx
-        .update(postTable)
-        .set({ deletedAt: null })
-        .where(eq(postTable.id, id));
+      return await this.db.transaction(async (tx) => {
+        // 2. 복원
+        await tx
+          .update(postTable)
+          .set({ deletedAt: null })
+          .where(eq(postTable.id, id));
 
-      // 3. 복원된 게시글 조회
-      return await this.getPostByIdInternal(id, tx);
+        // 3. 복원된 게시글 조회
+        return await this.getPostByIdInternal(id, tx);
+      });
     });
   }
 
@@ -679,7 +729,8 @@ export class PostService {
     const { action } = input;
     const uniqueIds = [...new Set(input.ids)];
 
-    await this.db.transaction(async (tx) => {
+    const run = async () =>
+      await this.db.transaction(async (tx) => {
       // 모든 대상 게시글 존재 확인 (deletedAt 필터 없음 — 소프트 삭제된 글도 admin이 조작 가능)
       const found = await tx
         .select({
@@ -720,7 +771,11 @@ export class PostService {
         ).length;
 
         if (pinnedPostsToRestore > 0) {
-          await this.assertPinnedPostCapacity(tx, pinnedPostsToRestore);
+          const pinnedCount = await this.countPinnedPosts(tx);
+
+          if (pinnedCount + pinnedPostsToRestore > MAX_PINNED_POSTS) {
+            throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+          }
         }
 
         await tx
@@ -744,7 +799,14 @@ export class PostService {
         // 고아 태그 삭제
         await this.cleanOrphanTags(tx, linkedTagIds);
       }
-    });
+      });
+
+    if (action === "restore") {
+      await this.withPinnedPostLimitLock(run);
+      return;
+    }
+
+    await run();
   }
 
   /**
@@ -963,18 +1025,35 @@ export class PostService {
     return Number(result?.total ?? 0);
   }
 
-  private async assertPinnedPostCapacity(
-    tx: Pick<MySql2Database<typeof schema>, "select" | "execute">,
-    additionalPinnedPosts: number,
+  private async withPinnedPostLimitLock<T>(operation: () => Promise<T>): Promise<T> {
+    const lockConnection = await connection.getConnection();
+
+    try {
+      const [lockRows] = await lockConnection.query<
+        Array<{ acquired: number | null }>
+      >("SELECT GET_LOCK(?, 10) AS acquired", [PINNED_POST_LIMIT_LOCK_NAME]);
+      const acquired = Number(lockRows[0]?.acquired ?? 0);
+
+      if (acquired !== 1) {
+        throw HttpError.internal("Failed to acquire pinned post limit lock.");
+      }
+
+      return await operation();
+    } finally {
+      await this.releasePinnedPostLimitLock(lockConnection);
+      lockConnection.release();
+    }
+  }
+
+  private async releasePinnedPostLimitLock(
+    lockConnection: PoolConnection,
   ): Promise<void> {
-    await tx.execute(
-      sql.raw("SELECT id FROM post_tb WHERE deleted_at IS NULL FOR UPDATE"),
-    );
-
-    const pinnedCount = await this.countPinnedPosts(tx);
-
-    if (pinnedCount + additionalPinnedPosts > MAX_PINNED_POSTS) {
-      throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+    try {
+      await lockConnection.query("SELECT RELEASE_LOCK(?)", [
+        PINNED_POST_LIMIT_LOCK_NAME,
+      ]);
+    } catch {
+      // Ignore release errors; the connection release closes the lock lifecycle.
     }
   }
 }
