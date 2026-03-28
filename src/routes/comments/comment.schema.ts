@@ -26,8 +26,18 @@ export const CreateCommentOAuthBodySchema = z.object({
     .min(1, "본문은 필수입니다")
     .max(2000, "본문은 2000자를 초과할 수 없습니다")
     .describe("댓글 본문 (최대 2000자)"),
-  parentId: z.number().int().positive().optional().describe("부모 댓글 ID (답글인 경우)"),
-  replyToCommentId: z.number().int().positive().optional().describe("답글 대상 댓글 ID"),
+  parentId: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("부모 댓글 ID (답글인 경우)"),
+  replyToCommentId: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("답글 대상 댓글 ID"),
   isSecret: z.boolean().optional().default(false).describe("비밀 댓글 여부"),
 });
 
@@ -46,7 +56,8 @@ export const CreateCommentGuestBodySchema = CreateCommentOAuthBodySchema.extend(
       .string()
       .email("유효한 이메일 주소를 입력하세요")
       .max(100, "이메일은 100자를 초과할 수 없습니다")
-      .describe("게스트 이메일"),
+      .optional()
+      .describe("게스트 이메일 (선택)"),
     guestPassword: z
       .string()
       .min(4, "비밀번호는 최소 4자 이상이어야 합니다")
@@ -55,19 +66,44 @@ export const CreateCommentGuestBodySchema = CreateCommentOAuthBodySchema.extend(
   },
 );
 
+export const RevealCommentBodySchema = z.object({
+  revealToken: z
+    .string()
+    .trim()
+    .min(1, "복원 토큰은 필수입니다")
+    .max(255, "복원 토큰이 너무 깁니다")
+    .describe("비밀 댓글 복원 토큰"),
+});
+
 /**
  * 게스트 댓글 삭제 스키마
  */
 export const DeleteCommentGuestBodySchema = z.object({
-  guestPassword: z.string().min(4, "비밀번호는 최소 4자 이상이어야 합니다").describe("게스트 비밀번호"),
+  guestPassword: z
+    .string()
+    .min(4, "비밀번호는 최소 4자 이상이어야 합니다")
+    .describe("게스트 비밀번호"),
 });
 
 /**
  * Public 댓글 목록 쿼리 스키마
  */
 export const CommentsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).optional().default(1).describe("페이지 번호"),
-  limit: z.coerce.number().int().min(1).max(50).optional().default(10).describe("페이지당 루트 댓글 수 (최대 50)"),
+  page: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .default(1)
+    .describe("페이지 번호"),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .optional()
+    .default(10)
+    .describe("페이지당 루트 댓글 수 (최대 50)"),
 });
 
 /**
@@ -107,7 +143,10 @@ export const CommentDetailSchema = z.lazy(() =>
   z.object({
     id: z.number().describe("댓글 ID"),
     postId: z.number().describe("게시글 ID"),
-    parentId: z.number().nullable().describe("부모 댓글 ID (루트 댓글이면 null)"),
+    parentId: z
+      .number()
+      .nullable()
+      .describe("부모 댓글 ID (루트 댓글이면 null)"),
     depth: z.number().describe("댓글 깊이 (0 = 루트)"),
     body: z.string().describe("댓글 본문"),
     isSecret: z.boolean().describe("비밀 댓글 여부"),
@@ -146,19 +185,60 @@ export const CommentResponseSchema = z.object({
   data: CommentDetailSchema,
 });
 
+export const CreateCommentResponseSchema = z.object({
+  data: CommentDetailSchema,
+  revealToken: z
+    .string()
+    .nullable()
+    .optional()
+    .describe("게스트 비밀 댓글 작성 직후 발급되는 복원 토큰"),
+});
+
 /**
  * 관리자 댓글 목록 쿼리 스키마
  */
 export const AdminCommentListQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional().default(1).describe("페이지 번호"),
-  limit: z.coerce.number().int().positive().max(100).optional().default(20).describe("페이지당 항목 수 (최대 100)"),
-  postId: z.coerce.number().int().positive().optional().describe("게시글 ID로 필터"),
-  status: z.enum(["active", "deleted", "hidden"]).optional().describe("댓글 상태 필터"),
-  authorType: z.enum(["oauth", "guest"]).optional().describe("작성자 유형 필터"),
+  page: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .default(1)
+    .describe("페이지 번호"),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .optional()
+    .default(20)
+    .describe("페이지당 항목 수 (최대 100)"),
+  postId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("게시글 ID로 필터"),
+  status: z
+    .enum(["active", "deleted", "hidden"])
+    .optional()
+    .describe("댓글 상태 필터"),
+  authorType: z
+    .enum(["oauth", "guest"])
+    .optional()
+    .describe("작성자 유형 필터"),
   startDate: z.string().optional().describe("시작일 (ISO 8601)"),
   endDate: z.string().optional().describe("종료일 (ISO 8601)"),
-  sort: z.enum(["created_at"]).optional().default("created_at").describe("정렬 기준"),
-  order: z.enum(["asc", "desc"]).optional().default("desc").describe("정렬 방향"),
+  sort: z
+    .enum(["created_at"])
+    .optional()
+    .default("created_at")
+    .describe("정렬 기준"),
+  order: z
+    .enum(["asc", "desc"])
+    .optional()
+    .default("desc")
+    .describe("정렬 방향"),
 });
 
 /**
@@ -174,7 +254,12 @@ export const AdminCommentItemSchema = z.object({
   status: z.enum(["active", "deleted", "hidden"]).describe("댓글 상태"),
   author: CommentAuthorSchema,
   replyToName: z.string().nullable().describe("답글 대상 작성자 이름"),
-  post: z.object({ id: z.number().describe("게시글 ID"), title: z.string().describe("게시글 제목") }).describe("댓글이 속한 게시글"),
+  post: z
+    .object({
+      id: z.number().describe("게시글 ID"),
+      title: z.string().describe("게시글 제목"),
+    })
+    .describe("댓글이 속한 게시글"),
   createdAt: z.string().describe("작성일 (ISO 8601)"),
   updatedAt: z.string().describe("수정일 (ISO 8601)"),
 });
@@ -199,7 +284,10 @@ export const AdminCommentThreadResponseSchema = z.object({
  * 관리자 댓글 삭제 쿼리 스키마
  */
 export const AdminCommentDeleteQuerySchema = z.object({
-  action: z.enum(["soft_delete", "hard_delete"]).default("soft_delete").describe("삭제 방식 (soft_delete: 복원 가능, hard_delete: 영구 삭제)"),
+  action: z
+    .enum(["soft_delete", "hard_delete"])
+    .default("soft_delete")
+    .describe("삭제 방식 (soft_delete: 복원 가능, hard_delete: 영구 삭제)"),
 });
 
 /**
@@ -213,8 +301,14 @@ export const AdminCommentRestoreResponseSchema = z.object({
  * 관리자 벌크 삭제/복원 요청 바디 스키마
  */
 export const AdminCommentBulkBodySchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1).max(100).describe("대상 댓글 ID 배열 (최대 100개)"),
-  action: z.enum(["restore", "soft_delete", "hard_delete"]).describe("수행할 작업"),
+  ids: z
+    .array(z.number().int().positive())
+    .min(1)
+    .max(100)
+    .describe("대상 댓글 ID 배열 (최대 100개)"),
+  action: z
+    .enum(["restore", "soft_delete", "hard_delete"])
+    .describe("수행할 작업"),
 });
 
 /**
@@ -231,6 +325,7 @@ export type CreateCommentGuestBody = z.infer<
 export type DeleteCommentGuestBody = z.infer<
   typeof DeleteCommentGuestBodySchema
 >;
+export type RevealCommentBody = z.infer<typeof RevealCommentBodySchema>;
 export type CommentsQuery = z.infer<typeof CommentsQuerySchema>;
 export type CommentAuthor = z.infer<typeof CommentAuthorSchema>;
 export type CommentDetail = CommentDetailSchemaType;

@@ -8,8 +8,10 @@ import {
   CreateCommentOAuthBodySchema,
   CreateCommentGuestBodySchema,
   DeleteCommentGuestBodySchema,
+  RevealCommentBodySchema,
   CommentsResponseSchema,
   CommentResponseSchema,
+  CreateCommentResponseSchema,
   AdminCommentListQuerySchema,
   AdminCommentListResponseSchema,
   AdminCommentThreadResponseSchema,
@@ -21,8 +23,8 @@ import { CommentService } from "./comment.service";
 import { OAuthAccount } from "@src/db/schema/oauth-accounts";
 import { optionalAuth, requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
-import { resolveAuthorFromRequest, Author } from "@src/shared/interaction";
 import { ErrorResponseSchema } from "@src/schemas/common";
+import { resolveAuthorFromRequest, Author } from "@src/shared/interaction";
 
 /**
  * Comment 라우트 플러그인 (Public)
@@ -85,7 +87,7 @@ export function createCommentRoute(
           tags: ["comments"],
           summary: "댓글 작성",
           description:
-            "OAuth 로그인 사용자 또는 게스트가 댓글을 작성합니다. 게스트는 이름, 이메일, 비밀번호를 함께 전달해야 합니다.\n\n" +
+            "OAuth 로그인 사용자 또는 게스트가 댓글을 작성합니다. 게스트는 이름과 비밀번호를 전달해야 하며, 비밀 댓글이면 복원 토큰이 함께 발급됩니다.\n\n" +
             "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.\n\n" +
             "**Rate limit**: 10회/분",
@@ -95,7 +97,7 @@ export function createCommentRoute(
             CreateCommentOAuthBodySchema,
           ]),
           response: {
-            201: CommentResponseSchema,
+            201: CreateCommentResponseSchema,
             400: ErrorResponseSchema,
             429: ErrorResponseSchema,
           },
@@ -146,15 +148,47 @@ export function createCommentRoute(
           };
         }
 
-        const comment = await commentService.createComment(
+        const result = await commentService.createComment(
           postId,
           input,
           author,
         );
 
         return reply.status(201).send({
-          data: comment,
+          data: result.comment,
+          revealToken: result.revealToken,
         });
+      },
+    );
+
+    typedFastify.post(
+      "/comments/:id/reveal",
+      {
+        schema: {
+          tags: ["comments"],
+          summary: "비밀 댓글 원문 복원",
+          description:
+            "게스트 비밀 댓글 작성 직후 받은 복원 토큰으로 해당 댓글의 원문을 다시 조회합니다.",
+          params: CommentIdParamSchema,
+          body: RevealCommentBodySchema,
+          response: {
+            200: CommentResponseSchema,
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const { id } = request.params;
+        const { revealToken } = request.body;
+
+        const comment = await commentService.revealSecretComment(
+          id,
+          revealToken,
+        );
+
+        return reply.status(200).send({ data: comment });
       },
     );
 
@@ -239,6 +273,7 @@ export function createAdminCommentRoute(
       async (request, reply) => {
         const query = request.query;
         const result = await commentService.getAdminComments(query);
+
         return reply.status(200).send(result);
       },
     );
@@ -264,6 +299,7 @@ export function createAdminCommentRoute(
       async (request, reply) => {
         const { id } = request.params;
         const result = await commentService.getAdminCommentThread(id);
+
         return reply.status(200).send(result);
       },
     );
@@ -292,6 +328,7 @@ export function createAdminCommentRoute(
       async (request, reply) => {
         const { id } = request.params;
         await commentService.restoreComment(id);
+
         return reply.status(200).send({ success: true as const });
       },
     );
@@ -321,6 +358,7 @@ export function createAdminCommentRoute(
       async (request, reply) => {
         const { ids, action } = request.body;
         await commentService.bulkOperateComments(ids, action);
+
         return reply.status(204).send();
       },
     );

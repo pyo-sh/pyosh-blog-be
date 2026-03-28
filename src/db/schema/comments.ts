@@ -36,6 +36,7 @@ export const commentTable = mysqlTable(
     // 내용
     body: text("body").notNull(),
     isSecret: boolean("is_secret").default(false).notNull(),
+    secretRevealTokenHash: varchar("secret_reveal_token_hash", { length: 64 }),
 
     // 상태
     status: mysqlEnum("status", ["active", "deleted", "hidden"])
