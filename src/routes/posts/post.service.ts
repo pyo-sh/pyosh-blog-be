@@ -63,7 +63,7 @@ export interface GetPostListQuery {
   filter?: "title_content" | "title" | "content" | "tag" | "category" | "comment";
   status?: "draft" | "published" | "archived";
   visibility?: "public" | "private";
-  sort?: "published_at" | "created_at";
+  sort?: "published_at" | "created_at" | "totalPageviews" | "commentCount";
   order?: "asc" | "desc";
   includeDeleted?: boolean;
 }
@@ -398,13 +398,54 @@ export class PostService {
       sort === "published_at" ? postTable.publishedAt : postTable.createdAt;
     const orderFn = order === "asc" ? sql`ASC` : sql`DESC`;
 
-    const posts = await this.db
-      .select()
-      .from(postTable)
-      .where(whereClause)
-      .orderBy(sql`${orderColumn} ${orderFn}`)
-      .limit(limit)
-      .offset(offset);
+    let posts: Post[];
+
+    if (sort === "totalPageviews" || sort === "commentCount") {
+      const statsSubquery = this.db
+        .select({
+          postId: statsDailyTable.postId,
+          totalPageviews:
+            sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`.as("totalPageviews"),
+        })
+        .from(statsDailyTable)
+        .groupBy(statsDailyTable.postId)
+        .as("post_stats");
+
+      const commentsSubquery = this.db
+        .select({
+          postId: commentTable.postId,
+          commentCount: sql<number>`COUNT(*)`.as("commentCount"),
+        })
+        .from(commentTable)
+        .where(isNull(commentTable.deletedAt))
+        .groupBy(commentTable.postId)
+        .as("post_comments");
+
+      const aggregateColumn =
+        sort === "totalPageviews"
+          ? sql`COALESCE(${statsSubquery.totalPageviews}, 0)`
+          : sql`COALESCE(${commentsSubquery.commentCount}, 0)`;
+
+      const rows = await this.db
+        .select({ post: postTable })
+        .from(postTable)
+        .leftJoin(statsSubquery, eq(statsSubquery.postId, postTable.id))
+        .leftJoin(commentsSubquery, eq(commentsSubquery.postId, postTable.id))
+        .where(whereClause)
+        .orderBy(sql`${aggregateColumn} ${orderFn}`, sql`${postTable.id} ${orderFn}`)
+        .limit(limit)
+        .offset(offset);
+
+      posts = rows.map((row) => row.post);
+    } else {
+      posts = await this.db
+        .select()
+        .from(postTable)
+        .where(whereClause)
+        .orderBy(sql`${orderColumn} ${orderFn}`)
+        .limit(limit)
+        .offset(offset);
+    }
 
     // 각 post에 category, tags, 집계 정보 추가 (목록용 - contentMd/ancestors 제외, 배치)
     const postsWithDetails = await this.enrichPostListItems(posts);

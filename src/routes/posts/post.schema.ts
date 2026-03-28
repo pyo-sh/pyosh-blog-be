@@ -67,7 +67,11 @@ export const AdminPostListQuerySchema = z.object({
   q: z.string().min(1).max(200).optional().describe("검색어"),
   status: z.enum(["draft", "published", "archived"]).optional().describe("게시 상태 필터"),
   visibility: z.enum(["public", "private"]).optional().describe("공개 범위 필터"),
-  sort: z.enum(["published_at", "created_at"]).optional().default("created_at").describe("정렬 기준 필드"),
+  sort: z
+    .enum(["published_at", "created_at", "totalPageviews", "commentCount"])
+    .optional()
+    .default("created_at")
+    .describe("정렬 기준 필드"),
   order: z.enum(["asc", "desc"]).optional().default("desc").describe("정렬 방향"),
   includeDeleted: z.coerce.boolean().optional().default(false).describe("삭제된 게시글 포함 여부"),
 });
