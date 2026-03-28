@@ -15,6 +15,9 @@ const SAFE_SVG = Buffer.from(
 const UNSAFE_SVG = Buffer.from(
   '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(1)</script></svg>',
 );
+const ENCODED_UNSAFE_SVG = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg"><a href="&#x6a;avascript:alert(1)">x</a></svg>',
+);
 const FAKE_WEBP = Buffer.concat([
   Buffer.from("RIFF", "ascii"),
   Buffer.from([0x24, 0x00, 0x00, 0x00]),
@@ -185,6 +188,24 @@ describe("Asset Routes", () => {
       const boundary = "testboundary";
       const payload = buildMultipart(
         [{ fieldName: "files", fileName: "unsafe.svg", content: UNSAFE_SVG, mimeType: "image/svg+xml" }],
+        boundary,
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("엔티티 인코딩된 scriptable URL이 있는 SVG → 400", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [{ fieldName: "files", fileName: "encoded-unsafe.svg", content: ENCODED_UNSAFE_SVG, mimeType: "image/svg+xml" }],
         boundary,
       );
       const res = await app.inject({

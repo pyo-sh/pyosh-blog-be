@@ -49,6 +49,22 @@ function validateWebP(buffer: Buffer): boolean {
   );
 }
 
+function decodeXmlEntities(value: string): string {
+  return value.replace(
+    /&#(?:x([0-9a-f]+)|([0-9]+));/gi,
+    (_match, hex, decimal) => {
+      const codePoint = parseInt(hex ?? decimal, hex ? 16 : 10);
+      if (!Number.isFinite(codePoint)) return "";
+
+      try {
+        return String.fromCodePoint(codePoint);
+      } catch {
+        return "";
+      }
+    },
+  );
+}
+
 function validateSvg(buffer: Buffer): boolean {
   const content = buffer.toString("utf8").trimStart();
 
@@ -56,12 +72,15 @@ function validateSvg(buffer: Buffer): boolean {
     return false;
   }
 
-  const normalized = content.toLowerCase();
-  const hasSvgRoot = /<svg[\s>]/i.test(content);
-  const hasScript = /<script[\s>]/i.test(content);
-  const hasEventHandler = /\son[a-z]+\s*=/i.test(content);
-  const hasJavascriptUrl = /javascript\s*:/i.test(content);
-  const hasForeignObject = /<foreignobject[\s>]/i.test(content);
+  const decoded = decodeXmlEntities(content);
+  const normalized = decoded.toLowerCase();
+  const hasSvgRoot = /<svg[\s>]/i.test(decoded);
+  const hasScript = /<script[\s>]/i.test(decoded);
+  const hasEventHandler = /\son[a-z]+\s*=/i.test(decoded);
+  const hasJavascriptUrl = /javascript\s*:/i.test(decoded);
+  const hasForeignObject = /<foreignobject[\s>]/i.test(decoded);
+  const hasLinkingAttr = /\s(?:href|xlink:href)\s*=/i.test(decoded);
+  const hasLinkingElement = /<(?:a|use|image|animate|set)\b/i.test(decoded);
 
   return (
     hasSvgRoot &&
@@ -69,6 +88,8 @@ function validateSvg(buffer: Buffer): boolean {
     !hasEventHandler &&
     !hasJavascriptUrl &&
     !hasForeignObject &&
+    !hasLinkingAttr &&
+    !hasLinkingElement &&
     !normalized.includes("<!entity") &&
     !normalized.includes("<!doctype")
   );
