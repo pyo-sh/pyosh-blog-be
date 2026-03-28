@@ -326,6 +326,7 @@ export function createAdminPostRoute(
           response: {
             204: z.void(),
             400: ErrorResponseSchema,
+            409: ErrorResponseSchema,
             403: ErrorResponseSchema,
           },
         },

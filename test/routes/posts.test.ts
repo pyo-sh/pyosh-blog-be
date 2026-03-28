@@ -1717,6 +1717,36 @@ describe("Post Routes", () => {
       expect(getRes.json().post.deletedAt).toBeNull();
     });
 
+    it("action=restore: pinned 복원으로 6개가 되면 409", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      for (let i = 0; i < 5; i += 1) {
+        await seedPost(category.id, {
+          title: `Pinned Bulk Restore ${i}`,
+          slug: `pinned-bulk-restore-${i}`,
+          isPinned: true,
+        });
+      }
+      const deletedPinnedPost = await seedPost(category.id, {
+        title: "Deleted Bulk Pinned Post",
+        slug: "deleted-bulk-pinned-post",
+        isPinned: true,
+        deletedAt: new Date(),
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [deletedPinnedPost.id], action: "restore" },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain("Pinned post limit exceeded");
+    });
+
     it("action=hard_delete: 일괄 영구 삭제 → 204", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);

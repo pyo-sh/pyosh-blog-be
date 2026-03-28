@@ -15,6 +15,10 @@ import {
 } from "@src/shared/pagination";
 import { generateSlug, ensureUniqueSlug } from "@src/shared/slug";
 
+const MAX_PINNED_POSTS = 5;
+const PINNED_POST_LIMIT_ERROR =
+  "Pinned post limit exceeded. Maximum 5 pinned posts allowed.";
+
 /**
  * 게시글 생성 입력 데이터
  */
@@ -167,13 +171,7 @@ export class PostService {
 
     return await this.db.transaction(async (tx) => {
       if (input.isPinned === true) {
-        const pinnedCount = await this.countPinnedPosts(tx);
-
-        if (pinnedCount >= 5) {
-          throw HttpError.conflict(
-            "Pinned post limit exceeded. Maximum 5 pinned posts allowed.",
-          );
-        }
+        await this.assertPinnedPostCapacity(tx, 1);
       }
 
       // 1. slug 생성 및 중복 확인
@@ -250,13 +248,7 @@ export class PostService {
       const [currentPost] = existing;
 
       if (input.isPinned === true && !currentPost.isPinned) {
-        const pinnedCount = await this.countPinnedPosts(tx);
-
-        if (pinnedCount >= 5) {
-          throw HttpError.conflict(
-            "Pinned post limit exceeded. Maximum 5 pinned posts allowed.",
-          );
-        }
+        await this.assertPinnedPostCapacity(tx, 1);
       }
 
       // 2. 게시글 수정
@@ -607,35 +599,31 @@ export class PostService {
    * 게시글 복원
    */
   async restorePost(id: number): Promise<PostDetail> {
-    // 1. 게시글 존재 확인
-    const [post] = await this.db
-      .select()
-      .from(postTable)
-      .where(eq(postTable.id, id))
-      .limit(1);
+    return await this.db.transaction(async (tx) => {
+      // 1. 게시글 존재 확인
+      const [post] = await tx
+        .select()
+        .from(postTable)
+        .where(eq(postTable.id, id))
+        .limit(1);
 
-    if (!post) {
-      throw HttpError.notFound("게시글을 찾을 수 없습니다");
-    }
-
-    if (post.isPinned) {
-      const pinnedCount = await this.countPinnedPosts(this.db);
-
-      if (pinnedCount >= 5) {
-        throw HttpError.conflict(
-          "Pinned post limit exceeded. Maximum 5 pinned posts allowed.",
-        );
+      if (!post) {
+        throw HttpError.notFound("게시글을 찾을 수 없습니다");
       }
-    }
 
-    // 2. 복원
-    await this.db
-      .update(postTable)
-      .set({ deletedAt: null })
-      .where(eq(postTable.id, id));
+      if (post.isPinned && post.deletedAt !== null) {
+        await this.assertPinnedPostCapacity(tx, 1);
+      }
 
-    // 3. 복원된 게시글 조회
-    return await this.getPostById(id);
+      // 2. 복원
+      await tx
+        .update(postTable)
+        .set({ deletedAt: null })
+        .where(eq(postTable.id, id));
+
+      // 3. 복원된 게시글 조회
+      return await this.getPostByIdInternal(id, tx);
+    });
   }
 
   /**
@@ -694,7 +682,11 @@ export class PostService {
     await this.db.transaction(async (tx) => {
       // 모든 대상 게시글 존재 확인 (deletedAt 필터 없음 — 소프트 삭제된 글도 admin이 조작 가능)
       const found = await tx
-        .select({ id: postTable.id })
+        .select({
+          id: postTable.id,
+          isPinned: postTable.isPinned,
+          deletedAt: postTable.deletedAt,
+        })
         .from(postTable)
         .where(inArray(postTable.id, uniqueIds));
 
@@ -723,6 +715,14 @@ export class PostService {
           .set({ deletedAt: new Date() })
           .where(inArray(postTable.id, uniqueIds));
       } else if (action === "restore") {
+        const pinnedPostsToRestore = found.filter(
+          (post) => post.isPinned && post.deletedAt !== null,
+        ).length;
+
+        if (pinnedPostsToRestore > 0) {
+          await this.assertPinnedPostCapacity(tx, pinnedPostsToRestore);
+        }
+
         await tx
           .update(postTable)
           .set({ deletedAt: null })
@@ -961,5 +961,20 @@ export class PostService {
       .where(and(eq(postTable.isPinned, true), isNull(postTable.deletedAt)));
 
     return Number(result?.total ?? 0);
+  }
+
+  private async assertPinnedPostCapacity(
+    tx: Pick<MySql2Database<typeof schema>, "select" | "execute">,
+    additionalPinnedPosts: number,
+  ): Promise<void> {
+    await tx.execute(
+      sql.raw("SELECT id FROM post_tb WHERE deleted_at IS NULL FOR UPDATE"),
+    );
+
+    const pinnedCount = await this.countPinnedPosts(tx);
+
+    if (pinnedCount + additionalPinnedPosts > MAX_PINNED_POSTS) {
+      throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+    }
   }
 }
