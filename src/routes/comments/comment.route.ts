@@ -319,6 +319,7 @@ export function createAdminCommentRoute(
           params: CommentIdParamSchema,
           response: {
             200: AdminCommentRestoreResponseSchema,
+            400: ErrorResponseSchema,
             403: ErrorResponseSchema,
             404: ErrorResponseSchema,
           },
