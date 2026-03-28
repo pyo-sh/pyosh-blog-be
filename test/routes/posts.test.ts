@@ -203,6 +203,35 @@ describe("Post Routes", () => {
       const body = response.json();
       expect(body.post.publishedAt).not.toBeNull();
     });
+
+    it("6번째 pinned 생성 시도는 409 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      for (let i = 0; i < 5; i += 1) {
+        await seedPost(category.id, {
+          title: `Pinned Create ${i}`,
+          slug: `pinned-create-${i}`,
+          isPinned: true,
+        });
+      }
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Overflow Pinned Post",
+          contentMd: "# Overflow",
+          categoryId: category.id,
+          isPinned: true,
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain("Pinned post limit exceeded");
+    });
   });
 
   // ===== GET /api/posts =====
@@ -567,6 +596,61 @@ describe("Post Routes", () => {
       });
 
       expect(response.statusCode).toBe(403);
+    });
+
+    it("이미 pinned인 글은 5개가 있어도 수정 가능 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const pinnedPost = await seedPost(category.id, { isPinned: true });
+      for (let i = 0; i < 4; i += 1) {
+        await seedPost(category.id, {
+          title: `Pinned ${i}`,
+          slug: `pinned-${i}`,
+          isPinned: true,
+        });
+      }
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/posts/${pinnedPost.id}`,
+        headers: { cookie },
+        payload: { title: "Pinned Title Updated", isPinned: true },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().post.title).toBe("Pinned Title Updated");
+      expect(response.json().post.isPinned).toBe(true);
+    });
+
+    it("6번째 pinned 시도는 409 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      for (let i = 0; i < 5; i += 1) {
+        await seedPost(category.id, {
+          title: `Pinned Limit ${i}`,
+          slug: `pinned-limit-${i}`,
+          isPinned: true,
+        });
+      }
+      const targetPost = await seedPost(category.id, {
+        title: "Unpinned Target",
+        slug: "unpinned-target",
+        isPinned: false,
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/posts/${targetPost.id}`,
+        headers: { cookie },
+        payload: { isPinned: true },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain("Pinned post limit exceeded");
     });
   });
 
@@ -945,6 +1029,42 @@ describe("Post Routes", () => {
       const response = await app.inject({
         method: "GET",
         url: "/api/admin/posts",
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+  });
+
+  // ===== GET /api/admin/posts/pinned-count =====
+
+  describe("GET /api/admin/posts/pinned-count", () => {
+    it("삭제된 글을 제외한 pinned 수를 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      await seedPost(category.id, { isPinned: true });
+      await seedPost(category.id, { isPinned: true });
+      await seedPost(category.id, { isPinned: false });
+      await seedPost(category.id, {
+        isPinned: true,
+        deletedAt: new Date(),
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts/pinned-count",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ pinnedCount: 2 });
+    });
+
+    it("비인증 → 403", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts/pinned-count",
       });
 
       expect(response.statusCode).toBe(403);
@@ -1415,6 +1535,35 @@ describe("Post Routes", () => {
       expect(response.statusCode).toBe(200);
       expect(response.json().post.deletedAt).toBeNull();
     });
+
+    it("pinned 복원으로 6개가 되면 409 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      for (let i = 0; i < 5; i += 1) {
+        await seedPost(category.id, {
+          title: `Pinned Restore ${i}`,
+          slug: `pinned-restore-${i}`,
+          isPinned: true,
+        });
+      }
+      const deletedPinnedPost = await seedPost(category.id, {
+        title: "Deleted Pinned Post",
+        slug: "deleted-pinned-post",
+        isPinned: true,
+        deletedAt: new Date(),
+      });
+
+      const response = await app.inject({
+        method: "PUT",
+        url: `/api/admin/posts/${deletedPinnedPost.id}/restore`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain("Pinned post limit exceeded");
+    });
   });
 
   // ===== PATCH /api/admin/posts/bulk =====
@@ -1566,6 +1715,36 @@ describe("Post Routes", () => {
         headers: { cookie },
       });
       expect(getRes.json().post.deletedAt).toBeNull();
+    });
+
+    it("action=restore: pinned 복원으로 6개가 되면 409", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      for (let i = 0; i < 5; i += 1) {
+        await seedPost(category.id, {
+          title: `Pinned Bulk Restore ${i}`,
+          slug: `pinned-bulk-restore-${i}`,
+          isPinned: true,
+        });
+      }
+      const deletedPinnedPost = await seedPost(category.id, {
+        title: "Deleted Bulk Pinned Post",
+        slug: "deleted-bulk-pinned-post",
+        isPinned: true,
+        deletedAt: new Date(),
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/api/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [deletedPinnedPost.id], action: "restore" },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain("Pinned post limit exceeded");
     });
 
     it("action=hard_delete: 일괄 영구 삭제 → 204", async () => {

@@ -13,6 +13,7 @@ import {
   PostDetailResponseSchema,
   PostDetailWithNavigationResponseSchema,
   PostSlugsResponseSchema,
+  PinnedPostCountResponseSchema,
 } from "./post.schema";
 import { PostService } from "./post.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
@@ -191,6 +192,30 @@ export function createAdminPostRoute(
       },
     );
 
+    // GET /api/admin/posts/pinned-count - pinned 게시글 수 조회 (Admin)
+    typedFastify.get(
+      "/pinned-count",
+      {
+        preHandler: requireAdmin(adminService),
+        schema: {
+          tags: ["posts", "admin"],
+          summary: "Get pinned post count (Admin)",
+          description:
+            "삭제되지 않은 pinned 게시글 수를 authoritative count로 반환합니다.",
+          security: [{ cookieAuth: [] }],
+          response: {
+            200: PinnedPostCountResponseSchema,
+            403: ErrorResponseSchema,
+          },
+        },
+      },
+      async (_request, reply) => {
+        const result = await postService.getPinnedPostCount();
+
+        return reply.status(200).send(result);
+      },
+    );
+
     // GET /api/admin/posts/:id - 게시글 상세 조회 (Admin)
     typedFastify.get(
       "/:id",
@@ -245,6 +270,7 @@ export function createAdminPostRoute(
           response: {
             201: PostDetailResponseSchema,
             400: ErrorResponseSchema,
+            409: ErrorResponseSchema,
             403: ErrorResponseSchema,
           },
         },
@@ -300,6 +326,7 @@ export function createAdminPostRoute(
           response: {
             204: z.void(),
             400: ErrorResponseSchema,
+            409: ErrorResponseSchema,
             403: ErrorResponseSchema,
           },
         },
@@ -336,6 +363,7 @@ export function createAdminPostRoute(
           response: {
             200: PostDetailResponseSchema,
             400: ErrorResponseSchema,
+            409: ErrorResponseSchema,
             403: ErrorResponseSchema,
             404: ErrorResponseSchema,
           },
@@ -414,6 +442,7 @@ export function createAdminPostRoute(
           params: PostIdParamSchema,
           response: {
             200: PostDetailResponseSchema,
+            409: ErrorResponseSchema,
             403: ErrorResponseSchema,
             404: ErrorResponseSchema,
           },

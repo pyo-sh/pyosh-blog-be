@@ -224,6 +224,10 @@ export const PostDetailWithNavigationResponseSchema = z.object({
   nextPost: PostNavigationSchema.nullable().describe("다음 게시글 (없으면 null)"),
 });
 
+export const PinnedPostCountResponseSchema = z.object({
+  pinnedCount: z.number().int().nonnegative().describe("삭제되지 않은 pinned 게시글 수"),
+});
+
 /**
  * Type exports
  */
