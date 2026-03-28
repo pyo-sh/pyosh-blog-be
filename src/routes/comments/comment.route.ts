@@ -304,7 +304,7 @@ export function createAdminCommentRoute(
       },
     );
 
-    // PUT /api/admin/comments/:id/restore - 댓글 복원 (deleted → active)
+    // PUT /api/admin/comments/:id/restore - 댓글 복원 (deleted | hidden → active)
     typedFastify.put(
       "/comments/:id/restore",
       {
@@ -312,7 +312,7 @@ export function createAdminCommentRoute(
           tags: ["admin", "comments"],
           summary: "관리자 댓글 복원",
           description:
-            "삭제된 댓글을 active 상태로 복원합니다.\n\n" +
+            "deleted 또는 hidden 상태 댓글을 active 상태로 복원합니다. active 상태 댓글은 400을 반환합니다.\n\n" +
             "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
@@ -342,7 +342,7 @@ export function createAdminCommentRoute(
           tags: ["admin", "comments"],
           summary: "관리자 댓글 벌크 작업",
           description:
-            "여러 댓글을 한 번에 복원, 소프트 삭제, 또는 하드 삭제합니다.\n\n" +
+            "여러 댓글을 한 번에 복원, 소프트 삭제, 또는 하드 삭제합니다. restore는 deleted 또는 hidden 상태를 active로 복원합니다.\n\n" +
             "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],

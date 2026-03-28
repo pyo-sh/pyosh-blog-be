@@ -425,7 +425,7 @@ export class CommentService {
   }
 
   /**
-   * 댓글 복원 (deleted → active)
+   * 댓글 복원 (deleted | hidden → active)
    *
    * @param commentId 댓글 ID
    */
@@ -440,8 +440,8 @@ export class CommentService {
       throw HttpError.notFound("Comment not found.");
     }
 
-    if (comment.status !== "deleted") {
-      throw HttpError.badRequest("Comment is not deleted.");
+    if (comment.status !== "deleted" && comment.status !== "hidden") {
+      throw HttpError.badRequest("Comment is not restorable.");
     }
 
     await this.db
@@ -620,7 +620,7 @@ export class CommentService {
         .where(
           and(
             inArray(commentTable.id, ids),
-            eq(commentTable.status, "deleted"),
+            inArray(commentTable.status, ["deleted", "hidden"]),
           ),
         );
     } else if (action === "soft_delete") {
