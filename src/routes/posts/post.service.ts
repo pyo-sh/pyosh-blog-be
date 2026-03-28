@@ -1,8 +1,20 @@
-import { eq, and, isNull, sql, inArray, lt, gt, desc, asc, like, or } from "drizzle-orm";
+import {
+  eq,
+  and,
+  isNull,
+  sql,
+  inArray,
+  lt,
+  gt,
+  desc,
+  asc,
+  like,
+  or,
+} from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import type { PoolConnection } from "mysql2/promise";
-import { categoryTable } from "@src/db/schema/categories";
 import { connection } from "@src/db/client";
+import { categoryTable } from "@src/db/schema/categories";
 import { commentTable } from "@src/db/schema/comments";
 import * as schema from "@src/db/schema/index";
 import { postTagTable } from "@src/db/schema/post-tags";
@@ -67,7 +79,13 @@ export interface GetPostListQuery {
   categoryId?: number;
   tagSlug?: string;
   q?: string;
-  filter?: "title_content" | "title" | "content" | "tag" | "category" | "comment";
+  filter?:
+    | "title_content"
+    | "title"
+    | "content"
+    | "tag"
+    | "category"
+    | "comment";
   status?: "draft" | "published" | "archived";
   visibility?: "public" | "private";
   sort?: "published_at" | "created_at" | "totalPageviews" | "commentCount";
@@ -97,7 +115,7 @@ interface PostListCategory {
  * 카테고리 정보 (상세용 - ancestors 포함)
  */
 interface PostDetailCategory extends PostListCategory {
-  ancestors: { name: string; slug: string }[];
+  ancestors: Array<{ name: string; slug: string }>;
 }
 
 /**
@@ -111,18 +129,20 @@ interface PostAggregates {
 /**
  * 게시글 목록 항목 (contentMd 제외)
  */
-export type PostListItem = Omit<Post, "contentMd"> & PostAggregates & {
-  category: PostListCategory;
-  tags: PostTag[];
-};
+export type PostListItem = Omit<Post, "contentMd"> &
+  PostAggregates & {
+    category: PostListCategory;
+    tags: PostTag[];
+  };
 
 /**
  * 게시글 상세 정보 (관계 + 집계 포함)
  */
-export type PostDetail = Post & PostAggregates & {
-  category: PostDetailCategory;
-  tags: PostTag[];
-};
+export type PostDetail = Post &
+  PostAggregates & {
+    category: PostDetailCategory;
+    tags: PostTag[];
+  };
 
 /**
  * 이전/다음 글 정보
@@ -166,15 +186,7 @@ export class PostService {
    * 게시글 생성 (트랜잭션)
    */
   async createPost(input: CreatePostInput): Promise<PostDetail> {
-    return await this.withPinnedPostLimitLock(async () => {
-      if (input.isPinned === true) {
-        const pinnedCount = await this.countPinnedPosts(this.db);
-
-        if (pinnedCount + 1 > MAX_PINNED_POSTS) {
-          throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
-        }
-      }
-
+    const runCreate = async () => {
       // MySQL REPEATABLE READ isolation 회피: 트랜잭션 시작 전에 태그 조회/생성
       const tagIds: number[] =
         input.tags && input.tags.length > 0
@@ -182,90 +194,94 @@ export class PostService {
           : [];
 
       return await this.db.transaction(async (tx) => {
-      // 1. slug 생성 및 중복 확인
-      const baseSlug = generateSlug(input.title);
-      const slug = await ensureUniqueSlug(baseSlug, async (checkSlug) => {
-        const existing = await tx
-          .select()
-          .from(postTable)
-          .where(eq(postTable.slug, checkSlug))
-          .limit(1);
+        // 1. slug 생성 및 중복 확인
+        const baseSlug = generateSlug(input.title);
+        const slug = await ensureUniqueSlug(baseSlug, async (checkSlug) => {
+          const existing = await tx
+            .select()
+            .from(postTable)
+            .where(eq(postTable.slug, checkSlug))
+            .limit(1);
 
-        return existing.length > 0;
+          return existing.length > 0;
+        });
+
+        // 2. status가 'published'이고 publishedAt이 없으면 자동 설정
+        let publishedAt = input.publishedAt;
+        if (input.status === "published" && !publishedAt) {
+          publishedAt = new Date();
+        }
+
+        // 3. 게시글 생성
+        const newPost: NewPost = {
+          title: input.title,
+          slug,
+          contentMd: input.contentMd,
+          categoryId: input.categoryId,
+          summary: input.summary ?? null,
+          description: input.description ?? null,
+          thumbnailUrl: input.thumbnailUrl ?? null,
+          visibility: input.visibility ?? "public",
+          status: input.status ?? "draft",
+          commentStatus: input.commentStatus ?? "open",
+          isPinned: input.isPinned ?? false,
+          publishedAt,
+        };
+
+        const [result] = await tx.insert(postTable).values(newPost);
+        const postId = result.insertId;
+
+        // 4. 태그 연결
+        if (tagIds.length > 0) {
+          await tx
+            .insert(postTagTable)
+            .values(tagIds.map((tagId) => ({ postId, tagId })));
+        }
+
+        // 5. 생성된 게시글 전체 조회
+        return await this.getPostByIdInternal(postId, tx);
       });
+    };
 
-      // 2. status가 'published'이고 publishedAt이 없으면 자동 설정
-      let publishedAt = input.publishedAt;
-      if (input.status === "published" && !publishedAt) {
-        publishedAt = new Date();
-      }
+    if (input.isPinned === true) {
+      return await this.withPinnedPostLimitLock(async () => {
+        const pinnedCount = await this.countPinnedPosts(this.db);
 
-      // 3. 게시글 생성
-      const newPost: NewPost = {
-        title: input.title,
-        slug,
-        contentMd: input.contentMd,
-        categoryId: input.categoryId,
-        summary: input.summary ?? null,
-        description: input.description ?? null,
-        thumbnailUrl: input.thumbnailUrl ?? null,
-        visibility: input.visibility ?? "public",
-        status: input.status ?? "draft",
-        commentStatus: input.commentStatus ?? "open",
-        isPinned: input.isPinned ?? false,
-        publishedAt,
-      };
+        if (pinnedCount + 1 > MAX_PINNED_POSTS) {
+          throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+        }
 
-      const [result] = await tx.insert(postTable).values(newPost);
-      const postId = result.insertId;
-
-      // 4. 태그 연결
-      if (tagIds.length > 0) {
-        await tx
-          .insert(postTagTable)
-          .values(tagIds.map((tagId) => ({ postId, tagId })));
-      }
-
-      // 5. 생성된 게시글 전체 조회
-      return await this.getPostByIdInternal(postId, tx);
+        return await runCreate();
       });
-    });
+    }
+
+    return await runCreate();
   }
 
   /**
    * 게시글 수정 (트랜잭션)
    */
   async updatePost(id: number, input: UpdatePostInput): Promise<PostDetail> {
-    return await this.withPinnedPostLimitLock(async () => {
-      let existingPostForPinnedCheck:
-        | Pick<Post, "id" | "isPinned">
-        | undefined;
+    let existingPostForPinnedCheck: Pick<Post, "id" | "isPinned"> | undefined;
 
-      if (input.isPinned === true) {
-        const [existingPost] = await this.db
-          .select({
-            id: postTable.id,
-            isPinned: postTable.isPinned,
-          })
-          .from(postTable)
-          .where(eq(postTable.id, id))
-          .limit(1);
+    if (input.isPinned === true) {
+      const [existingPost] = await this.db
+        .select({
+          id: postTable.id,
+          isPinned: postTable.isPinned,
+        })
+        .from(postTable)
+        .where(eq(postTable.id, id))
+        .limit(1);
 
-        if (!existingPost) {
-          throw HttpError.notFound("Post not found.");
-        }
-
-        existingPostForPinnedCheck = existingPost;
-
-        if (!existingPost.isPinned) {
-          const pinnedCount = await this.countPinnedPosts(this.db);
-
-          if (pinnedCount + 1 > MAX_PINNED_POSTS) {
-            throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
-          }
-        }
+      if (!existingPost) {
+        throw HttpError.notFound("Post not found.");
       }
 
+      existingPostForPinnedCheck = existingPost;
+    }
+
+    const runUpdate = async () => {
       // MySQL REPEATABLE READ isolation 회피: 트랜잭션 시작 전에 태그 조회/생성
       const newTagIds: number[] | undefined =
         input.tags !== undefined
@@ -273,58 +289,76 @@ export class PostService {
           : undefined;
 
       return await this.db.transaction(async (tx) => {
-      // 1. 게시글 존재 확인
-      const existing = await tx
-        .select()
-        .from(postTable)
-        .where(eq(postTable.id, id))
-        .limit(1);
+        // 1. 게시글 존재 확인
+        const existing = await tx
+          .select()
+          .from(postTable)
+          .where(eq(postTable.id, id))
+          .limit(1);
 
-      if (existing.length === 0) {
-        throw HttpError.notFound("Post not found.");
-      }
-
-      const [currentPost] = existing;
-
-      if (
-        input.isPinned === true &&
-        existingPostForPinnedCheck !== undefined &&
-        !existingPostForPinnedCheck.isPinned &&
-        currentPost.isPinned
-      ) {
-        throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
-      }
-
-      // 2. 게시글 수정
-      const updateData: Partial<NewPost> = {
-        ...input,
-        updatedAt: new Date(),
-      };
-
-      // contentMd가 변경되면 contentModifiedAt 자동 갱신
-      if (input.contentMd !== undefined) {
-        updateData.contentModifiedAt = new Date();
-      }
-
-      await tx.update(postTable).set(updateData).where(eq(postTable.id, id));
-
-      // 3. 태그 갱신 (undefined vs 빈 배열 구분)
-      if (newTagIds !== undefined) {
-        // 기존 태그 연결 삭제
-        await tx.delete(postTagTable).where(eq(postTagTable.postId, id));
-
-        // 새 태그 연결
-        if (newTagIds.length > 0) {
-          await tx
-            .insert(postTagTable)
-            .values(newTagIds.map((tagId) => ({ postId: id, tagId })));
+        if (existing.length === 0) {
+          throw HttpError.notFound("Post not found.");
         }
+
+        const [currentPost] = existing;
+
+        if (
+          input.isPinned === true &&
+          existingPostForPinnedCheck !== undefined &&
+          !existingPostForPinnedCheck.isPinned &&
+          currentPost.isPinned
+        ) {
+          throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+        }
+
+        // 2. 게시글 수정
+        const updateData: Partial<NewPost> = {
+          ...input,
+          updatedAt: new Date(),
+        };
+
+        // contentMd가 변경되면 contentModifiedAt 자동 갱신
+        if (input.contentMd !== undefined) {
+          updateData.contentModifiedAt = new Date();
+        }
+
+        await tx.update(postTable).set(updateData).where(eq(postTable.id, id));
+
+        // 3. 태그 갱신 (undefined vs 빈 배열 구분)
+        if (newTagIds !== undefined) {
+          // 기존 태그 연결 삭제
+          await tx.delete(postTagTable).where(eq(postTagTable.postId, id));
+
+          // 새 태그 연결
+          if (newTagIds.length > 0) {
+            await tx
+              .insert(postTagTable)
+              .values(newTagIds.map((tagId) => ({ postId: id, tagId })));
+          }
+        }
+
+        // 4. 수정된 게시글 전체 조회
+        return await this.getPostByIdInternal(id, tx);
+      });
+    };
+
+    if (input.isPinned === true && existingPostForPinnedCheck !== undefined) {
+      if (existingPostForPinnedCheck.isPinned) {
+        return await runUpdate();
       }
 
-      // 4. 수정된 게시글 전체 조회
-      return await this.getPostByIdInternal(id, tx);
+      return await this.withPinnedPostLimitLock(async () => {
+        const pinnedCount = await this.countPinnedPosts(this.db);
+
+        if (pinnedCount + 1 > MAX_PINNED_POSTS) {
+          throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+        }
+
+        return await runUpdate();
       });
-    });
+    }
+
+    return await runUpdate();
   }
 
   /**
@@ -404,7 +438,9 @@ export class PostService {
         const matchedComments = await this.db
           .select({ postId: commentTable.postId })
           .from(commentTable)
-          .where(and(like(commentTable.body, term), isNull(commentTable.deletedAt)));
+          .where(
+            and(like(commentTable.body, term), isNull(commentTable.deletedAt)),
+          );
         const postIds = [...new Set(matchedComments.map((c) => c.postId))];
         if (postIds.length === 0) {
           return buildPaginatedResponse([], 0, page, limit);
@@ -468,7 +504,9 @@ export class PostService {
         .select({
           postId: statsDailyTable.postId,
           totalPageviews:
-            sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`.as("totalPageviews"),
+            sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`.as(
+              "totalPageviews",
+            ),
         })
         .from(statsDailyTable)
         .groupBy(statsDailyTable.postId)
@@ -495,7 +533,10 @@ export class PostService {
         .leftJoin(statsSubquery, eq(statsSubquery.postId, postTable.id))
         .leftJoin(commentsSubquery, eq(commentsSubquery.postId, postTable.id))
         .where(whereClause)
-        .orderBy(sql`${aggregateColumn} ${orderFn}`, sql`${postTable.id} ${orderFn}`)
+        .orderBy(
+          sql`${aggregateColumn} ${orderFn}`,
+          sql`${postTable.id} ${orderFn}`,
+        )
         .limit(limit)
         .offset(offset);
 
@@ -644,25 +685,17 @@ export class PostService {
    * 게시글 복원
    */
   async restorePost(id: number): Promise<PostDetail> {
-    return await this.withPinnedPostLimitLock(async () => {
-      const [post] = await this.db
-        .select()
-        .from(postTable)
-        .where(eq(postTable.id, id))
-        .limit(1);
+    const [post] = await this.db
+      .select()
+      .from(postTable)
+      .where(eq(postTable.id, id))
+      .limit(1);
 
-      if (!post) {
-        throw HttpError.notFound("게시글을 찾을 수 없습니다");
-      }
+    if (!post) {
+      throw HttpError.notFound("게시글을 찾을 수 없습니다");
+    }
 
-      if (post.isPinned && post.deletedAt !== null) {
-        const pinnedCount = await this.countPinnedPosts(this.db);
-
-        if (pinnedCount + 1 > MAX_PINNED_POSTS) {
-          throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
-        }
-      }
-
+    const runRestore = async () => {
       return await this.db.transaction(async (tx) => {
         // 2. 복원
         await tx
@@ -673,7 +706,21 @@ export class PostService {
         // 3. 복원된 게시글 조회
         return await this.getPostByIdInternal(id, tx);
       });
-    });
+    };
+
+    if (post.isPinned && post.deletedAt !== null) {
+      return await this.withPinnedPostLimitLock(async () => {
+        const pinnedCount = await this.countPinnedPosts(this.db);
+
+        if (pinnedCount + 1 > MAX_PINNED_POSTS) {
+          throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+        }
+
+        return await runRestore();
+      });
+    }
+
+    return await runRestore();
   }
 
   /**
@@ -731,78 +778,109 @@ export class PostService {
 
     const run = async () =>
       await this.db.transaction(async (tx) => {
-      // 모든 대상 게시글 존재 확인 (deletedAt 필터 없음 — 소프트 삭제된 글도 admin이 조작 가능)
-      const found = await tx
-        .select({
-          id: postTable.id,
-          isPinned: postTable.isPinned,
-          deletedAt: postTable.deletedAt,
-        })
-        .from(postTable)
-        .where(inArray(postTable.id, uniqueIds));
-
-      if (found.length !== uniqueIds.length) {
-        throw HttpError.notFound("One or more posts not found.");
-      }
-
-      if (action === "update") {
-        if (input.categoryId !== undefined) {
-          const [cat] = await tx
-            .select({ id: categoryTable.id })
-            .from(categoryTable)
-            .where(eq(categoryTable.id, input.categoryId))
-            .limit(1);
-          if (!cat) throw HttpError.notFound(`Category ${input.categoryId} not found.`);
-        }
-        const updateData: Partial<{ categoryId: number; commentStatus: "open" | "locked" | "disabled"; updatedAt: Date }> = {
-          updatedAt: new Date(),
-        };
-        if (input.categoryId !== undefined) updateData.categoryId = input.categoryId;
-        if (input.commentStatus !== undefined) updateData.commentStatus = input.commentStatus;
-        await tx.update(postTable).set(updateData).where(inArray(postTable.id, uniqueIds));
-      } else if (action === "soft_delete") {
-        await tx
-          .update(postTable)
-          .set({ deletedAt: new Date() })
+        // 모든 대상 게시글 존재 확인 (deletedAt 필터 없음 — 소프트 삭제된 글도 admin이 조작 가능)
+        const found = await tx
+          .select({
+            id: postTable.id,
+            isPinned: postTable.isPinned,
+            deletedAt: postTable.deletedAt,
+          })
+          .from(postTable)
           .where(inArray(postTable.id, uniqueIds));
-      } else if (action === "restore") {
-        const pinnedPostsToRestore = found.filter(
-          (post) => post.isPinned && post.deletedAt !== null,
-        ).length;
 
-        if (pinnedPostsToRestore > 0) {
-          const pinnedCount = await this.countPinnedPosts(tx);
+        if (found.length !== uniqueIds.length) {
+          throw HttpError.notFound("One or more posts not found.");
+        }
 
-          if (pinnedCount + pinnedPostsToRestore > MAX_PINNED_POSTS) {
-            throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+        if (action === "update") {
+          if (input.categoryId !== undefined) {
+            const [cat] = await tx
+              .select({ id: categoryTable.id })
+              .from(categoryTable)
+              .where(eq(categoryTable.id, input.categoryId))
+              .limit(1);
+            if (!cat)
+              throw HttpError.notFound(
+                `Category ${input.categoryId} not found.`,
+              );
           }
+          const updateData: Partial<{
+            categoryId: number;
+            commentStatus: "open" | "locked" | "disabled";
+            updatedAt: Date;
+          }> = {
+            updatedAt: new Date(),
+          };
+          if (input.categoryId !== undefined)
+            updateData.categoryId = input.categoryId;
+          if (input.commentStatus !== undefined)
+            updateData.commentStatus = input.commentStatus;
+          await tx
+            .update(postTable)
+            .set(updateData)
+            .where(inArray(postTable.id, uniqueIds));
+        } else if (action === "soft_delete") {
+          await tx
+            .update(postTable)
+            .set({ deletedAt: new Date() })
+            .where(inArray(postTable.id, uniqueIds));
+        } else if (action === "restore") {
+          const pinnedPostsToRestore = found.filter(
+            (post) => post.isPinned && post.deletedAt !== null,
+          ).length;
+
+          if (pinnedPostsToRestore > 0) {
+            const pinnedCount = await this.countPinnedPosts(tx);
+
+            if (pinnedCount + pinnedPostsToRestore > MAX_PINNED_POSTS) {
+              throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+            }
+          }
+
+          await tx
+            .update(postTable)
+            .set({ deletedAt: null })
+            .where(inArray(postTable.id, uniqueIds));
+        } else if (action === "hard_delete") {
+          // 연결된 tagId 수집 (고아 태그 감지용)
+          const linkedTags = await tx
+            .select({ tagId: postTagTable.tagId })
+            .from(postTagTable)
+            .where(inArray(postTagTable.postId, uniqueIds));
+          const linkedTagIds = [...new Set(linkedTags.map((r) => r.tagId))];
+
+          // 댓글, 통계, 태그 관계, 게시글 순서로 삭제
+          await tx
+            .delete(commentTable)
+            .where(inArray(commentTable.postId, uniqueIds));
+          await tx
+            .delete(statsDailyTable)
+            .where(inArray(statsDailyTable.postId, uniqueIds));
+          await tx
+            .delete(postTagTable)
+            .where(inArray(postTagTable.postId, uniqueIds));
+          await tx.delete(postTable).where(inArray(postTable.id, uniqueIds));
+
+          // 고아 태그 삭제
+          await this.cleanOrphanTags(tx, linkedTagIds);
         }
-
-        await tx
-          .update(postTable)
-          .set({ deletedAt: null })
-          .where(inArray(postTable.id, uniqueIds));
-      } else if (action === "hard_delete") {
-        // 연결된 tagId 수집 (고아 태그 감지용)
-        const linkedTags = await tx
-          .select({ tagId: postTagTable.tagId })
-          .from(postTagTable)
-          .where(inArray(postTagTable.postId, uniqueIds));
-        const linkedTagIds = [...new Set(linkedTags.map((r) => r.tagId))];
-
-        // 댓글, 통계, 태그 관계, 게시글 순서로 삭제
-        await tx.delete(commentTable).where(inArray(commentTable.postId, uniqueIds));
-        await tx.delete(statsDailyTable).where(inArray(statsDailyTable.postId, uniqueIds));
-        await tx.delete(postTagTable).where(inArray(postTagTable.postId, uniqueIds));
-        await tx.delete(postTable).where(inArray(postTable.id, uniqueIds));
-
-        // 고아 태그 삭제
-        await this.cleanOrphanTags(tx, linkedTagIds);
-      }
       });
 
-    if (action === "restore") {
+    const shouldLockRestore =
+      action === "restore" &&
+      (
+        await this.db
+          .select({
+            isPinned: postTable.isPinned,
+            deletedAt: postTable.deletedAt,
+          })
+          .from(postTable)
+          .where(inArray(postTable.id, uniqueIds))
+      ).some((post) => post.isPinned && post.deletedAt !== null);
+
+    if (shouldLockRestore) {
       await this.withPinnedPostLimitLock(run);
+
       return;
     }
 
@@ -838,27 +916,46 @@ export class PostService {
     const postIds = posts.map((p) => p.id);
     const categoryIds = [...new Set(posts.map((p) => p.categoryId))];
 
-    const [categories, allPostTags, statsRows, commentRows] = await Promise.all([
-      this.db
-        .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug })
-        .from(categoryTable)
-        .where(inArray(categoryTable.id, categoryIds)),
-      this.db
-        .select({ postId: postTagTable.postId, id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
-        .from(postTagTable)
-        .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
-        .where(inArray(postTagTable.postId, postIds)),
-      this.db
-        .select({ postId: statsDailyTable.postId, total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)` })
-        .from(statsDailyTable)
-        .where(inArray(statsDailyTable.postId, postIds))
-        .groupBy(statsDailyTable.postId),
-      this.db
-        .select({ postId: commentTable.postId, count: sql<number>`COUNT(*)` })
-        .from(commentTable)
-        .where(and(inArray(commentTable.postId, postIds), isNull(commentTable.deletedAt)))
-        .groupBy(commentTable.postId),
-    ]);
+    const [categories, allPostTags, statsRows, commentRows] = await Promise.all(
+      [
+        this.db
+          .select({
+            id: categoryTable.id,
+            name: categoryTable.name,
+            slug: categoryTable.slug,
+          })
+          .from(categoryTable)
+          .where(inArray(categoryTable.id, categoryIds)),
+        this.db
+          .select({
+            postId: postTagTable.postId,
+            id: tagTable.id,
+            name: tagTable.name,
+            slug: tagTable.slug,
+          })
+          .from(postTagTable)
+          .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
+          .where(inArray(postTagTable.postId, postIds)),
+        this.db
+          .select({
+            postId: statsDailyTable.postId,
+            total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`,
+          })
+          .from(statsDailyTable)
+          .where(inArray(statsDailyTable.postId, postIds))
+          .groupBy(statsDailyTable.postId),
+        this.db
+          .select({ postId: commentTable.postId, count: sql<number>`COUNT(*)` })
+          .from(commentTable)
+          .where(
+            and(
+              inArray(commentTable.postId, postIds),
+              isNull(commentTable.deletedAt),
+            ),
+          )
+          .groupBy(commentTable.postId),
+      ],
+    );
 
     const catMap = new Map(categories.map((c) => [c.id, c]));
     const tagsMap = new Map<number, PostTag[]>();
@@ -867,11 +964,17 @@ export class PostService {
       tagsMap.get(t.postId)!.push({ id: t.id, name: t.name, slug: t.slug });
     }
     const statsMap = new Map(statsRows.map((r) => [r.postId, Number(r.total)]));
-    const commentMap = new Map(commentRows.map((r) => [r.postId, Number(r.count)]));
+    const commentMap = new Map(
+      commentRows.map((r) => [r.postId, Number(r.count)]),
+    );
 
     return posts.map(({ contentMd: _c, ...post }) => {
       const category = catMap.get(post.categoryId);
-      if (!category) throw HttpError.notFound(`Category ${post.categoryId} not found for post ${post.id}`);
+      if (!category)
+        throw HttpError.notFound(
+          `Category ${post.categoryId} not found for post ${post.id}`,
+        );
+
       return {
         ...post,
         category,
@@ -889,7 +992,11 @@ export class PostService {
     const [category, postTags, totalPageviews, commentCount, ancestors] =
       await Promise.all([
         this.db
-          .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug })
+          .select({
+            id: categoryTable.id,
+            name: categoryTable.name,
+            slug: categoryTable.slug,
+          })
           .from(categoryTable)
           .where(eq(categoryTable.id, post.categoryId))
           .limit(1)
@@ -900,19 +1007,29 @@ export class PostService {
           .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
           .where(eq(postTagTable.postId, post.id)),
         this.db
-          .select({ total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)` })
+          .select({
+            total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`,
+          })
           .from(statsDailyTable)
           .where(eq(statsDailyTable.postId, post.id))
           .then((rows) => Number(rows[0]?.total ?? 0)),
         this.db
           .select({ count: sql<number>`COUNT(*)` })
           .from(commentTable)
-          .where(and(eq(commentTable.postId, post.id), isNull(commentTable.deletedAt)))
+          .where(
+            and(
+              eq(commentTable.postId, post.id),
+              isNull(commentTable.deletedAt),
+            ),
+          )
           .then((rows) => Number(rows[0]?.count ?? 0)),
         this.fetchCategoryAncestors(post.categoryId, this.db),
       ]);
 
-    if (!category) throw HttpError.notFound(`Category ${post.categoryId} not found for post ${post.id}`);
+    if (!category)
+      throw HttpError.notFound(
+        `Category ${post.categoryId} not found for post ${post.id}`,
+      );
 
     return {
       ...post,
@@ -929,8 +1046,8 @@ export class PostService {
   private async fetchCategoryAncestors(
     categoryId: number,
     db: MySql2Database<typeof schema>,
-  ): Promise<{ name: string; slug: string }[]> {
-    const ancestors: { name: string; slug: string }[] = [];
+  ): Promise<Array<{ name: string; slug: string }>> {
+    const ancestors: Array<{ name: string; slug: string }> = [];
     const visited = new Set<number>([categoryId]);
 
     const [direct] = await db
@@ -947,7 +1064,12 @@ export class PostService {
       depth++;
       visited.add(parentId);
       const [parent] = await db
-        .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug, parentId: categoryTable.parentId })
+        .select({
+          id: categoryTable.id,
+          name: categoryTable.name,
+          slug: categoryTable.slug,
+          parentId: categoryTable.parentId,
+        })
         .from(categoryTable)
         .where(eq(categoryTable.id, parentId))
         .limit(1);
@@ -980,7 +1102,11 @@ export class PostService {
     const [category, postTags, totalPageviews, commentCount, ancestors] =
       await Promise.all([
         tx
-          .select({ id: categoryTable.id, name: categoryTable.name, slug: categoryTable.slug })
+          .select({
+            id: categoryTable.id,
+            name: categoryTable.name,
+            slug: categoryTable.slug,
+          })
           .from(categoryTable)
           .where(eq(categoryTable.id, post.categoryId))
           .limit(1)
@@ -991,19 +1117,29 @@ export class PostService {
           .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
           .where(eq(postTagTable.postId, post.id)),
         tx
-          .select({ total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)` })
+          .select({
+            total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`,
+          })
           .from(statsDailyTable)
           .where(eq(statsDailyTable.postId, post.id))
           .then((rows) => Number(rows[0]?.total ?? 0)),
         tx
           .select({ count: sql<number>`COUNT(*)` })
           .from(commentTable)
-          .where(and(eq(commentTable.postId, post.id), isNull(commentTable.deletedAt)))
+          .where(
+            and(
+              eq(commentTable.postId, post.id),
+              isNull(commentTable.deletedAt),
+            ),
+          )
           .then((rows) => Number(rows[0]?.count ?? 0)),
         this.fetchCategoryAncestors(post.categoryId, tx),
       ]);
 
-    if (!category) throw HttpError.notFound(`Category ${post.categoryId} not found for post ${post.id}`);
+    if (!category)
+      throw HttpError.notFound(
+        `Category ${post.categoryId} not found for post ${post.id}`,
+      );
 
     return {
       ...post,
@@ -1025,7 +1161,9 @@ export class PostService {
     return Number(result?.total ?? 0);
   }
 
-  private async withPinnedPostLimitLock<T>(operation: () => Promise<T>): Promise<T> {
+  private async withPinnedPostLimitLock<T>(
+    operation: () => Promise<T>,
+  ): Promise<T> {
     const lockConnection = await connection.getConnection();
 
     try {
