@@ -59,10 +59,38 @@ describe("Comment Routes", () => {
       expect(body.data.author.type).toBe("guest");
       expect(body.data.author.name).toBe("홍길동");
       expect(body.data.depth).toBe(0);
+      expect(body.revealToken).toBeNull();
+    });
+
+    it("게스트 비밀 댓글 작성 시 revealToken 발급 → 201", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "게스트 비밀 댓글입니다.",
+          guestName: "홍길동",
+          guestPassword: "pass1234",
+          isSecret: true,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+
+      const body = response.json();
+      expect(body.data.body).toBe("게스트 비밀 댓글입니다.");
+      expect(body.data.isSecret).toBe(true);
+      expect(typeof body.revealToken).toBe("string");
+      expect(body.revealToken.length).toBeGreaterThan(20);
     });
 
     it("OAuth 사용자 댓글 작성 → 201", async () => {
-      const user = await seedOAuthUser({ displayName:"OAuth User" });
+      const user = await seedOAuthUser({ displayName: "OAuth User" });
       const cookie = await injectOAuthUser(user.id);
 
       const category = await seedCategory();
@@ -288,7 +316,7 @@ describe("Comment Routes", () => {
     });
 
     it("비밀 댓글 마스킹 확인", async () => {
-      const user = await seedOAuthUser({ displayName:"Secret Author" });
+      const user = await seedOAuthUser({ displayName: "Secret Author" });
       const cookie = await injectOAuthUser(user.id);
 
       const category = await seedCategory();
@@ -328,6 +356,122 @@ describe("Comment Routes", () => {
       expect(authorResponse.statusCode).toBe(200);
       const authorBody = authorResponse.json();
       expect(authorBody.data[0].body).toBe("비밀 내용입니다.");
+    });
+
+    it("게스트 비밀 댓글은 revealToken으로 원문 복원 가능", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const createResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "게스트 비밀 원문",
+          guestName: "비밀 작성자",
+          guestPassword: "pass1234",
+          isSecret: true,
+        },
+      });
+
+      expect(createResponse.statusCode).toBe(201);
+      const { data: comment, revealToken } = createResponse.json();
+
+      const publicResponse = await app.inject({
+        method: "GET",
+        url: `/api/posts/${post.id}/comments`,
+      });
+      expect(publicResponse.statusCode).toBe(200);
+      expect(publicResponse.json().data[0].body).toBe(
+        "This comment is secret.",
+      );
+
+      const revealResponse = await app.inject({
+        method: "POST",
+        url: `/api/comments/${comment.id}/reveal`,
+        payload: { revealToken },
+      });
+
+      expect(revealResponse.statusCode).toBe(200);
+      expect(revealResponse.json().data.body).toBe("게스트 비밀 원문");
+    });
+
+    it("다른 댓글의 revealToken으로는 원문 복원 불가", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const firstCreate = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "첫 번째 비밀 댓글",
+          guestName: "작성자1",
+          guestPassword: "pass1234",
+          isSecret: true,
+        },
+      });
+      const secondCreate = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "두 번째 비밀 댓글",
+          guestName: "작성자2",
+          guestPassword: "pass5678",
+          isSecret: true,
+        },
+      });
+
+      const first = firstCreate.json();
+      const second = secondCreate.json();
+
+      const revealResponse = await app.inject({
+        method: "POST",
+        url: `/api/comments/${second.data.id}/reveal`,
+        payload: { revealToken: first.revealToken },
+      });
+
+      expect(revealResponse.statusCode).toBe(403);
+    });
+
+    it("삭제된 비밀 댓글은 revealToken으로도 복원 불가", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const createResponse = await app.inject({
+        method: "POST",
+        url: `/api/posts/${post.id}/comments`,
+        payload: {
+          body: "삭제될 비밀 댓글",
+          guestName: "삭제자",
+          guestPassword: "pass1234",
+          isSecret: true,
+        },
+      });
+
+      const { data: comment, revealToken } = createResponse.json();
+
+      const deleteResponse = await app.inject({
+        method: "DELETE",
+        url: `/api/comments/${comment.id}`,
+        payload: { guestPassword: "pass1234" },
+      });
+      expect(deleteResponse.statusCode).toBe(204);
+
+      const revealResponse = await app.inject({
+        method: "POST",
+        url: `/api/comments/${comment.id}/reveal`,
+        payload: { revealToken },
+      });
+
+      expect(revealResponse.statusCode).toBe(404);
     });
   });
 
@@ -372,10 +516,10 @@ describe("Comment Routes", () => {
     });
 
     it("다른 사용자의 댓글 삭제 시도 → 403", async () => {
-      const userA = await seedOAuthUser({ displayName:"User A" });
+      const userA = await seedOAuthUser({ displayName: "User A" });
       const cookieA = await injectOAuthUser(userA.id);
 
-      const userB = await seedOAuthUser({ displayName:"User B" });
+      const userB = await seedOAuthUser({ displayName: "User B" });
       const cookieB = await injectOAuthUser(userB.id);
 
       const category = await seedCategory();

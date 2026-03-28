@@ -17,7 +17,7 @@ export interface OAuthAuthor {
 export interface GuestAuthor {
   type: "guest";
   name: string;
-  email: string;
+  email?: string;
   password: string;
 }
 

@@ -1,4 +1,14 @@
-import { eq, and, isNull, sql, gte, lte, asc, desc, inArray } from "drizzle-orm";
+import {
+  eq,
+  and,
+  isNull,
+  sql,
+  gte,
+  lte,
+  asc,
+  desc,
+  inArray,
+} from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import type {
   CommentDetail,
@@ -8,8 +18,8 @@ import type {
 } from "./comment.schema";
 import { Comment, commentTable, NewComment } from "@src/db/schema/comments";
 import * as schema from "@src/db/schema/index";
-import { postTable } from "@src/db/schema/posts";
 import { oauthAccountTable } from "@src/db/schema/oauth-accounts";
+import { postTable } from "@src/db/schema/posts";
 import { HttpError } from "@src/errors/http-error";
 import {
   Author,
@@ -19,13 +29,14 @@ import {
   HierarchicalItem,
   SecretItem,
 } from "@src/shared/interaction";
-import { hashPassword } from "@src/shared/password";
 import {
   buildPaginatedResponse,
   calculateOffset,
   calculateTotalPages,
   PaginatedResponse,
 } from "@src/shared/pagination";
+import { hashPassword } from "@src/shared/password";
+import { generateRevealToken, hashRevealToken } from "@src/shared/reveal-token";
 
 /**
  * 댓글 작성 입력 데이터
@@ -59,6 +70,11 @@ export interface CommentListResult {
   };
 }
 
+export interface CreateCommentResult {
+  comment: CommentDetail;
+  revealToken: string | null;
+}
+
 /**
  * 내부 댓글 타입 (계층 구조 + 비밀글 속성)
  */
@@ -85,7 +101,7 @@ export class CommentService {
     postId: number,
     input: CreateCommentInput,
     author: Author,
-  ): Promise<CommentDetail> {
+  ): Promise<CreateCommentResult> {
     return await this.db.transaction(async (tx) => {
       // 1. 게시글 존재 확인 (삭제되지 않은 것)
       const [post] = await tx
@@ -164,6 +180,7 @@ export class CommentService {
 
       // 4. author 분기하여 댓글 데이터 생성
       let newComment: NewComment;
+      let revealToken: string | null = null;
 
       if (author.type === "oauth") {
         newComment = {
@@ -179,11 +196,17 @@ export class CommentService {
           guestPasswordHash: null,
           body: input.body,
           isSecret: input.isSecret ?? false,
+          secretRevealTokenHash: null,
           status: "active",
         };
       } else {
         // Guest
         const passwordHash = await hashPassword(author.password);
+        const shouldIssueRevealToken = input.isSecret ?? false;
+
+        if (shouldIssueRevealToken) {
+          revealToken = generateRevealToken();
+        }
 
         newComment = {
           postId,
@@ -194,10 +217,13 @@ export class CommentService {
           authorType: "guest",
           oauthAccountId: null,
           guestName: author.name,
-          guestEmail: author.email,
+          guestEmail: author.email ?? null,
           guestPasswordHash: passwordHash,
           body: input.body,
           isSecret: input.isSecret ?? false,
+          secretRevealTokenHash: revealToken
+            ? hashRevealToken(revealToken)
+            : null,
           status: "active",
         };
       }
@@ -220,8 +246,47 @@ export class CommentService {
       // CommentDetail 타입으로 직접 변환
       const enrichedComment = await this.enrichCommentWithAuthor(comment, tx);
 
-      return this.mapToCommentDetail(enrichedComment);
+      return {
+        comment: this.mapToCommentDetail(enrichedComment),
+        revealToken,
+      };
     });
+  }
+
+  async revealSecretComment(
+    commentId: number,
+    revealToken: string,
+  ): Promise<CommentDetail> {
+    const [comment] = await this.db
+      .select()
+      .from(commentTable)
+      .where(eq(commentTable.id, commentId))
+      .limit(1);
+
+    if (!comment) {
+      throw HttpError.notFound("Comment not found.");
+    }
+
+    if (comment.status !== "active" || comment.deletedAt !== null) {
+      throw HttpError.notFound("Comment not found.");
+    }
+
+    if (
+      comment.authorType !== "guest" ||
+      !comment.isSecret ||
+      !comment.secretRevealTokenHash
+    ) {
+      throw HttpError.forbidden("Reveal token is invalid.");
+    }
+
+    const hashedToken = hashRevealToken(revealToken);
+    if (hashedToken !== comment.secretRevealTokenHash) {
+      throw HttpError.forbidden("Reveal token is invalid.");
+    }
+
+    const enrichedComment = await this.enrichCommentWithAuthor(comment);
+
+    return this.mapToCommentDetail(enrichedComment);
   }
 
   /**
@@ -345,9 +410,7 @@ export class CommentService {
         await tx
           .delete(commentTable)
           .where(eq(commentTable.parentId, commentId));
-        await tx
-          .delete(commentTable)
-          .where(eq(commentTable.id, commentId));
+        await tx.delete(commentTable).where(eq(commentTable.id, commentId));
       });
     } else {
       // Soft delete (status='deleted', deletedAt 설정)
@@ -478,6 +541,7 @@ export class CommentService {
           id: comment.postId,
           title: "(삭제된 게시글)",
         };
+
         return this.mapToAdminCommentItem(enriched, post);
       }),
     );
@@ -533,9 +597,7 @@ export class CommentService {
 
     return {
       parent: this.mapToAdminCommentItem(enrichedRoot, post),
-      replies: enrichedReplies.map((r) =>
-        this.mapToAdminCommentItem(r, post),
-      ),
+      replies: enrichedReplies.map((r) => this.mapToAdminCommentItem(r, post)),
     };
   }
 
@@ -566,10 +628,7 @@ export class CommentService {
         .update(commentTable)
         .set({ status: "deleted", deletedAt: new Date() })
         .where(
-          and(
-            inArray(commentTable.id, ids),
-            eq(commentTable.status, "active"),
-          ),
+          and(inArray(commentTable.id, ids), eq(commentTable.status, "active")),
         );
     } else {
       // hard_delete: 자식 댓글도 cascade 삭제 (atomic)
@@ -585,9 +644,7 @@ export class CommentService {
             .delete(commentTable)
             .where(inArray(commentTable.id, childIds));
         }
-        await tx
-          .delete(commentTable)
-          .where(inArray(commentTable.id, ids));
+        await tx.delete(commentTable).where(inArray(commentTable.id, ids));
       });
     }
   }
