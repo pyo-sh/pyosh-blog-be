@@ -134,6 +134,10 @@ export interface PostDetailWithNavigation {
   nextPost: PostNavigation | null;
 }
 
+export interface PinnedPostCount {
+  pinnedCount: number;
+}
+
 /**
  * slug 목록 항목 (sitemap용)
  */
@@ -231,6 +235,18 @@ export class PostService {
 
       if (existing.length === 0) {
         throw HttpError.notFound("Post not found.");
+      }
+
+      const [currentPost] = existing;
+
+      if (input.isPinned === true && !currentPost.isPinned) {
+        const pinnedCount = await this.countPinnedPosts(tx);
+
+        if (pinnedCount >= 5) {
+          throw HttpError.conflict(
+            "Pinned post limit exceeded. Maximum 5 pinned posts allowed.",
+          );
+        }
       }
 
       // 2. 게시글 수정
@@ -547,6 +563,12 @@ export class PostService {
     }
 
     return await this.enrichPostWithDetails(post);
+  }
+
+  async getPinnedPostCount(): Promise<PinnedPostCount> {
+    const pinnedCount = await this.countPinnedPosts(this.db);
+
+    return { pinnedCount };
   }
 
   /**
@@ -908,5 +930,16 @@ export class PostService {
       totalPageviews,
       commentCount,
     };
+  }
+
+  private async countPinnedPosts(
+    executor: Pick<MySql2Database<typeof schema>, "select">,
+  ): Promise<number> {
+    const [result] = await executor
+      .select({ total: sql<number>`COUNT(*)` })
+      .from(postTable)
+      .where(and(eq(postTable.isPinned, true), isNull(postTable.deletedAt)));
+
+    return Number(result?.total ?? 0);
   }
 }
