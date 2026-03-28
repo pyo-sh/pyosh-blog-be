@@ -680,42 +680,35 @@ export class PostService {
    * 게시글 복원
    */
   async restorePost(id: number): Promise<PostDetail> {
-    const [post] = await this.db
-      .select()
-      .from(postTable)
-      .where(eq(postTable.id, id))
-      .limit(1);
+    return await this.withPinnedPostLimitLock(async () => {
+      const [currentPost] = await this.db
+        .select()
+        .from(postTable)
+        .where(eq(postTable.id, id))
+        .limit(1);
 
-    if (!post) {
-      throw HttpError.notFound("게시글을 찾을 수 없습니다");
-    }
+      if (!currentPost) {
+        throw HttpError.notFound("게시글을 찾을 수 없습니다");
+      }
 
-    const runRestore = async () => {
-      return await this.db.transaction(async (tx) => {
-        // 2. 복원
-        await tx
-          .update(postTable)
-          .set({ deletedAt: null })
-          .where(eq(postTable.id, id));
-
-        // 3. 복원된 게시글 조회
-        return await this.getPostByIdInternal(id, tx);
-      });
-    };
-
-    if (post.isPinned && post.deletedAt !== null) {
-      return await this.withPinnedPostLimitLock(async () => {
+      if (currentPost.isPinned && currentPost.deletedAt !== null) {
         const pinnedCount = await this.countPinnedPosts(this.db);
 
         if (pinnedCount + 1 > MAX_PINNED_POSTS) {
           throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
         }
+      }
 
-        return await runRestore();
+      return await this.db.transaction(async (tx) => {
+        // 락 획득 후 최신 상태를 기준으로 복원한다.
+        await tx
+          .update(postTable)
+          .set({ deletedAt: null })
+          .where(eq(postTable.id, id));
+
+        return await this.getPostByIdInternal(id, tx);
       });
-    }
-
-    return await runRestore();
+    });
   }
 
   /**
@@ -723,39 +716,41 @@ export class PostService {
    * 연쇄 삭제: 댓글 → 조회수 통계 → 태그 관계 → 고아 태그 → 게시글
    */
   async hardDeletePost(id: number): Promise<void> {
-    await this.db.transaction(async (tx) => {
-      // 1. 게시글 존재 확인
-      const [post] = await tx
-        .select()
-        .from(postTable)
-        .where(eq(postTable.id, id))
-        .limit(1);
+    await this.withPinnedPostLimitLock(async () => {
+      await this.db.transaction(async (tx) => {
+        // 1. 게시글 존재 확인
+        const [post] = await tx
+          .select()
+          .from(postTable)
+          .where(eq(postTable.id, id))
+          .limit(1);
 
-      if (!post) {
-        throw HttpError.notFound("Post not found.");
-      }
+        if (!post) {
+          throw HttpError.notFound("Post not found.");
+        }
 
-      // 2. post_tag_tb 연결에서 사용된 tagId 수집 (고아 태그 감지용)
-      const linkedTags = await tx
-        .select({ tagId: postTagTable.tagId })
-        .from(postTagTable)
-        .where(eq(postTagTable.postId, id));
-      const linkedTagIds = linkedTags.map((r) => r.tagId);
+        // 2. post_tag_tb 연결에서 사용된 tagId 수집 (고아 태그 감지용)
+        const linkedTags = await tx
+          .select({ tagId: postTagTable.tagId })
+          .from(postTagTable)
+          .where(eq(postTagTable.postId, id));
+        const linkedTagIds = linkedTags.map((r) => r.tagId);
 
-      // 3. 댓글 삭제
-      await tx.delete(commentTable).where(eq(commentTable.postId, id));
+        // 3. 댓글 삭제
+        await tx.delete(commentTable).where(eq(commentTable.postId, id));
 
-      // 4. 조회수 통계 삭제
-      await tx.delete(statsDailyTable).where(eq(statsDailyTable.postId, id));
+        // 4. 조회수 통계 삭제
+        await tx.delete(statsDailyTable).where(eq(statsDailyTable.postId, id));
 
-      // 5. post_tag_tb 연결 삭제
-      await tx.delete(postTagTable).where(eq(postTagTable.postId, id));
+        // 5. post_tag_tb 연결 삭제
+        await tx.delete(postTagTable).where(eq(postTagTable.postId, id));
 
-      // 6. post_tb 레코드 삭제
-      await tx.delete(postTable).where(eq(postTable.id, id));
+        // 6. post_tb 레코드 삭제
+        await tx.delete(postTable).where(eq(postTable.id, id));
 
-      // 7. 고아 태그 삭제 (다른 게시글에서 사용하지 않는 태그)
-      await this.cleanOrphanTags(tx, linkedTagIds);
+        // 7. 고아 태그 삭제 (다른 게시글에서 사용하지 않는 태그)
+        await this.cleanOrphanTags(tx, linkedTagIds);
+      });
     });
   }
 
