@@ -270,6 +270,7 @@ export function createAdminPostRoute(
           response: {
             201: PostDetailResponseSchema,
             400: ErrorResponseSchema,
+            409: ErrorResponseSchema,
             403: ErrorResponseSchema,
           },
         },
@@ -440,6 +441,7 @@ export function createAdminPostRoute(
           params: PostIdParamSchema,
           response: {
             200: PostDetailResponseSchema,
+            409: ErrorResponseSchema,
             403: ErrorResponseSchema,
             404: ErrorResponseSchema,
           },

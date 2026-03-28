@@ -166,6 +166,16 @@ export class PostService {
         : [];
 
     return await this.db.transaction(async (tx) => {
+      if (input.isPinned === true) {
+        const pinnedCount = await this.countPinnedPosts(tx);
+
+        if (pinnedCount >= 5) {
+          throw HttpError.conflict(
+            "Pinned post limit exceeded. Maximum 5 pinned posts allowed.",
+          );
+        }
+      }
+
       // 1. slug 생성 및 중복 확인
       const baseSlug = generateSlug(input.title);
       const slug = await ensureUniqueSlug(baseSlug, async (checkSlug) => {
@@ -606,6 +616,16 @@ export class PostService {
 
     if (!post) {
       throw HttpError.notFound("게시글을 찾을 수 없습니다");
+    }
+
+    if (post.isPinned) {
+      const pinnedCount = await this.countPinnedPosts(this.db);
+
+      if (pinnedCount >= 5) {
+        throw HttpError.conflict(
+          "Pinned post limit exceeded. Maximum 5 pinned posts allowed.",
+        );
+      }
     }
 
     // 2. 복원

@@ -203,6 +203,35 @@ describe("Post Routes", () => {
       const body = response.json();
       expect(body.post.publishedAt).not.toBeNull();
     });
+
+    it("6번째 pinned 생성 시도는 409 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      for (let i = 0; i < 5; i += 1) {
+        await seedPost(category.id, {
+          title: `Pinned Create ${i}`,
+          slug: `pinned-create-${i}`,
+          isPinned: true,
+        });
+      }
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Overflow Pinned Post",
+          contentMd: "# Overflow",
+          categoryId: category.id,
+          isPinned: true,
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain("Pinned post limit exceeded");
+    });
   });
 
   // ===== GET /api/posts =====
@@ -1505,6 +1534,35 @@ describe("Post Routes", () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json().post.deletedAt).toBeNull();
+    });
+
+    it("pinned 복원으로 6개가 되면 409 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      for (let i = 0; i < 5; i += 1) {
+        await seedPost(category.id, {
+          title: `Pinned Restore ${i}`,
+          slug: `pinned-restore-${i}`,
+          isPinned: true,
+        });
+      }
+      const deletedPinnedPost = await seedPost(category.id, {
+        title: "Deleted Pinned Post",
+        slug: "deleted-pinned-post",
+        isPinned: true,
+        deletedAt: new Date(),
+      });
+
+      const response = await app.inject({
+        method: "PUT",
+        url: `/api/admin/posts/${deletedPinnedPost.id}/restore`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain("Pinned post limit exceeded");
     });
   });
 
