@@ -262,25 +262,6 @@ export class PostService {
    * 게시글 수정 (트랜잭션)
    */
   async updatePost(id: number, input: UpdatePostInput): Promise<PostDetail> {
-    let existingPostForPinnedCheck: Pick<Post, "id" | "isPinned"> | undefined;
-
-    if (input.isPinned === true) {
-      const [existingPost] = await this.db
-        .select({
-          id: postTable.id,
-          isPinned: postTable.isPinned,
-        })
-        .from(postTable)
-        .where(eq(postTable.id, id))
-        .limit(1);
-
-      if (!existingPost) {
-        throw HttpError.notFound("Post not found.");
-      }
-
-      existingPostForPinnedCheck = existingPost;
-    }
-
     const runUpdate = async () => {
       // MySQL REPEATABLE READ isolation 회피: 트랜잭션 시작 전에 태그 조회/생성
       const newTagIds: number[] | undefined =
@@ -298,17 +279,6 @@ export class PostService {
 
         if (existing.length === 0) {
           throw HttpError.notFound("Post not found.");
-        }
-
-        const [currentPost] = existing;
-
-        if (
-          input.isPinned === true &&
-          existingPostForPinnedCheck !== undefined &&
-          !existingPostForPinnedCheck.isPinned &&
-          currentPost.isPinned
-        ) {
-          throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
         }
 
         // 2. 게시글 수정
@@ -342,16 +312,30 @@ export class PostService {
       });
     };
 
-    if (input.isPinned === true && existingPostForPinnedCheck !== undefined) {
-      if (existingPostForPinnedCheck.isPinned) {
-        return await runUpdate();
-      }
-
+    if (input.isPinned !== undefined) {
       return await this.withPinnedPostLimitLock(async () => {
-        const pinnedCount = await this.countPinnedPosts(this.db);
+        const [currentPost] = await this.db
+          .select()
+          .from(postTable)
+          .where(eq(postTable.id, id))
+          .limit(1);
 
-        if (pinnedCount + 1 > MAX_PINNED_POSTS) {
-          throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+        if (!currentPost) {
+          throw HttpError.notFound("Post not found.");
+        }
+
+        const isCurrentlyActivePinned =
+          currentPost.isPinned && currentPost.deletedAt === null;
+        const isNextActivePinned =
+          (input.isPinned ?? currentPost.isPinned) &&
+          currentPost.deletedAt === null;
+
+        if (!isCurrentlyActivePinned && isNextActivePinned) {
+          const pinnedCount = await this.countPinnedPosts(this.db);
+
+          if (pinnedCount + 1 > MAX_PINNED_POSTS) {
+            throw HttpError.conflict(PINNED_POST_LIMIT_ERROR);
+          }
         }
 
         return await runUpdate();
@@ -663,9 +647,11 @@ export class PostService {
    * 게시글 Soft Delete
    */
   async deletePost(id: number): Promise<void> {
-    // 1. 게시글 존재 확인
     const [post] = await this.db
-      .select()
+      .select({
+        isPinned: postTable.isPinned,
+        deletedAt: postTable.deletedAt,
+      })
       .from(postTable)
       .where(eq(postTable.id, id))
       .limit(1);
@@ -674,11 +660,20 @@ export class PostService {
       throw HttpError.notFound("게시글을 찾을 수 없습니다");
     }
 
-    // 2. Soft delete
-    await this.db
-      .update(postTable)
-      .set({ deletedAt: new Date() })
-      .where(eq(postTable.id, id));
+    const runDelete = async () => {
+      await this.db
+        .update(postTable)
+        .set({ deletedAt: new Date() })
+        .where(eq(postTable.id, id));
+    };
+
+    if (post.isPinned && post.deletedAt === null) {
+      await this.withPinnedPostLimitLock(runDelete);
+
+      return;
+    }
+
+    await runDelete();
   }
 
   /**
@@ -866,19 +861,23 @@ export class PostService {
         }
       });
 
-    const shouldLockRestore =
-      action === "restore" &&
-      (
-        await this.db
-          .select({
-            isPinned: postTable.isPinned,
-            deletedAt: postTable.deletedAt,
-          })
-          .from(postTable)
-          .where(inArray(postTable.id, uniqueIds))
-      ).some((post) => post.isPinned && post.deletedAt !== null);
+    const shouldLockBulk = (
+      await this.db
+        .select({
+          isPinned: postTable.isPinned,
+          deletedAt: postTable.deletedAt,
+        })
+        .from(postTable)
+        .where(inArray(postTable.id, uniqueIds))
+    ).some((post) =>
+      action === "restore"
+        ? post.isPinned && post.deletedAt !== null
+        : (action === "soft_delete" || action === "hard_delete") &&
+          post.isPinned &&
+          post.deletedAt === null,
+    );
 
-    if (shouldLockRestore) {
+    if (shouldLockBulk) {
       await this.withPinnedPostLimitLock(run);
 
       return;
