@@ -1,7 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
 import { seedAdmin, seedAsset, truncateAll } from "@test/helpers/seed";
 
@@ -9,6 +9,18 @@ import { seedAdmin, seedAsset, truncateAll } from "@test/helpers/seed";
 const TINY_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 const TINY_PNG = Buffer.from(TINY_PNG_BASE64, "base64");
+const SAFE_SVG = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1" /></svg>',
+);
+const UNSAFE_SVG = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(1)</script></svg>',
+);
+const FAKE_WEBP = Buffer.concat([
+  Buffer.from("RIFF", "ascii"),
+  Buffer.from([0x24, 0x00, 0x00, 0x00]),
+  Buffer.from("WAVE", "ascii"),
+  Buffer.alloc(32, 0),
+]);
 
 /**
  * multipart/form-data 본문 빌더
@@ -146,6 +158,63 @@ describe("Asset Routes", () => {
       expect(asset.url).toMatch(/^\/uploads\/\d{4}\/\d{2}\//);
       expect(asset.width).toBe(1);
       expect(asset.height).toBe(1);
+    });
+
+    it("안전한 SVG 업로드 → 201", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [{ fieldName: "files", fileName: "safe.svg", content: SAFE_SVG, mimeType: "image/svg+xml" }],
+        boundary,
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+      expect(res.statusCode).toBe(201);
+      const body = res.json();
+      expect(body.assets).toHaveLength(1);
+      expect(body.assets[0].mimeType).toBe("image/svg+xml");
+    });
+
+    it("active content가 포함된 SVG → 400", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [{ fieldName: "files", fileName: "unsafe.svg", content: UNSAFE_SVG, mimeType: "image/svg+xml" }],
+        boundary,
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("RIFF 기반 비-WebP 파일을 WebP로 위장하면 → 400", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [{ fieldName: "files", fileName: "fake.webp", content: FAKE_WEBP, mimeType: "image/webp" }],
+        boundary,
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+      expect(res.statusCode).toBe(400);
     });
 
     it("허용되지 않은 MIME → 400", async () => {

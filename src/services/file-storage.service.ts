@@ -25,15 +25,65 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
  */
 const MAGIC_BYTES: Record<string, number[]> = {
   "image/jpeg": [0xff, 0xd8, 0xff],
-  "image/png": [0x89, 0x50, 0x4e, 0x47],
+  "image/png": [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
   "image/gif": [0x47, 0x49, 0x46, 0x38],
-  "image/webp": [0x52, 0x49, 0x46, 0x46], // RIFF header
 };
 
 function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
   const expected = MAGIC_BYTES[mimeType];
-  if (!expected) return true; // SVG 등 magic bytes 검증 대상 외
+  if (!expected) return true;
   return expected.every((byte, i) => buffer[i] === byte);
+}
+
+function validateWebP(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false;
+  return (
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  );
+}
+
+function validateSvg(buffer: Buffer): boolean {
+  const content = buffer.toString("utf8").trimStart();
+
+  if (!content.startsWith("<svg") && !content.startsWith("<?xml")) {
+    return false;
+  }
+
+  const normalized = content.toLowerCase();
+  const hasSvgRoot = /<svg[\s>]/i.test(content);
+  const hasScript = /<script[\s>]/i.test(content);
+  const hasEventHandler = /\son[a-z]+\s*=/i.test(content);
+  const hasJavascriptUrl = /javascript\s*:/i.test(content);
+  const hasForeignObject = /<foreignobject[\s>]/i.test(content);
+
+  return (
+    hasSvgRoot &&
+    !hasScript &&
+    !hasEventHandler &&
+    !hasJavascriptUrl &&
+    !hasForeignObject &&
+    !normalized.includes("<!entity") &&
+    !normalized.includes("<!doctype")
+  );
+}
+
+function validateFileContent(buffer: Buffer, mimeType: string): boolean {
+  if (mimeType === "image/webp") {
+    return validateWebP(buffer);
+  }
+
+  if (mimeType === "image/svg+xml") {
+    return validateSvg(buffer);
+  }
+
+  return validateMagicBytes(buffer, mimeType);
 }
 
 /**
@@ -117,7 +167,7 @@ export class FileStorageService {
     const sizeBytes = buffer.length;
 
     // 3. Magic bytes 검증 (MIME 위조 차단)
-    if (!validateMagicBytes(buffer, buffered.mimetype)) {
+    if (!validateFileContent(buffer, buffered.mimetype)) {
       throw HttpError.badRequest("파일 형식이 올바르지 않습니다");
     }
 
