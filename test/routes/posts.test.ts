@@ -5,11 +5,12 @@ import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
 import {
   seedAdmin,
   seedCategory,
+  seedComment,
   seedPost,
   truncateAll,
 } from "@test/helpers/seed";
 import { db } from "@src/db/client";
-import { tagTable } from "@src/db/schema";
+import { statsDailyTable, tagTable } from "@src/db/schema";
 
 describe("Post Routes", () => {
   let app: FastifyInstance;
@@ -799,6 +800,143 @@ describe("Post Routes", () => {
       expect(response.statusCode).toBe(200);
       const body = response.json();
       expect(body.data).toHaveLength(2);
+      expect(body.meta.total).toBe(3);
+      expect(body.meta.totalPages).toBe(2);
+    });
+
+    it("sort=totalPageviews&order=desc → 조회수 합계 높은 순으로 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const lowViewsPost = await seedPost(category.id, { title: "Low Views Post" });
+      const highViewsPost = await seedPost(category.id, { title: "High Views Post" });
+      const midViewsPost = await seedPost(category.id, { title: "Mid Views Post" });
+
+      await db.insert(statsDailyTable).values([
+        { postId: lowViewsPost.id, date: new Date("2026-03-01"), pageviews: 5, uniques: 3 },
+        { postId: highViewsPost.id, date: new Date("2026-03-01"), pageviews: 20, uniques: 10 },
+        { postId: highViewsPost.id, date: new Date("2026-03-02"), pageviews: 3, uniques: 2 },
+        { postId: midViewsPost.id, date: new Date("2026-03-01"), pageviews: 11, uniques: 5 },
+      ]);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts?sort=totalPageviews&order=desc",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data.map((post: { title: string }) => post.title)).toEqual([
+        "High Views Post",
+        "Mid Views Post",
+        "Low Views Post",
+      ]);
+      expect(body.data.map((post: { totalPageviews: number }) => post.totalPageviews)).toEqual([23, 11, 5]);
+    });
+
+    it("sort=totalPageviews&order=asc → 조회수 합계 낮은 순으로 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const zeroViewsPost = await seedPost(category.id, { title: "Zero Views Post" });
+      const lowViewsPost = await seedPost(category.id, { title: "Low Views Post" });
+      const highViewsPost = await seedPost(category.id, { title: "High Views Post" });
+
+      await db.insert(statsDailyTable).values([
+        { postId: lowViewsPost.id, date: new Date("2026-03-03"), pageviews: 2, uniques: 1 },
+        { postId: highViewsPost.id, date: new Date("2026-03-03"), pageviews: 9, uniques: 4 },
+      ]);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts?sort=totalPageviews&order=asc",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data.map((post: { title: string }) => post.title)).toEqual([
+        "Zero Views Post",
+        "Low Views Post",
+        "High Views Post",
+      ]);
+      expect(body.data.map((post: { totalPageviews: number }) => post.totalPageviews)).toEqual([0, 2, 9]);
+    });
+
+    it("sort=commentCount&order=desc → 댓글 수 높은 순으로 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const noCommentPost = await seedPost(category.id, { title: "No Comment Post" });
+      const oneCommentPost = await seedPost(category.id, { title: "One Comment Post" });
+      const threeCommentPost = await seedPost(category.id, { title: "Three Comment Post" });
+
+      await seedComment(oneCommentPost.id);
+      await seedComment(threeCommentPost.id);
+      await seedComment(threeCommentPost.id);
+      await seedComment(threeCommentPost.id);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts?sort=commentCount&order=desc",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data.map((post: { title: string }) => post.title)).toEqual([
+        "Three Comment Post",
+        "One Comment Post",
+        "No Comment Post",
+      ]);
+      expect(body.data.map((post: { commentCount: number }) => post.commentCount)).toEqual([3, 1, 0]);
+    });
+
+    it("sort=commentCount&order=asc → 필터/페이지네이션과 함께 댓글 수 낮은 순으로 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const zeroCommentPost = await seedPost(category.id, {
+        title: "Zero Comment Post",
+        status: "published",
+      });
+      const oneCommentPost = await seedPost(category.id, {
+        title: "One Comment Post",
+        status: "published",
+      });
+      const twoCommentPost = await seedPost(category.id, {
+        title: "Two Comment Post",
+        status: "published",
+      });
+      await seedPost(category.id, {
+        title: "Draft Post",
+        status: "draft",
+      });
+
+      await seedComment(oneCommentPost.id);
+      await seedComment(twoCommentPost.id);
+      await seedComment(twoCommentPost.id);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts?status=published&sort=commentCount&order=asc&limit=2&page=2",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].title).toBe("Two Comment Post");
+      expect(body.data[0].commentCount).toBe(2);
       expect(body.meta.total).toBe(3);
       expect(body.meta.totalPages).toBe(2);
     });
