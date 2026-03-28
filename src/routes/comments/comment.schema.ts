@@ -294,7 +294,7 @@ export const AdminCommentDeleteQuerySchema = z.object({
  * 관리자 댓글 복원 응답 스키마
  */
 export const AdminCommentRestoreResponseSchema = z.object({
-  success: z.literal(true).describe("복원 성공 여부"),
+  success: z.literal(true).describe("복원 성공 여부 (deleted | hidden -> active)"),
 });
 
 /**
@@ -308,7 +308,7 @@ export const AdminCommentBulkBodySchema = z.object({
     .describe("대상 댓글 ID 배열 (최대 100개)"),
   action: z
     .enum(["restore", "soft_delete", "hard_delete"])
-    .describe("수행할 작업"),
+    .describe("수행할 작업 (restore: deleted | hidden -> active)"),
 });
 
 /**

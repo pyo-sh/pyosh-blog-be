@@ -1,5 +1,8 @@
+import { eq, inArray } from "drizzle-orm";
 import { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { db } from "@src/db/client";
+import { commentTable } from "@src/db/schema";
 import {
   createTestApp,
   cleanup,
@@ -1022,6 +1025,39 @@ describe("Comment Routes", () => {
       expect(listResponse.json().data).toHaveLength(1);
     });
 
+    it("hidden 댓글 복원 → 200 + active 전환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const comment = await seedComment(post.id, {
+        body: "숨김 댓글",
+        status: "hidden",
+      });
+
+      const restoreResponse = await app.inject({
+        method: "PUT",
+        url: `/api/admin/comments/${comment.id}/restore`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(restoreResponse.statusCode).toBe(200);
+      expect(restoreResponse.json().success).toBe(true);
+
+      const [restored] = await db
+        .select()
+        .from(commentTable)
+        .where(eq(commentTable.id, comment.id));
+
+      expect(restored?.status).toBe("active");
+      expect(restored?.deletedAt).toBeNull();
+    });
+
     it("삭제되지 않은 댓글 복원 시도 → 400", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
@@ -1275,6 +1311,52 @@ describe("Comment Routes", () => {
         headers: { cookie: adminCookie },
       });
       expect(listResponse.json().data).toHaveLength(2);
+    });
+
+    it("벌크 restore → hidden/deleted 혼합 입력을 active로 복원", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const deletedComment = await seedComment(post.id, {
+        body: "삭제 댓글",
+        status: "deleted",
+        deletedAt: new Date(),
+      });
+      const hiddenComment = await seedComment(post.id, {
+        body: "숨김 댓글",
+        status: "hidden",
+      });
+
+      const restoreResponse = await app.inject({
+        method: "DELETE",
+        url: "/api/admin/comments/bulk",
+        headers: { cookie: adminCookie },
+        payload: {
+          ids: [deletedComment.id, hiddenComment.id],
+          action: "restore",
+        },
+      });
+
+      expect(restoreResponse.statusCode).toBe(204);
+
+      const restoredComments = await db
+        .select()
+        .from(commentTable)
+        .where(inArray(commentTable.id, [deletedComment.id, hiddenComment.id]));
+
+      expect(restoredComments).toHaveLength(2);
+      expect(restoredComments.map((comment) => comment.status)).toEqual(
+        expect.arrayContaining(["active", "active"]),
+      );
+      expect(restoredComments.every((comment) => comment.deletedAt === null)).toBe(
+        true,
+      );
     });
 
     it("벌크 hard_delete → 204, 대댓글 cascade 삭제", async () => {

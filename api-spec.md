@@ -30,6 +30,38 @@ Response `200`:
 }
 ```
 
+## Admin Comments
+
+### PUT `/api/admin/comments/:id/restore`
+
+Auth: `requireAdmin`
+
+- Restores a comment from `deleted` or `hidden` to `active`
+- Request on an `active` comment returns `400`
+
+Response `200`:
+
+```json
+{ "success": true }
+```
+
+### DELETE `/api/admin/comments/bulk`
+
+Auth: `requireAdmin`
+
+Request Body:
+
+```json
+{
+  "ids": [1, 2, 3],
+  "action": "restore|soft_delete|hard_delete"
+}
+```
+
+- `restore`: `deleted | hidden -> active`
+- `soft_delete`: `active -> deleted`
+- `hard_delete`: permanently delete selected comments
+
 ## Guestbook
 
 ### POST `/api/guestbook`
