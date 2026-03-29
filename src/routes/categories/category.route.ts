@@ -1,5 +1,6 @@
 import { FastifyPluginAsync, FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
+import { z } from "zod";
 import {
   CategoryIdParamSchema,
   CategoryListQuerySchema,
@@ -140,7 +141,7 @@ export function createCategoryRoute(
         },
       },
       async (request, reply) => {
-        const { changes } = request.body;
+        const { changes } = CategoryTreeUpdateBodySchema.parse(request.body);
         await categoryService.updateCategoryTree(changes);
 
         return reply.status(200).send({ success: true });
@@ -208,7 +209,7 @@ export function createCategoryRoute(
           params: CategoryIdParamSchema,
           querystring: CategoryDeleteQuerySchema,
           response: {
-            204: {},
+            204: z.void(),
             400: ErrorResponseSchema,
             403: ErrorResponseSchema,
             404: ErrorResponseSchema,
