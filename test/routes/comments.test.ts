@@ -1355,6 +1355,13 @@ describe("Comment Routes", () => {
     it("벌크 hide → 204, active 상태만 hidden으로 전환", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1375,7 +1382,10 @@ describe("Comment Routes", () => {
       const bulkResponse = await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: {
           ids: [activeComment.id, deletedComment.id],
           action: "hide",
@@ -1401,6 +1411,13 @@ describe("Comment Routes", () => {
     it("벌크 soft_delete → 204, deleted 상태로 전환", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1426,7 +1443,10 @@ describe("Comment Routes", () => {
       const bulkResponse = await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: { ids, action: "soft_delete" },
       });
 
@@ -1443,6 +1463,13 @@ describe("Comment Routes", () => {
     it("벌크 restore → 204, active 상태로 복원", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1469,7 +1496,10 @@ describe("Comment Routes", () => {
       await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: { ids, action: "soft_delete" },
       });
 
@@ -1477,7 +1507,10 @@ describe("Comment Routes", () => {
       const restoreResponse = await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: { ids, action: "restore" },
       });
 
@@ -1494,6 +1527,13 @@ describe("Comment Routes", () => {
     it("벌크 restore → hidden/deleted 혼합 입력을 active로 복원", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1514,7 +1554,10 @@ describe("Comment Routes", () => {
       const restoreResponse = await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: {
           ids: [deletedComment.id, hiddenComment.id],
           action: "restore",
@@ -1540,6 +1583,13 @@ describe("Comment Routes", () => {
     it("벌크 hard_delete → 204, 대댓글 cascade 삭제", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1575,7 +1625,10 @@ describe("Comment Routes", () => {
       const bulkResponse = await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: { ids: [rootComment.id], action: "hard_delete" },
       });
 

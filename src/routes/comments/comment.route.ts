@@ -371,6 +371,7 @@ export function createAdminCommentRoute(
     typedFastify.delete(
       "/comments/bulk",
       {
+        onRequest: fastify.csrfProtection,
         schema: {
           tags: ["admin", "comments"],
           summary: "관리자 댓글 벌크 작업",
