@@ -298,6 +298,13 @@ export const AdminCommentRestoreResponseSchema = z.object({
 });
 
 /**
+ * 관리자 댓글 숨김 응답 스키마
+ */
+export const AdminCommentHideResponseSchema = z.object({
+  success: z.literal(true).describe("숨김 성공 여부 (active -> hidden)"),
+});
+
+/**
  * 관리자 벌크 삭제/복원 요청 바디 스키마
  */
 export const AdminCommentBulkBodySchema = z.object({
@@ -307,8 +314,10 @@ export const AdminCommentBulkBodySchema = z.object({
     .max(100)
     .describe("대상 댓글 ID 배열 (최대 100개)"),
   action: z
-    .enum(["restore", "soft_delete", "hard_delete"])
-    .describe("수행할 작업 (restore: deleted | hidden -> active)"),
+    .enum(["hide", "restore", "soft_delete", "hard_delete"])
+    .describe(
+      "수행할 작업 (hide: active -> hidden, restore: deleted | hidden -> active)",
+    ),
 });
 
 /**

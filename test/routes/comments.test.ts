@@ -974,6 +974,68 @@ describe("Comment Routes", () => {
     });
   });
 
+  // ===== PUT /api/admin/comments/:id/hide =====
+
+  describe("PUT /api/admin/comments/:id/hide", () => {
+    it("active 댓글 숨김 → 200 + hidden 전환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const comment = await seedComment(post.id, {
+        body: "숨길 댓글",
+        status: "active",
+      });
+
+      const hideResponse = await app.inject({
+        method: "PUT",
+        url: `/api/admin/comments/${comment.id}/hide`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(hideResponse.statusCode).toBe(200);
+      expect(hideResponse.json().success).toBe(true);
+
+      const [hiddenComment] = await db
+        .select()
+        .from(commentTable)
+        .where(eq(commentTable.id, comment.id));
+
+      expect(hiddenComment?.status).toBe("hidden");
+      expect(hiddenComment?.deletedAt).toBeNull();
+    });
+
+    it("deleted 댓글 숨김 시도 → 400", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const comment = await seedComment(post.id, {
+        body: "이미 삭제된 댓글",
+        status: "deleted",
+        deletedAt: new Date(),
+      });
+
+      const hideResponse = await app.inject({
+        method: "PUT",
+        url: `/api/admin/comments/${comment.id}/hide`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(hideResponse.statusCode).toBe(400);
+    });
+  });
+
   // ===== PUT /api/admin/comments/:id/restore =====
 
   describe("PUT /api/admin/comments/:id/restore", () => {
@@ -1220,6 +1282,52 @@ describe("Comment Routes", () => {
   // ===== DELETE /api/admin/comments/bulk =====
 
   describe("DELETE /api/admin/comments/bulk", () => {
+    it("벌크 hide → 204, active 상태만 hidden으로 전환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const activeComment = await seedComment(post.id, {
+        body: "활성 댓글",
+        status: "active",
+      });
+      const deletedComment = await seedComment(post.id, {
+        body: "삭제 댓글",
+        status: "deleted",
+        deletedAt: new Date(),
+      });
+
+      const bulkResponse = await app.inject({
+        method: "DELETE",
+        url: "/api/admin/comments/bulk",
+        headers: { cookie: adminCookie },
+        payload: {
+          ids: [activeComment.id, deletedComment.id],
+          action: "hide",
+        },
+      });
+
+      expect(bulkResponse.statusCode).toBe(204);
+
+      const comments = await db
+        .select()
+        .from(commentTable)
+        .where(inArray(commentTable.id, [activeComment.id, deletedComment.id]));
+
+      expect(comments).toHaveLength(2);
+      expect(
+        comments.find((comment) => comment.id === activeComment.id)?.status,
+      ).toBe("hidden");
+      expect(
+        comments.find((comment) => comment.id === deletedComment.id)?.status,
+      ).toBe("deleted");
+    });
+
     it("벌크 soft_delete → 204, deleted 상태로 전환", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);

@@ -451,6 +451,32 @@ export class CommentService {
   }
 
   /**
+   * 댓글 숨김 (active → hidden)
+   *
+   * @param commentId 댓글 ID
+   */
+  async hideComment(commentId: number): Promise<void> {
+    const [comment] = await this.db
+      .select()
+      .from(commentTable)
+      .where(eq(commentTable.id, commentId))
+      .limit(1);
+
+    if (!comment) {
+      throw HttpError.notFound("Comment not found.");
+    }
+
+    if (comment.status !== "active") {
+      throw HttpError.badRequest("Comment is not hideable.");
+    }
+
+    await this.db
+      .update(commentTable)
+      .set({ status: "hidden", deletedAt: null })
+      .where(eq(commentTable.id, commentId));
+  }
+
+  /**
    * 게시글의 댓글 수 조회
    *
    * @param postId 게시글 ID
@@ -609,11 +635,18 @@ export class CommentService {
    */
   async bulkOperateComments(
     ids: number[],
-    action: "restore" | "soft_delete" | "hard_delete",
+    action: "hide" | "restore" | "soft_delete" | "hard_delete",
   ): Promise<void> {
     if (ids.length === 0) return;
 
-    if (action === "restore") {
+    if (action === "hide") {
+      await this.db
+        .update(commentTable)
+        .set({ status: "hidden", deletedAt: null })
+        .where(
+          and(inArray(commentTable.id, ids), eq(commentTable.status, "active")),
+        );
+    } else if (action === "restore") {
       await this.db
         .update(commentTable)
         .set({ status: "active", deletedAt: null })

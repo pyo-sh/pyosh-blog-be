@@ -32,6 +32,19 @@ Response `200`:
 
 ## Admin Comments
 
+### PUT `/api/admin/comments/:id/hide`
+
+Auth: `requireAdmin`
+
+- Hides a comment from `active` to `hidden`
+- Request on a `hidden` or `deleted` comment returns `400`
+
+Response `200`:
+
+```json
+{ "success": true }
+```
+
 ### PUT `/api/admin/comments/:id/restore`
 
 Auth: `requireAdmin`
@@ -54,10 +67,11 @@ Request Body:
 ```json
 {
   "ids": [1, 2, 3],
-  "action": "restore|soft_delete|hard_delete"
+  "action": "hide|restore|soft_delete|hard_delete"
 }
 ```
 
+- `hide`: `active -> hidden`
 - `restore`: `deleted | hidden -> active`
 - `soft_delete`: `active -> deleted`
 - `hard_delete`: permanently delete selected comments
