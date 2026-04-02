@@ -1034,6 +1034,46 @@ describe("Comment Routes", () => {
 
       expect(hideResponse.statusCode).toBe(400);
     });
+
+    it("루트 댓글 숨김 시 public meta/목록에서 답글도 함께 제외", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const rootComment = await seedComment(post.id, {
+        body: "숨길 루트 댓글",
+        status: "active",
+      });
+      await seedComment(post.id, {
+        body: "활성 답글",
+        parentId: rootComment.id,
+        depth: 1,
+        status: "active",
+      });
+
+      const hideResponse = await app.inject({
+        method: "PUT",
+        url: `/api/admin/comments/${rootComment.id}/hide`,
+        headers: { cookie: adminCookie },
+      });
+
+      expect(hideResponse.statusCode).toBe(200);
+
+      const publicResponse = await app.inject({
+        method: "GET",
+        url: `/api/posts/${post.id}/comments`,
+      });
+
+      expect(publicResponse.statusCode).toBe(200);
+      expect(publicResponse.json().data).toHaveLength(0);
+      expect(publicResponse.json().meta.totalCount).toBe(0);
+      expect(publicResponse.json().meta.totalRootComments).toBe(0);
+    });
   });
 
   // ===== PUT /api/admin/comments/:id/restore =====

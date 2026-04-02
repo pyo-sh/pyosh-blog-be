@@ -314,20 +314,22 @@ export class CommentService {
       isNull(commentTable.deletedAt),
     );
 
-    // 1. 루트 댓글 수 + 전체 댓글 수 병렬 조회
-    const [rootCountResult, totalCountResult] = await Promise.all([
-      this.db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(commentTable)
-        .where(and(activeCondition, isNull(commentTable.parentId))),
-      this.db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(commentTable)
-        .where(activeCondition),
-    ]);
+    const activeComments = await this.db
+      .select({ id: commentTable.id, parentId: commentTable.parentId })
+      .from(commentTable)
+      .where(activeCondition);
 
-    const totalRootComments = rootCountResult[0]?.count ?? 0;
-    const totalCount = totalCountResult[0]?.count ?? 0;
+    const activeRootIds = new Set(
+      activeComments
+        .filter((comment) => comment.parentId === null)
+        .map((comment) => comment.id),
+    );
+
+    const totalRootComments = activeRootIds.size;
+    const totalCount = activeComments.filter(
+      (comment) =>
+        comment.parentId === null || activeRootIds.has(comment.parentId),
+    ).length;
     const totalPages = calculateTotalPages(totalRootComments, limit);
 
     // 2. 페이지네이션된 루트 댓글 조회
@@ -483,8 +485,8 @@ export class CommentService {
    * @returns 댓글 수 (active 상태만)
    */
   async getCommentCount(postId: number): Promise<number> {
-    const [result] = await this.db
-      .select({ count: sql<number>`COUNT(*)` })
+    const comments = await this.db
+      .select({ id: commentTable.id, parentId: commentTable.parentId })
       .from(commentTable)
       .where(
         and(
@@ -494,7 +496,16 @@ export class CommentService {
         ),
       );
 
-    return result?.count ?? 0;
+    const activeRootIds = new Set(
+      comments
+        .filter((comment) => comment.parentId === null)
+        .map((comment) => comment.id),
+    );
+
+    return comments.filter(
+      (comment) =>
+        comment.parentId === null || activeRootIds.has(comment.parentId),
+    ).length;
   }
 
   /**
