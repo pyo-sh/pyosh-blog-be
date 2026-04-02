@@ -980,6 +980,13 @@ describe("Comment Routes", () => {
     it("active 댓글 숨김 → 200 + hidden 전환", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -995,7 +1002,10 @@ describe("Comment Routes", () => {
       const hideResponse = await app.inject({
         method: "PUT",
         url: `/api/admin/comments/${comment.id}/hide`,
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
       });
 
       expect(hideResponse.statusCode).toBe(200);
@@ -1013,6 +1023,13 @@ describe("Comment Routes", () => {
     it("deleted 댓글 숨김 시도 → 400", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1029,7 +1046,10 @@ describe("Comment Routes", () => {
       const hideResponse = await app.inject({
         method: "PUT",
         url: `/api/admin/comments/${comment.id}/hide`,
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
       });
 
       expect(hideResponse.statusCode).toBe(400);
@@ -1038,6 +1058,13 @@ describe("Comment Routes", () => {
     it("루트 댓글 숨김 시 public meta/목록에서 답글도 함께 제외", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1059,7 +1086,10 @@ describe("Comment Routes", () => {
       const hideResponse = await app.inject({
         method: "PUT",
         url: `/api/admin/comments/${rootComment.id}/hide`,
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
       });
 
       expect(hideResponse.statusCode).toBe(200);

@@ -309,6 +309,7 @@ export function createAdminCommentRoute(
     typedFastify.put(
       "/comments/:id/hide",
       {
+        onRequest: fastify.csrfProtection,
         schema: {
           tags: ["admin", "comments"],
           summary: "관리자 댓글 숨김",
