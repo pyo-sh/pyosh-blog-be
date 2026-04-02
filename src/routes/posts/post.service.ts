@@ -3,6 +3,7 @@ import {
   and,
   isNull,
   sql,
+  SQL,
   inArray,
   lt,
   gt,
@@ -422,9 +423,7 @@ export class PostService {
         const matchedComments = await this.db
           .select({ postId: commentTable.postId })
           .from(commentTable)
-          .where(
-            and(like(commentTable.body, term), isNull(commentTable.deletedAt)),
-          );
+          .where(this.buildVisibleCommentWhere(like(commentTable.body, term)));
         const postIds = [...new Set(matchedComments.map((c) => c.postId))];
         if (postIds.length === 0) {
           return buildPaginatedResponse([], 0, page, limit);
@@ -502,7 +501,7 @@ export class PostService {
           commentCount: sql<number>`COUNT(*)`.as("commentCount"),
         })
         .from(commentTable)
-        .where(isNull(commentTable.deletedAt))
+        .where(this.buildVisibleCommentWhere())
         .groupBy(commentTable.postId)
         .as("post_comments");
 
@@ -942,10 +941,7 @@ export class PostService {
           .select({ postId: commentTable.postId, count: sql<number>`COUNT(*)` })
           .from(commentTable)
           .where(
-            and(
-              inArray(commentTable.postId, postIds),
-              isNull(commentTable.deletedAt),
-            ),
+            this.buildVisibleCommentWhere(inArray(commentTable.postId, postIds)),
           )
           .groupBy(commentTable.postId),
       ],
@@ -1010,12 +1006,7 @@ export class PostService {
         this.db
           .select({ count: sql<number>`COUNT(*)` })
           .from(commentTable)
-          .where(
-            and(
-              eq(commentTable.postId, post.id),
-              isNull(commentTable.deletedAt),
-            ),
-          )
+          .where(this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)))
           .then((rows) => Number(rows[0]?.count ?? 0)),
         this.fetchCategoryAncestors(post.categoryId, this.db),
       ]);
@@ -1120,12 +1111,7 @@ export class PostService {
         tx
           .select({ count: sql<number>`COUNT(*)` })
           .from(commentTable)
-          .where(
-            and(
-              eq(commentTable.postId, post.id),
-              isNull(commentTable.deletedAt),
-            ),
-          )
+          .where(this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)))
           .then((rows) => Number(rows[0]?.count ?? 0)),
         this.fetchCategoryAncestors(post.categoryId, tx),
       ]);
@@ -1153,6 +1139,29 @@ export class PostService {
       .where(and(eq(postTable.isPinned, true), isNull(postTable.deletedAt)));
 
     return Number(result?.total ?? 0);
+  }
+
+  private buildVisibleCommentWhere(postFilter?: SQL<unknown>) {
+    const conditions = [
+      eq(commentTable.status, "active"),
+      isNull(commentTable.deletedAt),
+      or(
+        isNull(commentTable.parentId),
+        sql`exists (
+          select 1
+          from comment_tb parent
+          where parent.id = ${commentTable.parentId}
+            and parent.status = 'active'
+            and parent.deleted_at is null
+        )`,
+      ),
+    ];
+
+    if (postFilter) {
+      conditions.unshift(postFilter);
+    }
+
+    return and(...conditions);
   }
 
   private async withPinnedPostLimitLock<T>(
