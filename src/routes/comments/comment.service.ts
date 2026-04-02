@@ -314,22 +314,31 @@ export class CommentService {
       isNull(commentTable.deletedAt),
     );
 
-    const activeComments = await this.db
-      .select({ id: commentTable.id, parentId: commentTable.parentId })
-      .from(commentTable)
-      .where(activeCondition);
-
-    const activeRootIds = new Set(
-      activeComments
-        .filter((comment) => comment.parentId === null)
-        .map((comment) => comment.id),
+    const visibleReplyCondition = and(
+      activeCondition,
+      sql`exists (
+        select 1
+        from comment_tb parent
+        where parent.id = ${commentTable.parentId}
+          and parent.status = 'active'
+          and parent.deleted_at is null
+      )`,
     );
 
-    const totalRootComments = activeRootIds.size;
-    const totalCount = activeComments.filter(
-      (comment) =>
-        comment.parentId === null || activeRootIds.has(comment.parentId),
-    ).length;
+    const [rootCountResult, visibleReplyCountResult] = await Promise.all([
+      this.db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(and(activeCondition, isNull(commentTable.parentId))),
+      this.db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(visibleReplyCondition),
+    ]);
+
+    const totalRootComments = rootCountResult[0]?.count ?? 0;
+    const totalCount =
+      totalRootComments + (visibleReplyCountResult[0]?.count ?? 0);
     const totalPages = calculateTotalPages(totalRootComments, limit);
 
     // 2. 페이지네이션된 루트 댓글 조회
@@ -485,27 +494,35 @@ export class CommentService {
    * @returns 댓글 수 (active 상태만)
    */
   async getCommentCount(postId: number): Promise<number> {
-    const comments = await this.db
-      .select({ id: commentTable.id, parentId: commentTable.parentId })
-      .from(commentTable)
-      .where(
-        and(
-          eq(commentTable.postId, postId),
-          eq(commentTable.status, "active"),
-          isNull(commentTable.deletedAt),
-        ),
-      );
-
-    const activeRootIds = new Set(
-      comments
-        .filter((comment) => comment.parentId === null)
-        .map((comment) => comment.id),
+    const activeCondition = and(
+      eq(commentTable.postId, postId),
+      eq(commentTable.status, "active"),
+      isNull(commentTable.deletedAt),
     );
 
-    return comments.filter(
-      (comment) =>
-        comment.parentId === null || activeRootIds.has(comment.parentId),
-    ).length;
+    const visibleReplyCondition = and(
+      activeCondition,
+      sql`exists (
+        select 1
+        from comment_tb parent
+        where parent.id = ${commentTable.parentId}
+          and parent.status = 'active'
+          and parent.deleted_at is null
+      )`,
+    );
+
+    const [rootCountResult, visibleReplyCountResult] = await Promise.all([
+      this.db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(and(activeCondition, isNull(commentTable.parentId))),
+      this.db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(visibleReplyCondition),
+    ]);
+
+    return (rootCountResult[0]?.count ?? 0) + (visibleReplyCountResult[0]?.count ?? 0);
   }
 
   /**
