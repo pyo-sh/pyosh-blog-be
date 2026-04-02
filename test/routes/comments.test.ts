@@ -974,6 +974,138 @@ describe("Comment Routes", () => {
     });
   });
 
+  // ===== PUT /api/admin/comments/:id/hide =====
+
+  describe("PUT /api/admin/comments/:id/hide", () => {
+    it("active 댓글 숨김 → 200 + hidden 전환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const comment = await seedComment(post.id, {
+        body: "숨길 댓글",
+        status: "active",
+      });
+
+      const hideResponse = await app.inject({
+        method: "PUT",
+        url: `/api/admin/comments/${comment.id}/hide`,
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
+      });
+
+      expect(hideResponse.statusCode).toBe(200);
+      expect(hideResponse.json().success).toBe(true);
+
+      const [hiddenComment] = await db
+        .select()
+        .from(commentTable)
+        .where(eq(commentTable.id, comment.id));
+
+      expect(hiddenComment?.status).toBe("hidden");
+      expect(hiddenComment?.deletedAt).toBeNull();
+    });
+
+    it("deleted 댓글 숨김 시도 → 400", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const comment = await seedComment(post.id, {
+        body: "이미 삭제된 댓글",
+        status: "deleted",
+        deletedAt: new Date(),
+      });
+
+      const hideResponse = await app.inject({
+        method: "PUT",
+        url: `/api/admin/comments/${comment.id}/hide`,
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
+      });
+
+      expect(hideResponse.statusCode).toBe(400);
+    });
+
+    it("루트 댓글 숨김 시 public meta/목록에서 답글도 함께 제외", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const rootComment = await seedComment(post.id, {
+        body: "숨길 루트 댓글",
+        status: "active",
+      });
+      await seedComment(post.id, {
+        body: "활성 답글",
+        parentId: rootComment.id,
+        depth: 1,
+        status: "active",
+      });
+
+      const hideResponse = await app.inject({
+        method: "PUT",
+        url: `/api/admin/comments/${rootComment.id}/hide`,
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
+      });
+
+      expect(hideResponse.statusCode).toBe(200);
+
+      const publicResponse = await app.inject({
+        method: "GET",
+        url: `/api/posts/${post.id}/comments`,
+      });
+
+      expect(publicResponse.statusCode).toBe(200);
+      expect(publicResponse.json().data).toHaveLength(0);
+      expect(publicResponse.json().meta.totalCount).toBe(0);
+      expect(publicResponse.json().meta.totalRootComments).toBe(0);
+    });
+  });
+
   // ===== PUT /api/admin/comments/:id/restore =====
 
   describe("PUT /api/admin/comments/:id/restore", () => {
@@ -1220,9 +1352,72 @@ describe("Comment Routes", () => {
   // ===== DELETE /api/admin/comments/bulk =====
 
   describe("DELETE /api/admin/comments/bulk", () => {
+    it("벌크 hide → 204, active 상태만 hidden으로 전환", async () => {
+      await seedAdmin();
+      const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
+
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const activeComment = await seedComment(post.id, {
+        body: "활성 댓글",
+        status: "active",
+      });
+      const deletedComment = await seedComment(post.id, {
+        body: "삭제 댓글",
+        status: "deleted",
+        deletedAt: new Date(),
+      });
+
+      const bulkResponse = await app.inject({
+        method: "DELETE",
+        url: "/api/admin/comments/bulk",
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
+        payload: {
+          ids: [activeComment.id, deletedComment.id],
+          action: "hide",
+        },
+      });
+
+      expect(bulkResponse.statusCode).toBe(204);
+
+      const comments = await db
+        .select()
+        .from(commentTable)
+        .where(inArray(commentTable.id, [activeComment.id, deletedComment.id]));
+
+      expect(comments).toHaveLength(2);
+      expect(
+        comments.find((comment) => comment.id === activeComment.id)?.status,
+      ).toBe("hidden");
+      expect(
+        comments.find((comment) => comment.id === deletedComment.id)?.status,
+      ).toBe("deleted");
+    });
+
     it("벌크 soft_delete → 204, deleted 상태로 전환", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1248,7 +1443,10 @@ describe("Comment Routes", () => {
       const bulkResponse = await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: { ids, action: "soft_delete" },
       });
 
@@ -1265,6 +1463,13 @@ describe("Comment Routes", () => {
     it("벌크 restore → 204, active 상태로 복원", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1291,7 +1496,10 @@ describe("Comment Routes", () => {
       await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: { ids, action: "soft_delete" },
       });
 
@@ -1299,7 +1507,10 @@ describe("Comment Routes", () => {
       const restoreResponse = await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: { ids, action: "restore" },
       });
 
@@ -1316,6 +1527,13 @@ describe("Comment Routes", () => {
     it("벌크 restore → hidden/deleted 혼합 입력을 active로 복원", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1336,7 +1554,10 @@ describe("Comment Routes", () => {
       const restoreResponse = await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: {
           ids: [deletedComment.id, hiddenComment.id],
           action: "restore",
@@ -1362,6 +1583,13 @@ describe("Comment Routes", () => {
     it("벌크 hard_delete → 204, 대댓글 cascade 삭제", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
+      const csrfToken = (
+        await app.inject({
+          method: "GET",
+          url: "/api/auth/csrf-token",
+          headers: { cookie: adminCookie },
+        })
+      ).json().token;
 
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -1397,7 +1625,10 @@ describe("Comment Routes", () => {
       const bulkResponse = await app.inject({
         method: "DELETE",
         url: "/api/admin/comments/bulk",
-        headers: { cookie: adminCookie },
+        headers: {
+          cookie: adminCookie,
+          "x-csrf-token": csrfToken,
+        },
         payload: { ids: [rootComment.id], action: "hard_delete" },
       });
 

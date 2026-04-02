@@ -17,6 +17,7 @@ import {
   AdminCommentThreadResponseSchema,
   AdminCommentDeleteQuerySchema,
   AdminCommentRestoreResponseSchema,
+  AdminCommentHideResponseSchema,
   AdminCommentBulkBodySchema,
 } from "./comment.schema";
 import { CommentService } from "./comment.service";
@@ -304,6 +305,37 @@ export function createAdminCommentRoute(
       },
     );
 
+    // PUT /api/admin/comments/:id/hide - 댓글 숨김 (active → hidden)
+    typedFastify.put(
+      "/comments/:id/hide",
+      {
+        onRequest: fastify.csrfProtection,
+        schema: {
+          tags: ["admin", "comments"],
+          summary: "관리자 댓글 숨김",
+          description:
+            "active 상태 댓글을 hidden 상태로 전환합니다. deleted 또는 hidden 상태 댓글은 400을 반환합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
+          params: CommentIdParamSchema,
+          response: {
+            200: AdminCommentHideResponseSchema,
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
+          },
+        },
+        preHandler: requireAdmin(adminService),
+      },
+      async (request, reply) => {
+        const { id } = request.params;
+        await commentService.hideComment(id);
+
+        return reply.status(200).send({ success: true as const });
+      },
+    );
+
     // PUT /api/admin/comments/:id/restore - 댓글 복원 (deleted | hidden → active)
     typedFastify.put(
       "/comments/:id/restore",
@@ -339,11 +371,12 @@ export function createAdminCommentRoute(
     typedFastify.delete(
       "/comments/bulk",
       {
+        onRequest: fastify.csrfProtection,
         schema: {
           tags: ["admin", "comments"],
           summary: "관리자 댓글 벌크 작업",
           description:
-            "여러 댓글을 한 번에 복원, 소프트 삭제, 또는 하드 삭제합니다. restore는 deleted 또는 hidden 상태를 active로 복원합니다.\n\n" +
+            "여러 댓글을 한 번에 숨김, 복원, 소프트 삭제, 또는 하드 삭제합니다. hide는 active 상태만 hidden으로 전환하고, restore는 deleted 또는 hidden 상태를 active로 복원합니다.\n\n" +
             "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],

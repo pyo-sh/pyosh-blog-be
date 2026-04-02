@@ -1387,6 +1387,49 @@ describe("Post Routes", () => {
       expect(typeof body.data[0].totalPageviews).toBe("number");
       expect(typeof body.data[0].commentCount).toBe("number");
     });
+
+    it("hidden 루트 댓글 스레드는 public commentCount와 comment 검색에서 제외", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
+
+      const hiddenRoot = await seedComment(post.id, {
+        body: "숨겨진 루트 댓글",
+        status: "hidden",
+      });
+      await seedComment(post.id, {
+        body: "hidden-thread-keyword",
+        parentId: hiddenRoot.id,
+        depth: 1,
+        status: "active",
+      });
+
+      const listResponse = await app.inject({
+        method: "GET",
+        url: "/api/posts",
+      });
+
+      expect(listResponse.statusCode).toBe(200);
+      expect(listResponse.json().data[0].commentCount).toBe(0);
+
+      const detailResponse = await app.inject({
+        method: "GET",
+        url: `/api/posts/${post.slug}`,
+      });
+
+      expect(detailResponse.statusCode).toBe(200);
+      expect(detailResponse.json().post.commentCount).toBe(0);
+
+      const searchResponse = await app.inject({
+        method: "GET",
+        url: "/api/posts?q=hidden-thread-keyword&filter=comment",
+      });
+
+      expect(searchResponse.statusCode).toBe(200);
+      expect(searchResponse.json().data).toHaveLength(0);
+    });
   });
 
   // ===== DELETE /api/admin/posts/:id/hard =====

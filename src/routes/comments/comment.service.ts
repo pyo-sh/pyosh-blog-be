@@ -314,8 +314,18 @@ export class CommentService {
       isNull(commentTable.deletedAt),
     );
 
-    // 1. 루트 댓글 수 + 전체 댓글 수 병렬 조회
-    const [rootCountResult, totalCountResult] = await Promise.all([
+    const visibleReplyCondition = and(
+      activeCondition,
+      sql`exists (
+        select 1
+        from comment_tb parent
+        where parent.id = ${commentTable.parentId}
+          and parent.status = 'active'
+          and parent.deleted_at is null
+      )`,
+    );
+
+    const [rootCountResult, visibleReplyCountResult] = await Promise.all([
       this.db
         .select({ count: sql<number>`COUNT(*)` })
         .from(commentTable)
@@ -323,11 +333,12 @@ export class CommentService {
       this.db
         .select({ count: sql<number>`COUNT(*)` })
         .from(commentTable)
-        .where(activeCondition),
+        .where(visibleReplyCondition),
     ]);
 
     const totalRootComments = rootCountResult[0]?.count ?? 0;
-    const totalCount = totalCountResult[0]?.count ?? 0;
+    const totalCount =
+      totalRootComments + (visibleReplyCountResult[0]?.count ?? 0);
     const totalPages = calculateTotalPages(totalRootComments, limit);
 
     // 2. 페이지네이션된 루트 댓글 조회
@@ -451,24 +462,67 @@ export class CommentService {
   }
 
   /**
+   * 댓글 숨김 (active → hidden)
+   *
+   * @param commentId 댓글 ID
+   */
+  async hideComment(commentId: number): Promise<void> {
+    const [comment] = await this.db
+      .select()
+      .from(commentTable)
+      .where(eq(commentTable.id, commentId))
+      .limit(1);
+
+    if (!comment) {
+      throw HttpError.notFound("Comment not found.");
+    }
+
+    if (comment.status !== "active") {
+      throw HttpError.badRequest("Comment is not hideable.");
+    }
+
+    await this.db
+      .update(commentTable)
+      .set({ status: "hidden", deletedAt: null })
+      .where(eq(commentTable.id, commentId));
+  }
+
+  /**
    * 게시글의 댓글 수 조회
    *
    * @param postId 게시글 ID
    * @returns 댓글 수 (active 상태만)
    */
   async getCommentCount(postId: number): Promise<number> {
-    const [result] = await this.db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(commentTable)
-      .where(
-        and(
-          eq(commentTable.postId, postId),
-          eq(commentTable.status, "active"),
-          isNull(commentTable.deletedAt),
-        ),
-      );
+    const activeCondition = and(
+      eq(commentTable.postId, postId),
+      eq(commentTable.status, "active"),
+      isNull(commentTable.deletedAt),
+    );
 
-    return result?.count ?? 0;
+    const visibleReplyCondition = and(
+      activeCondition,
+      sql`exists (
+        select 1
+        from comment_tb parent
+        where parent.id = ${commentTable.parentId}
+          and parent.status = 'active'
+          and parent.deleted_at is null
+      )`,
+    );
+
+    const [rootCountResult, visibleReplyCountResult] = await Promise.all([
+      this.db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(and(activeCondition, isNull(commentTable.parentId))),
+      this.db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(visibleReplyCondition),
+    ]);
+
+    return (rootCountResult[0]?.count ?? 0) + (visibleReplyCountResult[0]?.count ?? 0);
   }
 
   /**
@@ -609,11 +663,18 @@ export class CommentService {
    */
   async bulkOperateComments(
     ids: number[],
-    action: "restore" | "soft_delete" | "hard_delete",
+    action: "hide" | "restore" | "soft_delete" | "hard_delete",
   ): Promise<void> {
     if (ids.length === 0) return;
 
-    if (action === "restore") {
+    if (action === "hide") {
+      await this.db
+        .update(commentTable)
+        .set({ status: "hidden", deletedAt: null })
+        .where(
+          and(inArray(commentTable.id, ids), eq(commentTable.status, "active")),
+        );
+    } else if (action === "restore") {
       await this.db
         .update(commentTable)
         .set({ status: "active", deletedAt: null })
