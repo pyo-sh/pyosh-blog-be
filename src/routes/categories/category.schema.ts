@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CategoryTreeItem } from "./category.service";
 
 /**
  * Path Parameter Schemas
@@ -44,15 +45,23 @@ export const CategoryUpdateBodySchema = z.object({
   isVisible: z.boolean().optional().describe("카테고리 공개 여부"),
 });
 
+const CategoryTreeItemSchema = z
+  .object({
+    id: z.number().int().positive().describe("카테고리 ID"),
+    parentId: z.number().int().positive().nullable().describe("새 부모 카테고리 ID"),
+    sortOrder: z.number().int().min(0).describe("새 정렬 순서"),
+  })
+  .transform(
+    ({ id, parentId, sortOrder }): CategoryTreeItem => ({
+      id,
+      parentId,
+      sortOrder,
+    }),
+  );
+
 export const CategoryTreeUpdateBodySchema = z.object({
   changes: z
-    .array(
-      z.object({
-        id: z.number().int().positive().describe("카테고리 ID"),
-        parentId: z.number().int().positive().nullable().describe("새 부모 카테고리 ID"),
-        sortOrder: z.number().int().min(0).describe("새 정렬 순서"),
-      }),
-    )
+    .array(CategoryTreeItemSchema)
     .min(1, "At least one change is required")
     .max(200, "Too many changes in a single request")
     .describe("변경할 카테고리 목록 (최대 200개)"),
