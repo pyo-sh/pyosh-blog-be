@@ -1,9 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import mysql from "mysql2/promise";
+import type { RowDataPacket } from "mysql2/promise";
 import { loadEnv, requireDbEnv } from "./db-env";
 
-type MigrationSummaryRow = {
+type TableExistsRow = RowDataPacket & {
+  exists: number;
+};
+
+type MigrationSummaryRow = RowDataPacket & {
   appliedCount: number;
   lastAppliedAt: string | number | null;
 };
@@ -18,7 +23,7 @@ function getLocalMigrationCount(): number {
 }
 
 async function getAppliedMigrationSummary(conn: mysql.Connection) {
-  const [tableRows] = await conn.query<Array<{ exists: number }>>(
+  const [tableRows] = await conn.query<TableExistsRow[]>(
     `
       SELECT COUNT(*) AS exists
       FROM information_schema.tables
