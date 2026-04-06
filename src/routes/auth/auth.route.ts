@@ -8,6 +8,7 @@ import { ErrorResponseSchema } from "@src/schemas/common";
 import { env } from "@src/shared/env";
 
 const ADMIN_USERNAME_REGEX = /^[\p{L}\p{N}_.-]+$/u;
+const LEGACY_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function toAdminResponse(admin: AdminResponse) {
   return {
@@ -26,9 +27,10 @@ const AdminLoginSchema = z
       .string()
       .min(4, "사용자명은 최소 4자 이상이어야 합니다")
       .max(100, "사용자명은 최대 100자까지 가능합니다")
-      .regex(
-        ADMIN_USERNAME_REGEX,
-        "사용자명은 문자, 숫자, 밑줄(_), 점(.), 하이픈(-)만 사용할 수 있습니다",
+      .refine(
+        (value) =>
+          ADMIN_USERNAME_REGEX.test(value) || LEGACY_EMAIL_REGEX.test(value),
+        "사용자명은 문자, 숫자, 밑줄(_), 점(.), 하이픈(-)만 사용하거나 기존 이메일 형식이어야 합니다",
       )
       .describe("관리자 사용자명"),
     password: z

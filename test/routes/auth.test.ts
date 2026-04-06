@@ -78,6 +78,26 @@ describe("Auth Routes", () => {
       expect(response.statusCode).toBe(401);
     });
 
+    it("마이그레이션된 email 형태 username도 username 필드로 로그인 가능 → 200", async () => {
+      await truncateAll();
+      await seedAdmin({ username: "admin@test.pyosh.dev" });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/admin/login",
+        payload: {
+          username: "Admin@Test.pyosh.dev",
+          password: TEST_ADMIN_PASSWORD,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.admin.username).toBe("admin@test.pyosh.dev");
+      expect(body.admin).not.toHaveProperty("email");
+    });
+
     it("legacy email 필드를 보내면 → 400", async () => {
       const response = await app.inject({
         method: "POST",
