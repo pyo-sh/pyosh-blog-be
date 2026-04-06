@@ -8,15 +8,12 @@ import { ErrorResponseSchema } from "@src/schemas/common";
 import { env } from "@src/shared/env";
 
 const ADMIN_USERNAME_REGEX = /^[\p{L}\p{N}_.-]+$/u;
-const LEGACY_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function toAdminResponse(admin: AdminResponse) {
-  const isLegacyEmail = LEGACY_EMAIL_REGEX.test(admin.username);
-
   return {
     id: admin.id,
     username: admin.username,
-    email: isLegacyEmail ? admin.username : null,
+    email: admin.username,
     createdAt: admin.createdAt,
     updatedAt: admin.updatedAt,
     lastLoginAt: admin.lastLoginAt,
@@ -140,7 +137,7 @@ export function createAuthRoute(
               admin: z.object({
                 id: z.number(),
                 username: z.string(),
-                email: z.string().nullable(),
+                email: z.string(),
                 createdAt: z.date(),
                 updatedAt: z.date(),
                 lastLoginAt: z.date().nullable(),
@@ -207,7 +204,7 @@ export function createAuthRoute(
                 type: z.literal("admin"),
                 id: z.number(),
                 username: z.string(),
-                email: z.string().nullable(),
+                email: z.string(),
                 createdAt: z.date(),
                 updatedAt: z.date(),
                 lastLoginAt: z.date().nullable(),

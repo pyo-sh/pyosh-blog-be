@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import { Admin, adminTable } from "@src/db/schema/admins";
 import * as schema from "@src/db/schema/index";
@@ -29,15 +29,13 @@ export class AdminService {
     password: string,
   ): Promise<AdminResponse> {
     const identifier = username;
-    const isLegacyEmail = LEGACY_EMAIL_REGEX.test(identifier);
+    const normalizedIdentifier = LEGACY_EMAIL_REGEX.test(identifier)
+      ? identifier.toLowerCase()
+      : identifier;
     const [admin] = await this.db
       .select()
       .from(adminTable)
-      .where(
-        isLegacyEmail
-          ? sql`lower(${adminTable.username}) = lower(${identifier})`
-          : eq(adminTable.username, identifier),
-      )
+      .where(eq(adminTable.username, normalizedIdentifier))
       .limit(1);
 
     if (!admin) {
