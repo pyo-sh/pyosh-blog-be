@@ -5,8 +5,8 @@
  *   pnpm tsx scripts/hash-password.ts "my-password"
  *
  * 출력된 해시를 사용하여 DB에 직접 관리자 계정을 생성합니다:
- *   INSERT INTO admin_tb (email, password_hash)
- *   VALUES ('admin@example.com', '<출력된 해시>');
+ *   INSERT INTO admin_tb (username, password_hash)
+ *   VALUES ('admin.test', '<출력된 해시>');
  */
 import * as argon2 from "argon2";
 

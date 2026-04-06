@@ -3,8 +3,8 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import {
   createTestApp,
   cleanup,
-  TEST_ADMIN_EMAIL,
   TEST_ADMIN_PASSWORD,
+  TEST_ADMIN_USERNAME,
 } from "@test/helpers/app";
 import { seedAdmin, truncateAll } from "@test/helpers/seed";
 
@@ -35,7 +35,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: TEST_ADMIN_EMAIL,
+          email: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
         },
       });
@@ -44,7 +44,7 @@ describe("Auth Routes", () => {
 
       const body = response.json();
       expect(body.admin).toBeDefined();
-      expect(body.admin.email).toBe(TEST_ADMIN_EMAIL);
+      expect(body.admin.email).toBe(TEST_ADMIN_USERNAME);
       expect(body.admin).not.toHaveProperty("passwordHash");
 
       const setCookie = response.headers["set-cookie"];
@@ -56,7 +56,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: TEST_ADMIN_EMAIL,
+          email: TEST_ADMIN_USERNAME,
           password: "WrongPassword1!",
         },
       });
@@ -64,12 +64,12 @@ describe("Auth Routes", () => {
       expect(response.statusCode).toBe(401);
     });
 
-    it("존재하지 않는 이메일 → 401", async () => {
+    it("존재하지 않는 사용자명 → 401", async () => {
       const response = await app.inject({
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: "notexist@test.pyosh.dev",
+          email: "missing-user",
           password: TEST_ADMIN_PASSWORD,
         },
       });
@@ -84,7 +84,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: TEST_ADMIN_EMAIL,
+          email: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
         },
       });
@@ -106,7 +106,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: TEST_ADMIN_EMAIL,
+          email: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
         },
       });
@@ -125,7 +125,7 @@ describe("Auth Routes", () => {
 
       const body = response.json();
       expect(body.type).toBe("admin");
-      expect(body.email).toBe(TEST_ADMIN_EMAIL);
+      expect(body.email).toBe(TEST_ADMIN_USERNAME);
     });
 
     it("비로그인 → 401", async () => {
@@ -148,7 +148,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: TEST_ADMIN_EMAIL,
+          email: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
         },
       });

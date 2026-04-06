@@ -57,6 +57,13 @@
       "when": 1774695600000,
       "tag": "0007_comment_reveal_token",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1775476800000,
+      "tag": "0008_admin_username",
+      "breakpoints": true
     }
   ]
 }

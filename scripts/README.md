@@ -26,8 +26,8 @@ $argon2id$v=19$m=65536,t=3,p=1$abc123...$xyz789...
 ### 어드민 계정 생성 (MySQL)
 
 ```sql
-INSERT INTO admin_tb (email, password_hash)
-VALUES ('admin@example.com', '<출력된 해시>');
+INSERT INTO admin_tb (username, password_hash)
+VALUES ('admin.test', '<출력된 해시>');
 ```
 
 ### 비밀번호 초기화 (MySQL)
@@ -35,7 +35,7 @@ VALUES ('admin@example.com', '<출력된 해시>');
 ```sql
 UPDATE admin_tb
 SET password_hash = '<출력된 해시>'
-WHERE email = 'admin@example.com';
+WHERE username = 'admin.test';
 ```
 
 ### 참고

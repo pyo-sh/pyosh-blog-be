@@ -4,13 +4,24 @@ import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { AdminService } from "./admin.service";
 import { HttpError } from "@src/errors/http-error";
-import { env } from "@src/shared/env";
 import { ErrorResponseSchema } from "@src/schemas/common";
+import { env } from "@src/shared/env";
 
 // Zod 스키마 정의
 const AdminLoginSchema = z.object({
-  email: z.string().email("유효한 이메일 주소를 입력하세요").describe("관리자 이메일"),
-  password: z.string().min(8, "비밀번호는 최소 8자 이상이어야 합니다").describe("관리자 비밀번호 (최소 8자)"),
+  email: z
+    .string()
+    .min(4, "사용자명은 최소 4자 이상이어야 합니다")
+    .max(20, "사용자명은 최대 20자까지 가능합니다")
+    .regex(
+      /^[\p{L}\p{N}_.-]+$/u,
+      "사용자명은 문자, 숫자, _, ., - 만 사용할 수 있습니다",
+    )
+    .describe("관리자 사용자명"),
+  password: z
+    .string()
+    .min(8, "비밀번호는 최소 8자 이상이어야 합니다")
+    .describe("관리자 비밀번호 (최소 8자)"),
 });
 
 /**
@@ -103,7 +114,7 @@ export function createAuthRoute(
           tags: ["auth"],
           summary: "Admin login",
           description:
-            "관리자 이메일/비밀번호로 로그인합니다.\n\n" +
+            "관리자 사용자명/비밀번호로 로그인합니다.\n\n" +
             "**Rate limit**: 5회/분",
           body: AdminLoginSchema,
           response: {
@@ -124,13 +135,18 @@ export function createAuthRoute(
       async (request, reply) => {
         const { email, password } = request.body;
 
-        // 인증 검증
+        // 요청 필드명은 유지하되 내부 source of truth는 username이다.
         const admin = await adminService.verifyCredentials(email, password);
 
         // 세션에 adminId 저장
         request.session.set("adminId", admin.id);
 
-        return reply.status(200).send({ admin });
+        return reply.status(200).send({
+          admin: {
+            ...admin,
+            email: admin.username,
+          },
+        });
       },
     );
 
@@ -202,6 +218,7 @@ export function createAuthRoute(
           return reply.status(200).send({
             type: "admin" as const,
             ...admin,
+            email: admin.username,
           });
         }
 

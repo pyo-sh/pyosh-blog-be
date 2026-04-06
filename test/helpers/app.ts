@@ -6,7 +6,7 @@ import { sessionTable } from "@src/db/schema";
 import { env } from "@src/shared/env";
 
 /** 테스트용 Admin 기본 자격증명 */
-export const TEST_ADMIN_EMAIL = "admin@test.pyosh.dev";
+export const TEST_ADMIN_USERNAME = "admin.test";
 export const TEST_ADMIN_PASSWORD = "Test12345!";
 
 /**
@@ -34,7 +34,7 @@ export async function injectAuth(
     method: "POST",
     url: "/api/auth/admin/login",
     payload: {
-      email: TEST_ADMIN_EMAIL,
+      email: TEST_ADMIN_USERNAME,
       password: TEST_ADMIN_PASSWORD,
     },
   });
