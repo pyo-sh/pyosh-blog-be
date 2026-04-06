@@ -13,7 +13,7 @@ import {
   or,
 } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
-import type { PoolConnection } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { connection } from "@src/db/client";
 import { categoryTable } from "@src/db/schema/categories";
 import { commentTable } from "@src/db/schema/comments";
@@ -34,6 +34,7 @@ const MAX_PINNED_POSTS = 5;
 const PINNED_POST_LIMIT_ERROR =
   "Pinned post limit exceeded. Maximum 5 pinned posts allowed.";
 const PINNED_POST_LIMIT_LOCK_NAME = "post_pinned_limit";
+type NamedLockRow = RowDataPacket & { acquired: number | null };
 
 /**
  * 게시글 생성 입력 데이터
@@ -1170,9 +1171,10 @@ export class PostService {
     const lockConnection = await connection.getConnection();
 
     try {
-      const [lockRows] = await lockConnection.query<
-        Array<{ acquired: number | null }>
-      >("SELECT GET_LOCK(?, 10) AS acquired", [PINNED_POST_LIMIT_LOCK_NAME]);
+      const [lockRows] = await lockConnection.query<NamedLockRow[]>(
+        "SELECT GET_LOCK(?, 10) AS acquired",
+        [PINNED_POST_LIMIT_LOCK_NAME],
+      );
       const acquired = Number(lockRows[0]?.acquired ?? 0);
 
       if (acquired !== 1) {
