@@ -130,6 +130,7 @@ export function createAssetRoute(
     typedFastify.delete(
       "/bulk",
       {
+        onRequest: fastify.csrfProtection,
         preHandler: requireAdmin(adminService),
         schema: {
           tags: ["assets"],
@@ -159,6 +160,7 @@ export function createAssetRoute(
     typedFastify.delete(
       "/:id",
       {
+        onRequest: fastify.csrfProtection,
         preHandler: requireAdmin(adminService),
         schema: {
           tags: ["assets"],

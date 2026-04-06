@@ -51,6 +51,20 @@ function buildMultipart(
   return Buffer.concat(parts);
 }
 
+function expectRouteHasOnRequestHook(
+  tree: string,
+  route: string,
+  method: "POST" | "DELETE",
+) {
+  const lines = tree.trimEnd().split("\n");
+  const routeIndex = lines.findIndex((line) =>
+    line.includes(`${route} (${method})`),
+  );
+
+  expect(routeIndex).toBeGreaterThanOrEqual(0);
+  expect(lines[routeIndex + 1]).toContain("• (onRequest)");
+}
+
 describe("Asset Routes", () => {
   let app: FastifyInstance;
   let authCookie: string;
@@ -121,6 +135,16 @@ describe("Asset Routes", () => {
       } catch {
         // 무시
       }
+    });
+
+    it("route에 CSRF onRequest hook 등록", () => {
+      const routes = app.printRoutes({
+        commonPrefix: false,
+        includeHooks: true,
+        method: "POST",
+      });
+
+      expectRouteHasOnRequestHook(routes, "/api/assets/upload", "POST");
     });
 
     it("인증 없이 → 403", async () => {
@@ -320,6 +344,16 @@ describe("Asset Routes", () => {
   // ===== DELETE /api/assets/:id =====
 
   describe("DELETE /api/assets/:id", () => {
+    it("route에 CSRF onRequest hook 등록", () => {
+      const routes = app.printRoutes({
+        commonPrefix: false,
+        includeHooks: true,
+        method: "DELETE",
+      });
+
+      expectRouteHasOnRequestHook(routes, "/api/assets/:id", "DELETE");
+    });
+
     it("인증 없이 → 403", async () => {
       const asset = await seedAsset();
       const res = await app.inject({
@@ -359,6 +393,16 @@ describe("Asset Routes", () => {
   // ===== DELETE /api/assets/bulk =====
 
   describe("DELETE /api/assets/bulk", () => {
+    it("route에 CSRF onRequest hook 등록", () => {
+      const routes = app.printRoutes({
+        commonPrefix: false,
+        includeHooks: true,
+        method: "DELETE",
+      });
+
+      expectRouteHasOnRequestHook(routes, "/api/assets/bulk", "DELETE");
+    });
+
     it("인증 없이 → 403", async () => {
       const res = await app.inject({
         method: "DELETE",

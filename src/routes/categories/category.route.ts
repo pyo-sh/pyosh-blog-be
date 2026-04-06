@@ -83,6 +83,7 @@ export function createCategoryRoute(
     typedFastify.post(
       "/",
       {
+        onRequest: fastify.csrfProtection,
         preHandler: requireAdmin(adminService),
         schema: {
           tags: ["categories"],
@@ -123,6 +124,7 @@ export function createCategoryRoute(
     typedFastify.patch(
       "/tree",
       {
+        onRequest: fastify.csrfProtection,
         preHandler: requireAdmin(adminService),
         schema: {
           tags: ["categories"],
@@ -152,6 +154,7 @@ export function createCategoryRoute(
     typedFastify.patch(
       "/:id",
       {
+        onRequest: fastify.csrfProtection,
         preHandler: requireAdmin(adminService),
         schema: {
           tags: ["categories"],
@@ -197,6 +200,7 @@ export function createCategoryRoute(
     typedFastify.delete(
       "/:id",
       {
+        onRequest: fastify.csrfProtection,
         preHandler: requireAdmin(adminService),
         schema: {
           tags: ["categories"],
