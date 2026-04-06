@@ -45,7 +45,7 @@ describe("Auth Routes", () => {
       const body = response.json();
       expect(body.admin).toBeDefined();
       expect(body.admin.username).toBe(TEST_ADMIN_USERNAME);
-      expect(body.admin.email).toBeNull();
+      expect(body.admin).not.toHaveProperty("email");
       expect(body.admin).not.toHaveProperty("passwordHash");
 
       const setCookie = response.headers["set-cookie"];
@@ -78,61 +78,7 @@ describe("Auth Routes", () => {
       expect(response.statusCode).toBe(401);
     });
 
-    it("기존 이메일 식별자도 전환 기간 동안 로그인 가능 → 200", async () => {
-      await truncateAll();
-      await seedAdmin({ username: "admin@test.pyosh.dev" });
-
-      const response = await app.inject({
-        method: "POST",
-        url: "/api/auth/admin/login",
-        payload: {
-          username: "admin@test.pyosh.dev",
-          email: "admin@test.pyosh.dev",
-          password: TEST_ADMIN_PASSWORD,
-        },
-      });
-
-      expect(response.statusCode).toBe(200);
-
-      const body = response.json();
-      expect(body.admin.username).toBe("admin@test.pyosh.dev");
-      expect(body.admin.email).toBe("admin@test.pyosh.dev");
-    });
-
-    it("legacy email alias만 보내도 로그인 가능 → 200", async () => {
-      await truncateAll();
-      await seedAdmin({ username: "admin@test.pyosh.dev" });
-
-      const response = await app.inject({
-        method: "POST",
-        url: "/api/auth/admin/login",
-        payload: {
-          email: "admin@test.pyosh.dev",
-          password: TEST_ADMIN_PASSWORD,
-        },
-      });
-
-      expect(response.statusCode).toBe(200);
-
-      const body = response.json();
-      expect(body.admin.username).toBe("admin@test.pyosh.dev");
-      expect(body.admin.email).toBe("admin@test.pyosh.dev");
-    });
-
-    it("email alias에 username 값을 보내면 → 400", async () => {
-      const response = await app.inject({
-        method: "POST",
-        url: "/api/auth/admin/login",
-        payload: {
-          email: TEST_ADMIN_USERNAME,
-          password: TEST_ADMIN_PASSWORD,
-        },
-      });
-
-      expect(response.statusCode).toBe(400);
-    });
-
-    it("기존 이메일 식별자는 대소문자 구분 없이 로그인 가능 → 200", async () => {
+    it("마이그레이션된 email 형태 username도 username 필드로 로그인 가능 → 200", async () => {
       await truncateAll();
       await seedAdmin({ username: "admin@test.pyosh.dev" });
 
@@ -141,7 +87,6 @@ describe("Auth Routes", () => {
         url: "/api/auth/admin/login",
         payload: {
           username: "Admin@Test.pyosh.dev",
-          email: "Admin@Test.pyosh.dev",
           password: TEST_ADMIN_PASSWORD,
         },
       });
@@ -150,7 +95,47 @@ describe("Auth Routes", () => {
 
       const body = response.json();
       expect(body.admin.username).toBe("admin@test.pyosh.dev");
-      expect(body.admin.email).toBe("admin@test.pyosh.dev");
+      expect(body.admin).not.toHaveProperty("email");
+    });
+
+    it("legacy email 필드를 보내면 → 400", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/admin/login",
+        payload: {
+          username: TEST_ADMIN_USERNAME,
+          email: TEST_ADMIN_USERNAME,
+          password: TEST_ADMIN_PASSWORD,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("username에 공백이 포함되면 → 400", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/admin/login",
+        payload: {
+          username: "admin user",
+          password: TEST_ADMIN_PASSWORD,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("username이 100자를 초과하면 → 400", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/admin/login",
+        payload: {
+          username: "a".repeat(101),
+          password: TEST_ADMIN_PASSWORD,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
     });
 
     it("DB에 admin이 없을 때 로그인 → 401 + 에러 메시지", async () => {
@@ -202,7 +187,7 @@ describe("Auth Routes", () => {
       const body = response.json();
       expect(body.type).toBe("admin");
       expect(body.username).toBe(TEST_ADMIN_USERNAME);
-      expect(body.email).toBeNull();
+      expect(body).not.toHaveProperty("email");
     });
 
     it("비로그인 → 401", async () => {

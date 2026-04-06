@@ -11,14 +11,9 @@ const ADMIN_USERNAME_REGEX = /^[\p{L}\p{N}_.-]+$/u;
 const LEGACY_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function toAdminResponse(admin: AdminResponse) {
-  const legacyEmail = LEGACY_EMAIL_REGEX.test(admin.username)
-    ? admin.username
-    : null;
-
   return {
     id: admin.id,
     username: admin.username,
-    email: legacyEmail,
     createdAt: admin.createdAt,
     updatedAt: admin.updatedAt,
     lastLoginAt: admin.lastLoginAt,
@@ -31,44 +26,19 @@ const AdminLoginSchema = z
     username: z
       .string()
       .min(4, "사용자명은 최소 4자 이상이어야 합니다")
-      .max(100, "관리자 식별자는 최대 100자까지 가능합니다")
+      .max(100, "사용자명은 최대 100자까지 가능합니다")
       .refine(
         (value) =>
-          z.string().email().safeParse(value).success ||
-          ADMIN_USERNAME_REGEX.test(value),
-        "관리자 식별자는 이메일 또는 사용자명 형식이어야 합니다",
+          ADMIN_USERNAME_REGEX.test(value) || LEGACY_EMAIL_REGEX.test(value),
+        "사용자명은 문자, 숫자, 밑줄(_), 점(.), 하이픈(-)만 사용하거나 기존 이메일 형식이어야 합니다",
       )
-      .optional()
       .describe("관리자 사용자명"),
-    email: z
-      .string()
-      .email("legacy email alias는 이메일 형식이어야 합니다")
-      .optional()
-      .describe("기존 이메일 식별자 호환 필드"),
     password: z
       .string()
       .min(8, "비밀번호는 최소 8자 이상이어야 합니다")
       .describe("관리자 비밀번호 (최소 8자)"),
   })
-  .superRefine((value, ctx) => {
-    if (!value.username && !value.email) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["username"],
-        message: "username 또는 email 중 하나는 필요합니다",
-      });
-
-      return;
-    }
-
-    if (value.email && value.username && value.email !== value.username) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["email"],
-        message: "email 필드는 username과 동일한 legacy alias만 허용합니다",
-      });
-    }
-  });
+  .strict();
 
 /**
  * Auth 라우트 플러그인
@@ -160,7 +130,7 @@ export function createAuthRoute(
           tags: ["auth"],
           summary: "Admin login",
           description:
-            "관리자 사용자명/비밀번호로 로그인합니다. 기존 배포 환경의 이메일 식별자도 전환 기간 동안 허용합니다.\n\n" +
+            "관리자 username/password로 로그인합니다.\n\n" +
             "**Rate limit**: 5회/분",
           body: AdminLoginSchema,
           response: {
@@ -168,7 +138,6 @@ export function createAuthRoute(
               admin: z.object({
                 id: z.number(),
                 username: z.string(),
-                email: z.string().nullable(),
                 createdAt: z.date(),
                 updatedAt: z.date(),
                 lastLoginAt: z.date().nullable(),
@@ -180,18 +149,8 @@ export function createAuthRoute(
         },
       },
       async (request, reply) => {
-        const { username, email, password } = request.body;
-        const identifier = username ?? email;
-
-        if (!identifier) {
-          throw HttpError.badRequest("username is required.");
-        }
-
-        // username을 우선으로 사용하고 email은 전환 기간 alias로만 허용한다.
-        const admin = await adminService.verifyCredentials(
-          identifier,
-          password,
-        );
+        const { username, password } = request.body;
+        const admin = await adminService.verifyCredentials(username, password);
 
         // 세션에 adminId 저장
         request.session.set("adminId", admin.id);
@@ -243,7 +202,6 @@ export function createAuthRoute(
                 type: z.literal("admin"),
                 id: z.number(),
                 username: z.string(),
-                email: z.string().nullable(),
                 createdAt: z.date(),
                 updatedAt: z.date(),
                 lastLoginAt: z.date().nullable(),
