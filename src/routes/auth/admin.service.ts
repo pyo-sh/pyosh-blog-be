@@ -10,6 +10,8 @@ import { verifyPassword } from "@src/shared/password";
  */
 export type AdminResponse = Omit<Admin, "passwordHash">;
 
+const LEGACY_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * Admin 서비스 (관리자 계정 관리 및 인증)
  */
@@ -17,30 +19,33 @@ export class AdminService {
   constructor(private readonly db: MySql2Database<typeof schema>) {}
 
   /**
-   * 이메일/비밀번호 검증
-   * @param email 이메일 주소
+   * 사용자명/비밀번호 검증
+   * @param username 관리자 사용자명
    * @param password 평문 비밀번호
    * @returns 인증된 관리자 정보 (password_hash 제외)
    */
   async verifyCredentials(
-    email: string,
+    username: string,
     password: string,
   ): Promise<AdminResponse> {
-    // 이메일로 관리자 조회
+    const identifier = username;
+    const normalizedIdentifier = LEGACY_EMAIL_REGEX.test(identifier)
+      ? identifier.toLowerCase()
+      : identifier;
     const [admin] = await this.db
       .select()
       .from(adminTable)
-      .where(eq(adminTable.email, email))
+      .where(eq(adminTable.username, normalizedIdentifier))
       .limit(1);
 
     if (!admin) {
-      throw HttpError.unauthorized("Invalid email or password.");
+      throw HttpError.unauthorized("Invalid username or password.");
     }
 
     // 비밀번호 검증
     const isValid = await verifyPassword(admin.passwordHash, password);
     if (!isValid) {
-      throw HttpError.unauthorized("Invalid email or password.");
+      throw HttpError.unauthorized("Invalid username or password.");
     }
 
     // last_login_at 업데이트

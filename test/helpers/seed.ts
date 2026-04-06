@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm";
-import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from "./app";
+import { TEST_ADMIN_PASSWORD, TEST_ADMIN_USERNAME } from "./app";
 import { db } from "@src/db/client";
 import {
   adminTable,
@@ -48,16 +48,18 @@ export async function truncateAll(): Promise<void> {
  * 테스트 Admin 계정 생성
  */
 export async function seedAdmin(overrides?: {
-  email?: string;
+  username?: string;
   password?: string;
-}): Promise<{ id: number; email: string }> {
-  const email = overrides?.email ?? TEST_ADMIN_EMAIL;
+}): Promise<{ id: number; username: string }> {
+  const username = overrides?.username ?? TEST_ADMIN_USERNAME;
   const password = overrides?.password ?? TEST_ADMIN_PASSWORD;
   const passwordHash = await hashPassword(password);
 
-  const [result] = await db.insert(adminTable).values({ email, passwordHash });
+  const [result] = await db
+    .insert(adminTable)
+    .values({ username, passwordHash });
 
-  return { id: Number(result.insertId), email };
+  return { id: Number(result.insertId), username };
 }
 
 /**
