@@ -42,8 +42,7 @@ const AdminLoginSchema = z
       .describe("관리자 사용자명"),
     email: z
       .string()
-      .min(4, "관리자 식별자는 최소 4자 이상이어야 합니다")
-      .max(100, "관리자 식별자는 최대 100자까지 가능합니다")
+      .email("legacy email alias는 이메일 형식이어야 합니다")
       .optional()
       .describe("기존 이메일 식별자 호환 필드"),
     password: z

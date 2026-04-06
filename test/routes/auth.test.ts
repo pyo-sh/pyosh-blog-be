@@ -119,6 +119,19 @@ describe("Auth Routes", () => {
       expect(body.admin.email).toBe("admin@test.pyosh.dev");
     });
 
+    it("email alias에 username 값을 보내면 → 400", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/admin/login",
+        payload: {
+          email: TEST_ADMIN_USERNAME,
+          password: TEST_ADMIN_PASSWORD,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
     it("기존 이메일 식별자는 대소문자 구분 없이 로그인 가능 → 200", async () => {
       await truncateAll();
       await seedAdmin({ username: "admin@test.pyosh.dev" });
@@ -169,7 +182,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: TEST_ADMIN_USERNAME,
+          username: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
         },
       });
