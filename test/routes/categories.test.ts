@@ -11,6 +11,20 @@ import {
 import { db } from "@src/db/client";
 import { postTable } from "@src/db/schema";
 
+function expectRouteHasOnRequestHook(
+  tree: string,
+  route: string,
+  method: "POST" | "PATCH" | "DELETE",
+) {
+  const lines = tree.trimEnd().split("\n");
+  const routeIndex = lines.findIndex((line) =>
+    line.includes(`${route} (${method})`),
+  );
+
+  expect(routeIndex).toBeGreaterThanOrEqual(0);
+  expect(lines[routeIndex + 1]).toContain("• (onRequest)");
+}
+
 describe("Category Routes", () => {
   let app: FastifyInstance;
 
@@ -93,6 +107,16 @@ describe("Category Routes", () => {
   // ===== POST /api/categories =====
 
   describe("POST /api/categories", () => {
+    it("route에 CSRF onRequest hook 등록", () => {
+      const routes = app.printRoutes({
+        commonPrefix: false,
+        includeHooks: true,
+        method: "POST",
+      });
+
+      expectRouteHasOnRequestHook(routes, "/api/categories", "POST");
+    });
+
     it("Admin 생성 성공 → 201", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -134,6 +158,16 @@ describe("Category Routes", () => {
   // ===== PATCH /api/categories/:id =====
 
   describe("PATCH /api/categories/:id", () => {
+    it("route에 CSRF onRequest hook 등록", () => {
+      const routes = app.printRoutes({
+        commonPrefix: false,
+        includeHooks: true,
+        method: "PATCH",
+      });
+
+      expectRouteHasOnRequestHook(routes, "/api/categories/:id", "PATCH");
+    });
+
     it("이름 변경", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -159,6 +193,16 @@ describe("Category Routes", () => {
   // ===== PATCH /api/categories/tree =====
 
   describe("PATCH /api/categories/tree", () => {
+    it("route에 CSRF onRequest hook 등록", () => {
+      const routes = app.printRoutes({
+        commonPrefix: false,
+        includeHooks: true,
+        method: "PATCH",
+      });
+
+      expectRouteHasOnRequestHook(routes, "/api/categories/tree", "PATCH");
+    });
+
     it("트리 배치 변경 → 200", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -258,6 +302,16 @@ describe("Category Routes", () => {
   // ===== DELETE /api/categories/:id =====
 
   describe("DELETE /api/categories/:id", () => {
+    it("route에 CSRF onRequest hook 등록", () => {
+      const routes = app.printRoutes({
+        commonPrefix: false,
+        includeHooks: true,
+        method: "DELETE",
+      });
+
+      expectRouteHasOnRequestHook(routes, "/api/categories/:id", "DELETE");
+    });
+
     it("하위 카테고리 있으면 409", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
