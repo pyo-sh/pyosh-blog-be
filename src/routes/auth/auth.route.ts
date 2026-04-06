@@ -2,12 +2,26 @@ import fastifyPassport from "@fastify/passport";
 import { FastifyPluginAsync, FastifyInstance } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { AdminService } from "./admin.service";
+import { AdminResponse, AdminService } from "./admin.service";
 import { HttpError } from "@src/errors/http-error";
 import { ErrorResponseSchema } from "@src/schemas/common";
 import { env } from "@src/shared/env";
 
 const ADMIN_USERNAME_REGEX = /^[\p{L}\p{N}_.-]+$/u;
+const LEGACY_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function toAdminResponse(admin: AdminResponse) {
+  const isLegacyEmail = LEGACY_EMAIL_REGEX.test(admin.username);
+
+  return {
+    id: admin.id,
+    username: admin.username,
+    email: isLegacyEmail ? admin.username : null,
+    createdAt: admin.createdAt,
+    updatedAt: admin.updatedAt,
+    lastLoginAt: admin.lastLoginAt,
+  };
+}
 
 // Zod 스키마 정의
 const AdminLoginSchema = z.object({
@@ -125,7 +139,8 @@ export function createAuthRoute(
             200: z.object({
               admin: z.object({
                 id: z.number(),
-                email: z.string(),
+                username: z.string(),
+                email: z.string().nullable(),
                 createdAt: z.date(),
                 updatedAt: z.date(),
                 lastLoginAt: z.date().nullable(),
@@ -146,10 +161,7 @@ export function createAuthRoute(
         request.session.set("adminId", admin.id);
 
         return reply.status(200).send({
-          admin: {
-            ...admin,
-            email: admin.username,
-          },
+          admin: toAdminResponse(admin),
         });
       },
     );
@@ -194,7 +206,8 @@ export function createAuthRoute(
               z.object({
                 type: z.literal("admin"),
                 id: z.number(),
-                email: z.string(),
+                username: z.string(),
+                email: z.string().nullable(),
                 createdAt: z.date(),
                 updatedAt: z.date(),
                 lastLoginAt: z.date().nullable(),
@@ -221,8 +234,7 @@ export function createAuthRoute(
 
           return reply.status(200).send({
             type: "admin" as const,
-            ...admin,
-            email: admin.username,
+            ...toAdminResponse(admin),
           });
         }
 

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import { Admin, adminTable } from "@src/db/schema/admins";
 import * as schema from "@src/db/schema/index";
@@ -9,6 +9,8 @@ import { verifyPassword } from "@src/shared/password";
  * Admin 계정 반환 타입 (password_hash 제외)
  */
 export type AdminResponse = Omit<Admin, "passwordHash">;
+
+const LEGACY_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Admin 서비스 (관리자 계정 관리 및 인증)
@@ -26,11 +28,16 @@ export class AdminService {
     username: string,
     password: string,
   ): Promise<AdminResponse> {
-    // 사용자명으로 관리자 조회
+    const identifier = username;
+    const isLegacyEmail = LEGACY_EMAIL_REGEX.test(identifier);
     const [admin] = await this.db
       .select()
       .from(adminTable)
-      .where(eq(adminTable.username, username))
+      .where(
+        isLegacyEmail
+          ? sql`lower(${adminTable.username}) = lower(${identifier})`
+          : eq(adminTable.username, identifier),
+      )
       .limit(1);
 
     if (!admin) {
