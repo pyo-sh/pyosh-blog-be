@@ -7,17 +7,21 @@ import { HttpError } from "@src/errors/http-error";
 import { ErrorResponseSchema } from "@src/schemas/common";
 import { env } from "@src/shared/env";
 
+const ADMIN_USERNAME_REGEX = /^[\p{L}\p{N}_.-]+$/u;
+
 // Zod 스키마 정의
 const AdminLoginSchema = z.object({
   email: z
     .string()
     .min(4, "사용자명은 최소 4자 이상이어야 합니다")
-    .max(20, "사용자명은 최대 20자까지 가능합니다")
-    .regex(
-      /^[\p{L}\p{N}_.-]+$/u,
-      "사용자명은 문자, 숫자, _, ., - 만 사용할 수 있습니다",
+    .max(100, "관리자 식별자는 최대 100자까지 가능합니다")
+    .refine(
+      (value) =>
+        z.string().email().safeParse(value).success ||
+        ADMIN_USERNAME_REGEX.test(value),
+      "관리자 식별자는 이메일 또는 사용자명 형식이어야 합니다",
     )
-    .describe("관리자 사용자명"),
+    .describe("관리자 사용자명 또는 기존 이메일"),
   password: z
     .string()
     .min(8, "비밀번호는 최소 8자 이상이어야 합니다")
@@ -114,7 +118,7 @@ export function createAuthRoute(
           tags: ["auth"],
           summary: "Admin login",
           description:
-            "관리자 사용자명/비밀번호로 로그인합니다.\n\n" +
+            "관리자 사용자명/비밀번호로 로그인합니다. 기존 배포 환경의 이메일 식별자도 전환 기간 동안 허용합니다.\n\n" +
             "**Rate limit**: 5회/분",
           body: AdminLoginSchema,
           response: {

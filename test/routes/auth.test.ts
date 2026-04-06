@@ -77,6 +77,25 @@ describe("Auth Routes", () => {
       expect(response.statusCode).toBe(401);
     });
 
+    it("기존 이메일 식별자도 전환 기간 동안 로그인 가능 → 200", async () => {
+      await truncateAll();
+      await seedAdmin({ username: "admin@test.pyosh.dev" });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/admin/login",
+        payload: {
+          email: "admin@test.pyosh.dev",
+          password: TEST_ADMIN_PASSWORD,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.admin.email).toBe("admin@test.pyosh.dev");
+    });
+
     it("DB에 admin이 없을 때 로그인 → 401 + 에러 메시지", async () => {
       await truncateAll();
 
