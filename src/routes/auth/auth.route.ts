@@ -25,7 +25,7 @@ const AdminLoginSchema = z
     username: z
       .string()
       .min(4, "사용자명은 최소 4자 이상이어야 합니다")
-      .max(20, "사용자명은 최대 20자까지 가능합니다")
+      .max(100, "사용자명은 최대 100자까지 가능합니다")
       .regex(
         ADMIN_USERNAME_REGEX,
         "사용자명은 문자, 숫자, 밑줄(_), 점(.), 하이픈(-)만 사용할 수 있습니다",

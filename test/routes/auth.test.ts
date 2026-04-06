@@ -105,12 +105,12 @@ describe("Auth Routes", () => {
       expect(response.statusCode).toBe(400);
     });
 
-    it("username이 20자를 초과하면 → 400", async () => {
+    it("username이 100자를 초과하면 → 400", async () => {
       const response = await app.inject({
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          username: "a".repeat(21),
+          username: "a".repeat(101),
           password: TEST_ADMIN_PASSWORD,
         },
       });
