@@ -35,7 +35,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: TEST_ADMIN_USERNAME,
+          username: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
         },
       });
@@ -45,7 +45,7 @@ describe("Auth Routes", () => {
       const body = response.json();
       expect(body.admin).toBeDefined();
       expect(body.admin.username).toBe(TEST_ADMIN_USERNAME);
-      expect(body.admin.email).toBe(TEST_ADMIN_USERNAME);
+      expect(body.admin.email).toBeNull();
       expect(body.admin).not.toHaveProperty("passwordHash");
 
       const setCookie = response.headers["set-cookie"];
@@ -57,7 +57,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: TEST_ADMIN_USERNAME,
+          username: TEST_ADMIN_USERNAME,
           password: "WrongPassword1!",
         },
       });
@@ -70,7 +70,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: "missing-user",
+          username: "missing-user",
           password: TEST_ADMIN_PASSWORD,
         },
       });
@@ -79,6 +79,27 @@ describe("Auth Routes", () => {
     });
 
     it("기존 이메일 식별자도 전환 기간 동안 로그인 가능 → 200", async () => {
+      await truncateAll();
+      await seedAdmin({ username: "admin@test.pyosh.dev" });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/admin/login",
+        payload: {
+          username: "admin@test.pyosh.dev",
+          email: "admin@test.pyosh.dev",
+          password: TEST_ADMIN_PASSWORD,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = response.json();
+      expect(body.admin.username).toBe("admin@test.pyosh.dev");
+      expect(body.admin.email).toBe("admin@test.pyosh.dev");
+    });
+
+    it("legacy email alias만 보내도 로그인 가능 → 200", async () => {
       await truncateAll();
       await seedAdmin({ username: "admin@test.pyosh.dev" });
 
@@ -106,6 +127,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
+          username: "Admin@Test.pyosh.dev",
           email: "Admin@Test.pyosh.dev",
           password: TEST_ADMIN_PASSWORD,
         },
@@ -125,7 +147,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: TEST_ADMIN_USERNAME,
+          username: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
         },
       });
@@ -167,7 +189,7 @@ describe("Auth Routes", () => {
       const body = response.json();
       expect(body.type).toBe("admin");
       expect(body.username).toBe(TEST_ADMIN_USERNAME);
-      expect(body.email).toBe(TEST_ADMIN_USERNAME);
+      expect(body.email).toBeNull();
     });
 
     it("비로그인 → 401", async () => {
@@ -190,7 +212,7 @@ describe("Auth Routes", () => {
         method: "POST",
         url: "/api/auth/admin/login",
         payload: {
-          email: TEST_ADMIN_USERNAME,
+          username: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
         },
       });

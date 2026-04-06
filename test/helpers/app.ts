@@ -34,7 +34,7 @@ export async function injectAuth(
     method: "POST",
     url: "/api/auth/admin/login",
     payload: {
-      email: TEST_ADMIN_USERNAME,
+      username: TEST_ADMIN_USERNAME,
       password: TEST_ADMIN_PASSWORD,
     },
   });
