@@ -204,6 +204,30 @@ describe("Post Routes", () => {
       expect(body.post.publishedAt).not.toBeNull();
     });
 
+    it("status=published + summary 없음 → contentMd 기반 summary 자동 생성 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Auto Summary",
+          contentMd:
+            "# Heading\n\n본문 **요약** 문장과 [링크](https://example.com)가 포함됩니다.",
+          categoryId: category.id,
+          status: "published",
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().post.summary).toBe(
+        "Heading 본문 요약 문장과 링크가 포함됩니다.",
+      );
+    });
+
     it("6번째 pinned 생성 시도는 409 반환", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -543,6 +567,54 @@ describe("Post Routes", () => {
       expect(response.statusCode).toBe(200);
       const body = response.json();
       expect(body.post.contentModifiedAt).not.toBeNull();
+    });
+
+    it("draft에서 published 전환 시 summary가 없으면 자동 생성 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "draft",
+        summary: null,
+        contentMd: "# Draft Title\n\n전환 시 요약을 자동 생성합니다.",
+        publishedAt: null,
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+        payload: { status: "published" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().post.summary).toBe(
+        "Draft Title 전환 시 요약을 자동 생성합니다.",
+      );
+      expect(response.json().post.publishedAt).not.toBeNull();
+    });
+
+    it("published 글에서 summary를 null로 비우면 contentMd 기반으로 다시 생성 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        summary: "기존 요약",
+        contentMd: "# Updated\n\nsummary regenerated from content.",
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+        payload: { summary: null },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().post.summary).toBe(
+        "Updated summary regenerated from content.",
+      );
     });
 
     it("tags=[] 전달 시 태그 전체 제거 → 200", async () => {

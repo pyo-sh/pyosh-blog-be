@@ -34,7 +34,55 @@ const MAX_PINNED_POSTS = 5;
 const PINNED_POST_LIMIT_ERROR =
   "Pinned post limit exceeded. Maximum 5 pinned posts allowed.";
 const PINNED_POST_LIMIT_LOCK_NAME = "post_pinned_limit";
+const SUMMARY_MAX_LENGTH = 200;
 type NamedLockRow = RowDataPacket & { acquired: number | null };
+
+function extractPlainText(markdown: string, maxLength = SUMMARY_MAX_LENGTH) {
+  const plainText = markdown
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/[>*_~]/g, "")
+    .replace(/\n+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (plainText.length <= maxLength) {
+    return plainText;
+  }
+
+  const ellipsis = "...";
+  const safeLimit = Math.max(maxLength - ellipsis.length, 0);
+
+  if (safeLimit === 0) {
+    return ellipsis.slice(0, maxLength);
+  }
+
+  return `${plainText.slice(0, safeLimit).trimEnd()}${ellipsis}`;
+}
+
+function normalizeSummary(summary: string | null | undefined) {
+  const trimmed = summary?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function resolvePublishedSummary(input: {
+  status: "draft" | "published" | "archived";
+  summary: string | null | undefined;
+  contentMd: string;
+}) {
+  const normalizedSummary = normalizeSummary(input.summary);
+
+  if (input.status !== "published") {
+    return normalizedSummary;
+  }
+
+  return normalizedSummary ?? extractPlainText(input.contentMd);
+}
 
 /**
  * 게시글 생성 입력 데이터
@@ -220,7 +268,11 @@ export class PostService {
           slug,
           contentMd: input.contentMd,
           categoryId: input.categoryId,
-          summary: input.summary ?? null,
+          summary: resolvePublishedSummary({
+            status: input.status ?? "draft",
+            summary: input.summary,
+            contentMd: input.contentMd,
+          }),
           description: input.description ?? null,
           thumbnailUrl: input.thumbnailUrl ?? null,
           visibility: input.visibility ?? "public",
@@ -283,11 +335,30 @@ export class PostService {
           throw HttpError.notFound("Post not found.");
         }
 
+        const nextStatus = input.status ?? existing[0].status;
+        const nextContentMd = input.contentMd ?? existing[0].contentMd;
+        const nextSummary =
+          input.summary !== undefined ? input.summary : existing[0].summary;
+        const nextPublishedAt =
+          input.publishedAt !== undefined
+            ? input.publishedAt
+            : existing[0].publishedAt;
+
         // 2. 게시글 수정
         const updateData: Partial<NewPost> = {
           ...input,
           updatedAt: new Date(),
         };
+
+        updateData.summary = resolvePublishedSummary({
+          status: nextStatus,
+          summary: nextSummary,
+          contentMd: nextContentMd,
+        });
+
+        if (nextStatus === "published" && !nextPublishedAt) {
+          updateData.publishedAt = new Date();
+        }
 
         // contentMd가 변경되면 contentModifiedAt 자동 갱신
         if (input.contentMd !== undefined) {
