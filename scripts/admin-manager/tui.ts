@@ -25,57 +25,7 @@ async function promptPassword(
   rl: readline.Interface,
   label: string,
 ): Promise<string> {
-  if (!input.isTTY || !output.isTTY) {
-    return rl.question(label);
-  }
-
-  output.write(label);
-
-  return new Promise<string>((resolve, reject) => {
-    const buffer: string[] = [];
-
-    function cleanup() {
-      input.setRawMode?.(false);
-      input.pause();
-      input.removeListener("data", onData);
-      output.write("\n");
-    }
-
-    function onData(chunk: Buffer) {
-      const raw = chunk.toString("utf8");
-
-      if (raw === "\u0003") {
-        cleanup();
-        reject(new Error("Cancelled by user."));
-        return;
-      }
-
-      if (raw === "\r" || raw === "\n") {
-        cleanup();
-        resolve(buffer.join(""));
-        return;
-      }
-
-      if (raw === "\u007f") {
-        if (buffer.length > 0) {
-          buffer.pop();
-          output.write("\b \b");
-        }
-        return;
-      }
-
-      if (/[\u001b]/.test(raw)) {
-        return;
-      }
-
-      buffer.push(raw);
-      output.write("*");
-    }
-
-    input.setRawMode?.(true);
-    input.resume();
-    input.on("data", onData);
-  });
+  return rl.question(label);
 }
 
 export class AdminManagerTui {
