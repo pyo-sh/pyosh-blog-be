@@ -14,7 +14,7 @@
 ### 사용법
 
 ```bash
-pnpm tsx scripts/hash-password.ts "<비밀번호>"
+pnpm ts-node ./scripts/hash-password.ts "<비밀번호>"
 ```
 
 ### 출력 예시
@@ -42,6 +42,49 @@ WHERE username = 'admin.test';
 
 - Argon2id 옵션은 `src/shared/password.ts`와 동일하게 유지해야 합니다 (`memoryCost: 65536`, `timeCost: 3`).
 - salt는 라이브러리가 자동 생성하므로, 같은 비밀번호라도 매번 다른 해시가 출력됩니다.
+
+---
+
+## admin-manager.ts
+
+로컬 터미널에서 admin 계정을 조회, 생성, 수정, 비밀번호 변경, 삭제할 수 있는 대화형 TUI 스크립트입니다.
+
+### 언제 사용하나
+
+- 현재 등록된 admin 계정을 확인할 때
+- 새 admin 계정을 생성할 때
+- username을 변경할 때
+- 비밀번호를 변경할 때
+- 더 이상 필요 없는 admin 계정을 삭제할 때
+
+### 사용법
+
+```bash
+# 기본값: NODE_ENV=development
+pnpm ts-node ./scripts/admin-manager.ts
+
+# override 예시
+NODE_ENV=production pnpm ts-node ./scripts/admin-manager.ts
+```
+
+### 제공 기능
+
+- admin 목록 조회
+- 상세 정보 확인
+- admin 생성
+- username 변경
+- 비밀번호 변경
+- admin 삭제
+
+### 안전 장치
+
+- 비밀번호 입력 마스킹
+- 비밀번호 변경 시 대상 username 재확인
+- 삭제 시 대상 username 재확인 + 최종 delete 확인
+
+### 필요 환경변수
+
+`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PSWD`, `DB_DTBS`
 
 ---
 
