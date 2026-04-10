@@ -1,7 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { connection, db } from "@src/db/client";
-import { env } from "@src/shared/env";
 
 // Drizzle을 Fastify 데코레이터로 등록
 declare module "fastify" {
@@ -21,11 +20,6 @@ const drizzlePlugin: FastifyPluginAsync = async (fastify) => {
 
     // 서버 종료 시 연결 해제
     fastify.addHook("onClose", async () => {
-      if (env.NODE_ENV === "test") {
-        fastify.log.info("[Drizzle] Skipping pool close in test environment");
-        return;
-      }
-
       await connection.end();
       fastify.log.info("[Drizzle] Database connection closed");
     });

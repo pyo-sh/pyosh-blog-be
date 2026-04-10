@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { FastifyInstance } from "fastify";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup } from "@test/helpers/app";
 import { truncateAll } from "@test/helpers/seed";
 
@@ -42,15 +42,18 @@ async function createRealCsrfApp(): Promise<FastifyInstance> {
 describe("CSRF Route Wiring", () => {
   let app: FastifyInstance;
 
-  beforeEach(async () => {
-    await truncateAll();
+  beforeAll(async () => {
     app = await createRealCsrfApp();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await cleanup(app);
     vi.doUnmock("@src/shared/env");
     vi.resetModules();
+  });
+
+  beforeEach(async () => {
+    await truncateAll();
   });
 
   it("rejects guestbook creation when the issued session cookie is missing its CSRF token", async () => {

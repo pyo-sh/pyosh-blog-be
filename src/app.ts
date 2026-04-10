@@ -106,9 +106,18 @@ export async function buildApp(): Promise<FastifyInstance> {
 
     if (
       typeof fastifyError.statusCode === "number" &&
-      fastifyError.statusCode >= 400 &&
-      fastifyError.statusCode < 500
+      fastifyError.code?.startsWith("FST_CSRF_")
     ) {
+      const headers = (
+        fastifyError as FastifyError & { headers?: Record<string, string> }
+      ).headers;
+
+      if (headers) {
+        for (const [name, value] of Object.entries(headers)) {
+          reply.header(name, value);
+        }
+      }
+
       return reply.status(fastifyError.statusCode).send({
         statusCode: fastifyError.statusCode,
         error: fastifyError.code ?? fastifyError.name,

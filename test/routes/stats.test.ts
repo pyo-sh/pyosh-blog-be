@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
 import { seedAdmin, seedCategory, seedPost, truncateAll } from "@test/helpers/seed";
 import { db } from "@src/db/client";
@@ -28,13 +28,16 @@ describe("Stats Routes", () => {
     return headers;
   }
 
-  beforeEach(async () => {
-    await truncateAll();
+  beforeAll(async () => {
     app = await createTestApp();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await cleanup(app);
+  });
+
+  beforeEach(async () => {
+    await truncateAll();
   });
 
   // ===== POST /api/stats/view =====
@@ -46,6 +49,7 @@ describe("Stats Routes", () => {
         method: "POST",
         url: "/api/stats/view",
         headers: csrfHeaders,
+        remoteAddress: "10.0.0.1",
         payload: {},
       });
 
@@ -65,6 +69,7 @@ describe("Stats Routes", () => {
         method: "POST",
         url: "/api/stats/view",
         headers: csrfHeaders,
+        remoteAddress: "10.0.0.2",
         payload: { postId: post.id },
       });
 
@@ -78,6 +83,7 @@ describe("Stats Routes", () => {
         method: "POST",
         url: "/api/stats/view",
         headers: csrfHeaders,
+        remoteAddress: "10.0.0.3",
         payload: { postId: 99999 },
       });
 
@@ -96,6 +102,7 @@ describe("Stats Routes", () => {
         method: "POST",
         url: "/api/stats/view",
         headers: csrfHeaders,
+        remoteAddress: "10.0.0.4",
         payload: { postId: post.id },
       });
 
@@ -142,7 +149,7 @@ describe("Stats Routes", () => {
         method: "POST",
         url: "/api/stats/view",
         headers: csrfHeaders,
-        remoteAddress: "1.2.3.4",
+        remoteAddress: "10.0.0.6",
         payload: { postId: post.id },
       });
 
@@ -150,7 +157,7 @@ describe("Stats Routes", () => {
         method: "POST",
         url: "/api/stats/view",
         headers: csrfHeaders,
-        remoteAddress: "1.2.3.4",
+        remoteAddress: "10.0.0.6",
         payload: {},
       });
 
