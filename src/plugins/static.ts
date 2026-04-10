@@ -1,25 +1,28 @@
-import * as path from "path";
+import * as fs from "fs/promises";
 import fastifyStatic from "@fastify/static";
 import { FastifyInstance } from "fastify";
 import fastifyPlugin from "fastify-plugin";
+import { getUploadDir, UPLOADS_URL_PREFIX } from "@src/shared/uploads";
 
 /**
  * Static 파일 서빙 플러그인
  * uploads 디렉토리의 파일을 /uploads/ 경로로 서빙
  */
 async function staticPlugin(fastify: FastifyInstance) {
-  const uploadDir =
-    process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+  const uploadDir = getUploadDir();
+  await fs.mkdir(uploadDir, { recursive: true });
 
   await fastify.register(fastifyStatic, {
     root: uploadDir,
-    prefix: "/uploads/",
+    prefix: UPLOADS_URL_PREFIX,
     decorateReply: false,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30일 (밀리초)
     immutable: true,
   });
 
-  fastify.log.info(`Static files serving from: ${uploadDir} at /uploads/`);
+  fastify.log.info(
+    `Static files serving from: ${uploadDir} at ${UPLOADS_URL_PREFIX}`,
+  );
 }
 
 export default fastifyPlugin(staticPlugin, {

@@ -4,12 +4,12 @@ import * as path from "path";
 import { imageSize } from "image-size";
 import type { MultipartFile } from "@fastify/multipart";
 import { HttpError } from "@src/errors/http-error";
+import { getUploadDir } from "@src/shared/uploads";
 
 /**
  * 파일 저장 설정 상수
  */
-const UPLOAD_DIR =
-  process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+const UPLOAD_DIR = getUploadDir();
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
   "image/png",
@@ -217,7 +217,7 @@ export class FileStorageService {
     await fs.writeFile(filePath, buffer);
 
     // 8. 상대 경로 반환 (storageKey)
-    const storageKey = path.join(year, month, fileName);
+    const storageKey = path.posix.join(year, month, fileName);
 
     // 9. 이미지 크기 추출 (SVG 등 추출 불가 시 undefined)
     let width: number | undefined;
