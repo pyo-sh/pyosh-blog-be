@@ -104,6 +104,18 @@ export async function buildApp(): Promise<FastifyInstance> {
       });
     }
 
+    if (
+      typeof fastifyError.statusCode === "number" &&
+      fastifyError.statusCode >= 400 &&
+      fastifyError.statusCode < 500
+    ) {
+      return reply.status(fastifyError.statusCode).send({
+        statusCode: fastifyError.statusCode,
+        error: fastifyError.code ?? fastifyError.name,
+        message: fastifyError.message,
+      });
+    }
+
     // 기타 에러: 스택 트레이스 + 요청 컨텍스트 로깅 (pino serializes Error via err key)
     request.log.error(
       {
