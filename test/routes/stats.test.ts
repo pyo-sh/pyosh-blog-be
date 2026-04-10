@@ -9,6 +9,25 @@ import { sql } from "drizzle-orm";
 describe("Stats Routes", () => {
   let app: FastifyInstance;
 
+  async function getCsrfHeaders(cookie?: string): Promise<Record<string, string>> {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/auth/csrf-token",
+      headers: cookie ? { cookie } : undefined,
+    });
+    const setCookie = response.headers["set-cookie"];
+    const raw = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+    const headers: Record<string, string> = {
+      "x-csrf-token": response.json().token,
+    };
+
+    if (raw || cookie) {
+      headers.cookie = (raw ?? cookie)!.split(";")[0];
+    }
+
+    return headers;
+  }
+
   beforeAll(async () => {
     app = await createTestApp();
   });
@@ -25,9 +44,12 @@ describe("Stats Routes", () => {
 
   describe("POST /api/stats/view", () => {
     it("postId 없이 사이트 전체 조회수 기록 → 200", async () => {
+      const csrfHeaders = await getCsrfHeaders();
       const response = await app.inject({
         method: "POST",
         url: "/api/stats/view",
+        headers: csrfHeaders,
+        remoteAddress: "10.0.0.1",
         payload: {},
       });
 
@@ -41,10 +63,13 @@ describe("Stats Routes", () => {
         status: "published",
         visibility: "public",
       });
+      const csrfHeaders = await getCsrfHeaders();
 
       const response = await app.inject({
         method: "POST",
         url: "/api/stats/view",
+        headers: csrfHeaders,
+        remoteAddress: "10.0.0.2",
         payload: { postId: post.id },
       });
 
@@ -53,9 +78,12 @@ describe("Stats Routes", () => {
     });
 
     it("존재하지 않는 postId → 404", async () => {
+      const csrfHeaders = await getCsrfHeaders();
       const response = await app.inject({
         method: "POST",
         url: "/api/stats/view",
+        headers: csrfHeaders,
+        remoteAddress: "10.0.0.3",
         payload: { postId: 99999 },
       });
 
@@ -68,10 +96,13 @@ describe("Stats Routes", () => {
         status: "published",
         visibility: "private",
       });
+      const csrfHeaders = await getCsrfHeaders();
 
       const response = await app.inject({
         method: "POST",
         url: "/api/stats/view",
+        headers: csrfHeaders,
+        remoteAddress: "10.0.0.4",
         payload: { postId: post.id },
       });
 
@@ -84,10 +115,12 @@ describe("Stats Routes", () => {
         status: "published",
         visibility: "public",
       });
+      const csrfHeaders = await getCsrfHeaders();
 
       await app.inject({
         method: "POST",
         url: "/api/stats/view",
+        headers: csrfHeaders,
         remoteAddress: "1.2.3.4",
         payload: { postId: post.id },
       });
@@ -95,6 +128,7 @@ describe("Stats Routes", () => {
       const response = await app.inject({
         method: "POST",
         url: "/api/stats/view",
+        headers: csrfHeaders,
         remoteAddress: "1.2.3.4",
         payload: { postId: post.id },
       });
@@ -109,18 +143,21 @@ describe("Stats Routes", () => {
         status: "published",
         visibility: "public",
       });
+      const csrfHeaders = await getCsrfHeaders();
 
       const postRes = await app.inject({
         method: "POST",
         url: "/api/stats/view",
-        remoteAddress: "1.2.3.4",
+        headers: csrfHeaders,
+        remoteAddress: "10.0.0.6",
         payload: { postId: post.id },
       });
 
       const siteRes = await app.inject({
         method: "POST",
         url: "/api/stats/view",
-        remoteAddress: "1.2.3.4",
+        headers: csrfHeaders,
+        remoteAddress: "10.0.0.6",
         payload: {},
       });
 

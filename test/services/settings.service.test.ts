@@ -11,11 +11,36 @@ function createMissingTableError(): Error {
 }
 
 function getSqlString(value: unknown): string {
-  const sqlChunk = (
-    value as { queryChunks?: Array<{ value?: string }> } | undefined
-  )?.queryChunks?.[0];
+  const seen = new Set<unknown>();
+  const strings: string[] = [];
 
-  return typeof sqlChunk?.value === "string" ? sqlChunk.value : "";
+  function collect(input: unknown): void {
+    if (typeof input === "string") {
+      strings.push(input);
+      return;
+    }
+
+    if (!input || typeof input !== "object" || seen.has(input)) {
+      return;
+    }
+
+    seen.add(input);
+
+    for (const nested of Object.values(input as Record<string, unknown>)) {
+      if (Array.isArray(nested)) {
+        for (const item of nested) {
+          collect(item);
+        }
+        continue;
+      }
+
+      collect(nested);
+    }
+  }
+
+  collect(value);
+
+  return strings.join(" ");
 }
 
 function createDbMock() {

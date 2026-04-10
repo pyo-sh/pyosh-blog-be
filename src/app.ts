@@ -104,6 +104,27 @@ export async function buildApp(): Promise<FastifyInstance> {
       });
     }
 
+    if (
+      typeof fastifyError.statusCode === "number" &&
+      fastifyError.code?.startsWith("FST_CSRF_")
+    ) {
+      const headers = (
+        fastifyError as FastifyError & { headers?: Record<string, string> }
+      ).headers;
+
+      if (headers) {
+        for (const [name, value] of Object.entries(headers)) {
+          reply.header(name, value);
+        }
+      }
+
+      return reply.status(fastifyError.statusCode).send({
+        statusCode: fastifyError.statusCode,
+        error: fastifyError.code ?? fastifyError.name,
+        message: fastifyError.message,
+      });
+    }
+
     // 기타 에러: 스택 트레이스 + 요청 컨텍스트 로깅 (pino serializes Error via err key)
     request.log.error(
       {
