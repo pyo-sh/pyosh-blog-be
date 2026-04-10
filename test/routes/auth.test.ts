@@ -27,12 +27,14 @@ describe("Auth Routes", () => {
       url: "/api/auth/csrf-token",
       headers: cookie ? { cookie } : undefined,
     });
+    const responseCookie = response.headers["set-cookie"];
+    const nextCookie = responseCookie ? getSessionCookie(responseCookie) : cookie;
     const headers: Record<string, string> = {
       "x-csrf-token": response.json().token,
     };
 
-    if (cookie) {
-      headers.cookie = cookie;
+    if (nextCookie) {
+      headers.cookie = nextCookie;
     }
 
     return headers;

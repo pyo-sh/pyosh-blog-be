@@ -92,5 +92,10 @@ export async function setup(): Promise<void> {
 }
 
 export async function teardown(): Promise<void> {
-  // 테스트 DB는 유지 (다음 실행 시 migrate가 멱등하게 동작)
+  const { config } = await import("dotenv");
+  config({ path: path.resolve(process.cwd(), ".env.test") });
+
+  const { connection } = await import("../src/db/client");
+
+  await connection.end();
 }

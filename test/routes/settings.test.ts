@@ -15,12 +15,14 @@ describe("Settings Routes", () => {
       url: "/api/auth/csrf-token",
       headers: cookie ? { cookie } : undefined,
     });
+    const setCookie = response.headers["set-cookie"];
+    const raw = Array.isArray(setCookie) ? setCookie[0] : setCookie;
     const headers: Record<string, string> = {
       "x-csrf-token": response.json().token,
     };
 
-    if (cookie) {
-      headers.cookie = cookie;
+    if (raw || cookie) {
+      headers.cookie = (raw ?? cookie)!.split(";")[0];
     }
 
     return headers;
