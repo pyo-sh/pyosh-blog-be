@@ -1,21 +1,23 @@
 import { FastifyInstance } from "fastify";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, createTestApp } from "@test/helpers/app";
 
 describe("Health Routes", () => {
   let app: FastifyInstance;
 
+  beforeAll(async () => {
+    app = await createTestApp();
+  });
+
+  afterAll(async () => {
+    await cleanup(app);
+  });
+
   afterEach(async () => {
     vi.restoreAllMocks();
-
-    if (app) {
-      await cleanup(app);
-    }
   });
 
   it("GET /health should return basic health response", async () => {
-    app = await createTestApp();
-
     const response = await app.inject({
       method: "GET",
       url: "/health",
@@ -28,8 +30,6 @@ describe("Health Routes", () => {
   });
 
   it("GET /api/health/live should return liveness payload", async () => {
-    app = await createTestApp();
-
     const response = await app.inject({
       method: "GET",
       url: "/api/health/live",
@@ -44,8 +44,6 @@ describe("Health Routes", () => {
   });
 
   it("GET /api/health/ready should include database status", async () => {
-    app = await createTestApp();
-
     const response = await app.inject({
       method: "GET",
       url: "/api/health/ready",
@@ -59,8 +57,6 @@ describe("Health Routes", () => {
   });
 
   it("GET /api/health should include uptime and database status", async () => {
-    app = await createTestApp();
-
     const response = await app.inject({
       method: "GET",
       url: "/api/health",
@@ -76,7 +72,6 @@ describe("Health Routes", () => {
   });
 
   it("GET /api/health/ready should return 503 when DB is down", async () => {
-    app = await createTestApp();
     vi.spyOn(app.db, "execute").mockRejectedValueOnce(new Error("db down"));
 
     const response = await app.inject({
@@ -93,7 +88,6 @@ describe("Health Routes", () => {
   });
 
   it("GET /api/health should return 503 when DB is down", async () => {
-    app = await createTestApp();
     vi.spyOn(app.db, "execute").mockRejectedValueOnce(new Error("db down"));
 
     const response = await app.inject({

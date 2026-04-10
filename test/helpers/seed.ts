@@ -23,6 +23,7 @@ const ALL_TABLES = [
   "post_tag_tb",
   "comment_tb",
   "guestbook_entry_tb",
+  "site_settings_tb",
   "stats_daily_tb",
   "post_tb",
   "asset_tb",

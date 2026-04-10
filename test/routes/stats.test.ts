@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
 import { seedAdmin, seedCategory, seedPost, truncateAll } from "@test/helpers/seed";
 import { db } from "@src/db/client";
@@ -9,16 +9,13 @@ import { sql } from "drizzle-orm";
 describe("Stats Routes", () => {
   let app: FastifyInstance;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    await truncateAll();
     app = await createTestApp();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     await cleanup(app);
-  });
-
-  beforeEach(async () => {
-    await truncateAll();
   });
 
   // ===== POST /api/stats/view =====

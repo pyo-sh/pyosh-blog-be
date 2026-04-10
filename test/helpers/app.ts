@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { mkdir } from "node:fs/promises";
 import { FastifyInstance } from "fastify";
 import { buildApp } from "@src/app";
 import { db } from "@src/db/client";
@@ -13,6 +14,8 @@ export const TEST_ADMIN_PASSWORD = "Test12345!";
  * 테스트용 Fastify 인스턴스 생성
  */
 export async function createTestApp(): Promise<FastifyInstance> {
+  await mkdir("uploads", { recursive: true });
+
   const app = await buildApp();
   await app.ready();
 

@@ -11,6 +11,33 @@ import { seedAdmin, truncateAll } from "@test/helpers/seed";
 describe("Auth Routes", () => {
   let app: FastifyInstance;
 
+  function getSessionCookie(setCookie: string | string[] | undefined): string {
+    const raw = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+
+    if (!raw) {
+      throw new Error("No session cookie in response");
+    }
+
+    return raw.split(";")[0];
+  }
+
+  async function getCsrfHeaders(cookie?: string): Promise<Record<string, string>> {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/auth/csrf-token",
+      headers: cookie ? { cookie } : undefined,
+    });
+    const headers: Record<string, string> = {
+      "x-csrf-token": response.json().token,
+    };
+
+    if (cookie) {
+      headers.cookie = cookie;
+    }
+
+    return headers;
+  }
+
   beforeAll(async () => {
     app = await createTestApp();
   });
@@ -157,6 +184,20 @@ describe("Auth Routes", () => {
     });
   });
 
+  // ===== GET /api/auth/csrf-token =====
+
+  describe("GET /api/auth/csrf-token", () => {
+    it("CSRF 토큰 발급 + 세션 쿠키 설정 → 200", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/auth/csrf-token",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().token).toEqual(expect.any(String));
+    });
+  });
+
   // ===== GET /api/auth/me =====
 
   describe("GET /api/auth/me", () => {
@@ -172,9 +213,7 @@ describe("Auth Routes", () => {
         },
       });
 
-      const setCookie = loginResponse.headers["set-cookie"];
-      const raw = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-      const sessionCookie = raw!.split(";")[0];
+      const sessionCookie = getSessionCookie(loginResponse.headers["set-cookie"]);
 
       const response = await app.inject({
         method: "GET",
@@ -215,14 +254,13 @@ describe("Auth Routes", () => {
         },
       });
 
-      const setCookie = loginResponse.headers["set-cookie"];
-      const raw = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-      const sessionCookie = raw!.split(";")[0];
+      const sessionCookie = getSessionCookie(loginResponse.headers["set-cookie"]);
+      const csrfHeaders = await getCsrfHeaders(sessionCookie);
 
       const logoutResponse = await app.inject({
         method: "POST",
         url: "/api/auth/admin/logout",
-        headers: { cookie: sessionCookie },
+        headers: csrfHeaders,
       });
 
       expect(logoutResponse.statusCode).toBe(204);
