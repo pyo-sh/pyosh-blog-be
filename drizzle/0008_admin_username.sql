@@ -1,10 +1,10 @@
 ALTER TABLE `admin_tb`
   DROP INDEX `admin_tb_email_unique`,
-  CHANGE COLUMN `email` `username` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL;
+  CHANGE COLUMN `email` `username` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL;--> statement-breakpoint
 
 UPDATE `admin_tb`
 SET `username` = LOWER(`username`)
-WHERE `username` LIKE '%@%';
+WHERE `username` LIKE '%@%';--> statement-breakpoint
 
 ALTER TABLE `admin_tb`
   ADD CONSTRAINT `admin_tb_username_unique` UNIQUE(`username`);

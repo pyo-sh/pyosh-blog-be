@@ -5,7 +5,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { loadEnv, requireDbEnv } from "./db-env";
 
 type TableExistsRow = RowDataPacket & {
-  exists: number;
+  tableExists: number;
 };
 
 type MigrationSummaryRow = RowDataPacket & {
@@ -25,14 +25,14 @@ function getLocalMigrationCount(): number {
 async function getAppliedMigrationSummary(conn: mysql.Connection) {
   const [tableRows] = await conn.query<TableExistsRow[]>(
     `
-      SELECT COUNT(*) AS exists
+      SELECT COUNT(*) AS tableExists
       FROM information_schema.tables
       WHERE table_schema = DATABASE()
         AND table_name = '__drizzle_migrations'
     `,
   );
 
-  if (!tableRows[0]?.exists) {
+  if (!tableRows[0]?.tableExists) {
     return { appliedCount: 0, lastAppliedAt: null };
   }
 
