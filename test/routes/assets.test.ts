@@ -2,6 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
+import { getUploadDir } from "@src/shared/uploads";
 import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
 import { seedAdmin, seedAsset, truncateAll } from "@test/helpers/seed";
 
@@ -128,8 +129,7 @@ describe("Asset Routes", () => {
   describe("POST /api/assets/upload", () => {
     afterEach(async () => {
       // 업로드된 파일 정리
-      const uploadDir =
-        process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+      const uploadDir = getUploadDir();
       try {
         await fs.rm(uploadDir, { recursive: true, force: true });
       } catch {
@@ -185,6 +185,40 @@ describe("Asset Routes", () => {
       expect(asset.url).toMatch(/^\/uploads\/\d{4}\/\d{2}\//);
       expect(asset.width).toBe(1);
       expect(asset.height).toBe(1);
+    });
+
+    it("업로드 후 반환된 /uploads URL로 정적 접근 가능", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [{ fieldName: "files", fileName: "served.png", content: TINY_PNG, mimeType: "image/png" }],
+        boundary,
+      );
+      const uploadRes = await app.inject({
+        method: "POST",
+        url: "/api/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+
+      expect(uploadRes.statusCode).toBe(201);
+      const body = uploadRes.json();
+      const asset = body.assets[0];
+      const relativePath = asset.url.replace(/^\/uploads\//, "");
+      const savedFile = path.join(getUploadDir(), relativePath);
+
+      await expect(fs.access(savedFile)).resolves.toBeUndefined();
+
+      const staticRes = await app.inject({
+        method: "GET",
+        url: asset.url,
+      });
+
+      expect(staticRes.statusCode).toBe(200);
+      expect(staticRes.headers["content-type"]).toContain("image/png");
+      expect(Number(staticRes.headers["content-length"])).toBe(TINY_PNG.length);
     });
 
     it("안전한 SVG 업로드 → 201", async () => {

@@ -4,6 +4,7 @@ import { assetTable, type Asset } from "@src/db/schema/assets";
 import * as schema from "@src/db/schema/index";
 import { HttpError } from "@src/errors/http-error";
 import { FileStorageService, type BufferedFile } from "@src/services/file-storage.service";
+import { toUploadUrl, UPLOADS_URL_PREFIX } from "@src/shared/uploads";
 import {
   buildPaginatedResponse,
   calculateOffset,
@@ -112,7 +113,7 @@ export class AssetService {
 
     // 2. 실제 파일 삭제 (실패해도 DB는 삭제)
     try {
-      await this.fileStorage.deleteFile(asset.url.replace("/uploads/", ""));
+      await this.fileStorage.deleteFile(asset.url.replace(UPLOADS_URL_PREFIX, ""));
     } catch (error) {
       // 파일 삭제 실패는 로그만 남기고 계속 진행
       console.error(`Failed to delete file: ${asset.url}`, error);
@@ -184,7 +185,7 @@ export class AssetService {
   private toUploadedAsset(asset: Asset): UploadedAsset {
     return {
       id: asset.id,
-      url: `/uploads/${asset.storageKey}`,
+      url: toUploadUrl(asset.storageKey),
       mimeType: asset.mimeType,
       sizeBytes: asset.sizeBytes,
       width: asset.width ?? undefined,
