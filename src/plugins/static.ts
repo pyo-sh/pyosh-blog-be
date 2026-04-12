@@ -18,6 +18,11 @@ async function staticPlugin(fastify: FastifyInstance) {
     decorateReply: false,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30일 (밀리초)
     immutable: true,
+    setHeaders(res) {
+      // Allow images to be embedded across same-site origins such as
+      // app.example.com -> api.example.com without opening them to all origins.
+      res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+    },
   });
 
   fastify.log.info(
