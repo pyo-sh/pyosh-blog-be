@@ -36,7 +36,8 @@ COPY tsconfig.json tsconfig.alias.json tsconfig.prod.json ./
 COPY src ./src
 
 # TypeScript -> JavaScript 컴파일
-# 산출물: /app/build/src/*.js
+# 1) tsc로 컴파일 → 2) tsc-alias로 @src/* 경로를 상대경로로 재작성
+# 산출물: /app/build/src/*.js (path alias가 제거된 평범한 JS)
 RUN pnpm build
 
 
@@ -51,16 +52,15 @@ FROM node:20-slim AS production
 WORKDIR /app
 
 # builder에서 산출물 복사
-# - build/        : 컴파일된 JS
+# - build/        : 컴파일된 JS (tsc-alias로 @src/* 경로 재작성 완료)
 # - node_modules/ : 컴파일된 argon2 .node 바이너리 포함
-#                   (현재는 devDeps 포함된 상태로 복사 — tsconfig-paths가
-#                    devDeps에 있어 prune 불가. 나중에 dependencies로 이동 후 prune 가능)
-# - tsconfig*.json: 런타임에 tsconfig-paths/register가 읽음 (path alias 해석)
+# - package.json  : 메타데이터
+#
+# tsc-alias 덕분에 런타임에 tsconfig-paths가 더 이상 필요 없으므로
+# tsconfig*.json 파일들도 복사하지 않음 (이미지 더 작아짐)
 COPY --from=builder --chown=node:node /app/build ./build
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/package.json ./package.json
-COPY --from=builder --chown=node:node /app/tsconfig.json ./tsconfig.json
-COPY --from=builder --chown=node:node /app/tsconfig.alias.json ./tsconfig.alias.json
 
 # drizzle migration 파일 (entrypoint.sh에서 사용 예정)
 COPY --chown=node:node drizzle ./drizzle
@@ -80,4 +80,5 @@ USER node
 
 # 다음 단계(entrypoint.sh)에서 ENTRYPOINT로 교체될 예정
 # 지금은 server.js를 직접 실행해서 컨테이너 단독 동작 검증 가능
-CMD ["node", "-r", "tsconfig-paths/register", "./build/src/server.js"]
+# tsc-alias 덕분에 런타임 path resolver 없이 평범한 node 실행
+CMD ["node", "./build/src/server.js"]

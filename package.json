@@ -6,8 +6,8 @@
   "author": "pyo-sh <pygosky@gmail.com>",
   "scripts": {
     "dev": "NODE_ENV=development nodemon --spawn --exec ts-node -r tsconfig-paths/register ./src/server.ts",
-    "build": "NODE_ENV=production rm -rf ./build && pnpm tsc --project tsconfig.prod.json",
-    "start": "NODE_ENV=production node -r tsconfig-paths/register ./build/src/server.js",
+    "build": "NODE_ENV=production rm -rf ./build && pnpm tsc --project tsconfig.prod.json && pnpm tsc-alias -p tsconfig.prod.json",
+    "start": "NODE_ENV=production node ./build/src/server.js",
     "test": "NODE_ENV=test vitest run",
     "test:watch": "NODE_ENV=test vitest",
     "test:ui": "NODE_ENV=test vitest --ui",
@@ -70,6 +70,7 @@
     "nodemon": "^2.0.20",
     "prettier": "^3.8.1",
     "ts-node": "^10.9.1",
+    "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^3.14.2",
     "typescript": "^5.9.3",
     "vitest": "^2.1.9"
