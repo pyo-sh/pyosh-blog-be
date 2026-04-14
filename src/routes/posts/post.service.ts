@@ -28,7 +28,7 @@ import {
   buildPaginatedResponse,
   calculateOffset,
 } from "@src/shared/pagination";
-import { generateSlug, isBlankSlug } from "@src/shared/slug";
+import { ensureUniqueSlug, generateSlug, isBlankSlug } from "@src/shared/slug";
 
 const MAX_PINNED_POSTS = 5;
 const PINNED_POST_LIMIT_ERROR =
@@ -1066,7 +1066,7 @@ export class PostService {
     const preferredSlug = generateSlug(title);
 
     if (isBlankSlug(preferredSlug)) {
-      return String(postId);
+      return await this.resolveFallbackSlug(tx, postId, excludeId);
     }
 
     const existing = await tx
@@ -1079,7 +1079,29 @@ export class PostService {
       return preferredSlug;
     }
 
-    return String(postId);
+    return await this.resolveFallbackSlug(tx, postId, excludeId);
+  }
+
+  private async resolveFallbackSlug(
+    tx: MySql2Database<typeof schema>,
+    postId: number,
+    excludeId?: number,
+  ): Promise<string> {
+    const baseSlug = String(postId);
+
+    return await ensureUniqueSlug(baseSlug, async (checkSlug) => {
+      const existing = await tx
+        .select({ id: postTable.id })
+        .from(postTable)
+        .where(eq(postTable.slug, checkSlug))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return false;
+      }
+
+      return excludeId === undefined || existing[0]?.id !== excludeId;
+    });
   }
 
   /**

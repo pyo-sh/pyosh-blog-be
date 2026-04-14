@@ -224,6 +224,42 @@ describe("Post Routes", () => {
       expect(body.post.slug).toBe(String(body.post.id));
     });
 
+    it("id fallback slug가 이미 존재하면 숫자 suffix로 유니크하게 만든다 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const existingNumericSlug = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "2",
+          contentMd: "# Existing numeric slug",
+          categoryId: category.id,
+        },
+      });
+
+      expect(existingNumericSlug.statusCode).toBe(201);
+      expect(existingNumericSlug.json().post.slug).toBe("2");
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "!!!",
+          contentMd: "# Symbols only",
+          categoryId: category.id,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json();
+      expect(body.post.id).toBe(2);
+      expect(body.post.slug).toBe("2-2");
+    });
+
     it("status=published + publishedAt 없음 → publishedAt 자동 설정 → 201", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
