@@ -1,0 +1,20 @@
+services:
+  blog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: blog_container:latest
+    container_name: blog_container
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    volumes:
+      - ${HOME}/blog_uploads:/app/uploads
+    networks:
+      - blog_network
+    # 외부 포트 노출 없음. cloudflared가 blog_network 내부에서 접근.
+
+networks:
+  blog_network:
+    external: true
