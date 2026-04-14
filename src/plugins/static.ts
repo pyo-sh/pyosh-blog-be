@@ -3,6 +3,7 @@ import fastifyStatic from "@fastify/static";
 import { FastifyInstance } from "fastify";
 import fastifyPlugin from "fastify-plugin";
 import { getUploadDir, UPLOADS_URL_PREFIX } from "@src/shared/uploads";
+import { env } from "@src/shared/env";
 
 /**
  * Static 파일 서빙 플러그인
@@ -10,6 +11,8 @@ import { getUploadDir, UPLOADS_URL_PREFIX } from "@src/shared/uploads";
  */
 async function staticPlugin(fastify: FastifyInstance) {
   const uploadDir = getUploadDir();
+  const crossOriginResourcePolicy =
+    env.NODE_ENV === "development" ? "cross-origin" : "same-site";
   await fs.mkdir(uploadDir, { recursive: true });
 
   await fastify.register(fastifyStatic, {
@@ -19,9 +22,12 @@ async function staticPlugin(fastify: FastifyInstance) {
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30일 (밀리초)
     immutable: true,
     setHeaders(res) {
-      // Allow images to be embedded across same-site origins such as
-      // app.example.com -> api.example.com without opening them to all origins.
-      res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+      // Keep production constrained to same-site while allowing
+      // localhost dev ports to embed uploaded images during development.
+      res.setHeader(
+        "Cross-Origin-Resource-Policy",
+        crossOriginResourcePolicy,
+      );
     },
   });
 
