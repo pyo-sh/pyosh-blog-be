@@ -228,6 +228,32 @@ describe("Post Routes", () => {
       );
     });
 
+    it("summary/description에 null 전달 시 생성 허용 + published summary 자동 생성 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Null Meta Post",
+          contentMd: "# Null Heading\n\nnull 메타 필드를 허용합니다.",
+          categoryId: category.id,
+          status: "published",
+          summary: null,
+          description: null,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().post.summary).toBe(
+        "Null Heading null 메타 필드를 허용합니다.",
+      );
+      expect(response.json().post.description).toBeNull();
+    });
+
     it("6번째 pinned 생성 시도는 409 반환", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);

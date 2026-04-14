@@ -83,8 +83,22 @@ export const CreatePostBodySchema = z.object({
   title: z.string().min(1).max(200).describe("게시글 제목"),
   contentMd: z.string().min(1).describe("마크다운 본문"),
   categoryId: z.number().int().positive().describe("카테고리 ID"),
-  summary: z.string().trim().min(1).max(200).optional().describe("게시글 요약 (최대 200자)"),
-  description: z.string().trim().min(1).max(300).optional().describe("SEO 메타 설명 (최대 300자)"),
+  summary: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .nullable()
+    .optional()
+    .describe("게시글 요약 (최대 200자, null 허용)"),
+  description: z
+    .string()
+    .trim()
+    .min(1)
+    .max(300)
+    .nullable()
+    .optional()
+    .describe("SEO 메타 설명 (최대 300자, null 허용)"),
   thumbnailUrl: ThumbnailUrlInputSchema.optional().describe("썸네일 URL (/uploads/... 또는 http(s) URL)"),
   visibility: z.enum(["public", "private"]).optional().default("public").describe("공개 범위"),
   status: z
