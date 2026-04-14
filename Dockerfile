@@ -65,10 +65,10 @@ COPY --from=builder --chown=node:node /app/package.json ./package.json
 # drizzle migration 파일 (entrypoint.sh에서 사용 예정)
 COPY --chown=node:node drizzle ./drizzle
 
-# uploads 디렉토리 생성 (host volume mount 지점)
+# uploads / logs 디렉토리 생성 (host volume mount 지점)
 # 호스트 볼륨이 마운트되면 이 디렉토리는 마운트로 덮어써짐
 # 마운트가 없을 때도 컨테이너 내부에서 쓰기 가능하도록 준비
-RUN mkdir -p /app/uploads && chown node:node /app/uploads
+RUN mkdir -p /app/uploads /app/logs && chown -R node:node /app/uploads /app/logs
 
 ENV NODE_ENV=production
 

@@ -11,6 +11,7 @@ services:
       - .env
     volumes:
       - ${HOME}/blog_uploads:/app/uploads
+      - ${HOME}/blog_logs:/app/logs
     networks:
       - blog_network
     # 외부 포트 노출 없음. cloudflared가 blog_network 내부에서 접근.
