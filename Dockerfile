@@ -62,8 +62,12 @@ COPY --from=builder --chown=node:node /app/build ./build
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/package.json ./package.json
 
-# drizzle migration 파일 (entrypoint.sh에서 사용 예정)
+# drizzle migration 파일 (entrypoint.sh의 migrate 스텝에서 사용)
 COPY --chown=node:node drizzle ./drizzle
+
+# 컨테이너 부트스트랩 스크립트 (migration → server)
+COPY --chown=node:node scripts/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
 # uploads / logs 디렉토리 생성 (host volume mount 지점)
 # 호스트 볼륨이 마운트되면 이 디렉토리는 마운트로 덮어써짐
@@ -78,7 +82,6 @@ EXPOSE 5500
 # 보안: non-root 유저로 실행
 USER node
 
-# 다음 단계(entrypoint.sh)에서 ENTRYPOINT로 교체될 예정
-# 지금은 server.js를 직접 실행해서 컨테이너 단독 동작 검증 가능
+# Entrypoint: drizzle migration → server start
 # tsc-alias 덕분에 런타임 path resolver 없이 평범한 node 실행
-CMD ["node", "./build/src/server.js"]
+ENTRYPOINT ["./entrypoint.sh"]
