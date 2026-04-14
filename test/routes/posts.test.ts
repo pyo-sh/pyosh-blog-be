@@ -1082,6 +1082,34 @@ describe("Post Routes", () => {
       expect(withDeleted.json().data).toHaveLength(1);
     });
 
+    it("includeDeleted=false 쿼리스트링 → 삭제된 글 제외 (회귀 방지)", async () => {
+      // z.coerce.boolean() 은 Boolean("false") === true 로 강제변환되어
+      // 이 쿼리를 정확히 오분해하는 버그가 있었다. 문자열 "false" 가
+      // deletedAt IS NULL 필터를 유지하는지 명시적으로 확인한다.
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const activePost = await seedPost(category.id);
+      const deletedPost = await seedPost(category.id);
+      await app.inject({
+        method: "DELETE",
+        url: `/api/admin/posts/${deletedPost.id}`,
+        headers: { cookie },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/admin/posts?includeDeleted=false",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const data = response.json().data as { id: number }[];
+      expect(data).toHaveLength(1);
+      expect(data[0].id).toBe(activePost.id);
+    });
+
     it("페이지네이션 — limit=2, 총 3개 → meta.totalCount=3", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);

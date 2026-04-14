@@ -14,6 +14,14 @@ const isAllowedThumbnailUrl = (value: string): boolean => {
   }
 };
 
+// z.coerce.boolean()은 Boolean(v)이라 "false" 같은 문자열도 true가 된다.
+// 쿼리스트링은 항상 문자열이므로 명시적으로 파싱해야 한다.
+const BooleanQueryParam = z
+  .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+  .transform((value) =>
+    typeof value === "boolean" ? value : value === "true" || value === "1",
+  );
+
 const ThumbnailUrlInputSchema = z
   .string()
   .trim()
@@ -56,7 +64,7 @@ export const PostListQuerySchema = z.object({
     .default("published_at")
     .describe("정렬 기준 필드"),
   order: z.enum(["asc", "desc"]).optional().default("desc").describe("정렬 방향"),
-  includeDeleted: z.coerce.boolean().optional().default(false).describe("삭제된 게시글 포함 여부"),
+  includeDeleted: BooleanQueryParam.optional().default(false).describe("삭제된 게시글 포함 여부"),
 });
 
 export const AdminPostListQuerySchema = z.object({
@@ -73,7 +81,7 @@ export const AdminPostListQuerySchema = z.object({
     .default("created_at")
     .describe("정렬 기준 필드"),
   order: z.enum(["asc", "desc"]).optional().default("desc").describe("정렬 방향"),
-  includeDeleted: z.coerce.boolean().optional().default(false).describe("삭제된 게시글 포함 여부"),
+  includeDeleted: BooleanQueryParam.optional().default(false).describe("삭제된 게시글 포함 여부"),
 });
 
 /**
