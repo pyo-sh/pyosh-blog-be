@@ -1,5 +1,5 @@
 UPDATE `post_tb`
-SET `slug` = CONCAT('__repair__', `id`, '__', REPLACE(UUID(), '-', ''))
+SET `slug` = CONCAT('~repair~', `id`, '~', REPLACE(UUID(), '-', ''))
 WHERE TRIM(COALESCE(`slug`, '')) = ''
    OR `slug` REGEXP '^-[0-9]+$';--> statement-breakpoint
 
@@ -19,4 +19,4 @@ SET `slug` = (
     )
   END
 )
-WHERE `target`.`slug` REGEXP '^__repair__';
+WHERE `target`.`slug` REGEXP '^~repair~[0-9]+~';
