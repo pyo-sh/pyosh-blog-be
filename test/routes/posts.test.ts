@@ -157,7 +157,27 @@ describe("Post Routes", () => {
       expect(body.post.slug).toMatch(/hello-world-post/);
     });
 
-    it("중복 slug는 suffix로 유니크하게 생성된다 → 201", async () => {
+    it("한글 제목도 유니코드 slug로 생성한다 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "한글 제목만 있는 글",
+          contentMd: "# 안녕하세요",
+          categoryId: category.id,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().post.slug).toBe("한글-제목만-있는-글");
+    });
+
+    it("중복 slug는 생성된 post id를 fallback으로 사용한다 → 201", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
       const category = await seedCategory();
@@ -177,9 +197,67 @@ describe("Post Routes", () => {
 
       expect(first.statusCode).toBe(201);
       expect(second.statusCode).toBe(201);
-      const slug1 = first.json().post.slug as string;
-      const slug2 = second.json().post.slug as string;
-      expect(slug1).not.toBe(slug2);
+      const firstBody = first.json();
+      const secondBody = second.json();
+      expect(firstBody.post.slug).toBe("duplicate-title");
+      expect(secondBody.post.slug).toBe(String(secondBody.post.id));
+    });
+
+    it("제목에서 slug를 만들 수 없으면 생성된 post id를 사용한다 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "!!!",
+          contentMd: "# Symbols only",
+          categoryId: category.id,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json();
+      expect(body.post.slug).toBe(String(body.post.id));
+    });
+
+    it("id fallback slug가 이미 존재하면 숫자 suffix로 유니크하게 만든다 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const existingNumericSlug = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "2",
+          contentMd: "# Existing numeric slug",
+          categoryId: category.id,
+        },
+      });
+
+      expect(existingNumericSlug.statusCode).toBe(201);
+      expect(existingNumericSlug.json().post.slug).toBe("2");
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "!!!",
+          contentMd: "# Symbols only",
+          categoryId: category.id,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json();
+      expect(body.post.id).toBe(2);
+      expect(body.post.slug).toBe("2-2");
     });
 
     it("status=published + publishedAt 없음 → publishedAt 자동 설정 → 201", async () => {
@@ -749,6 +827,46 @@ describe("Post Routes", () => {
 
       expect(response.statusCode).toBe(409);
       expect(response.json().message).toContain("Pinned post limit exceeded");
+    });
+
+    it("비정상 빈 slug 글을 수정하면 slug를 복구한다 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        title: "초기 제목",
+        slug: "",
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+        payload: { title: "복구된 제목" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().post.slug).toBe("복구된-제목");
+    });
+
+    it("legacy -숫자 slug 글을 수정하면 slug를 복구한다 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        title: "초기 제목",
+        slug: "-2",
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+        payload: { title: "복구된 제목" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().post.slug).toBe("복구된-제목");
     });
   });
 

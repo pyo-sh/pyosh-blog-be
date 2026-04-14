@@ -28,7 +28,11 @@ import {
   buildPaginatedResponse,
   calculateOffset,
 } from "@src/shared/pagination";
-import { generateSlug, ensureUniqueSlug } from "@src/shared/slug";
+import {
+  ensureUniqueSlug,
+  generateUnicodeSlug,
+  isBlankSlug,
+} from "@src/shared/slug";
 
 const MAX_PINNED_POSTS = 5;
 const PINNED_POST_LIMIT_ERROR =
@@ -68,6 +72,14 @@ function extractPlainText(markdown: string, maxLength = SUMMARY_MAX_LENGTH) {
 function normalizeSummary(summary: string | null | undefined) {
   const trimmed = summary?.trim();
   return trimmed ? trimmed : null;
+}
+
+function needsLegacySlugRepair(slug: string | null | undefined) {
+  if (isBlankSlug(slug)) {
+    return true;
+  }
+
+  return /^-[0-9]+$/.test(slug.trim());
 }
 
 function resolvePublishedSummary(input: {
@@ -244,28 +256,16 @@ export class PostService {
           : [];
 
       return await this.db.transaction(async (tx) => {
-        // 1. slug 생성 및 중복 확인
-        const baseSlug = generateSlug(input.title);
-        const slug = await ensureUniqueSlug(baseSlug, async (checkSlug) => {
-          const existing = await tx
-            .select()
-            .from(postTable)
-            .where(eq(postTable.slug, checkSlug))
-            .limit(1);
-
-          return existing.length > 0;
-        });
-
-        // 2. status가 'published'이고 publishedAt이 없으면 자동 설정
+        // 1. status가 'published'이고 publishedAt이 없으면 자동 설정
         let publishedAt = input.publishedAt;
         if (input.status === "published" && !publishedAt) {
           publishedAt = new Date();
         }
 
-        // 3. 게시글 생성
+        // 2. 게시글 생성
         const newPost: NewPost = {
           title: input.title,
-          slug,
+          slug: this.buildPendingSlug(),
           contentMd: input.contentMd,
           categoryId: input.categoryId,
           summary: resolvePublishedSummary({
@@ -283,16 +283,24 @@ export class PostService {
         };
 
         const [result] = await tx.insert(postTable).values(newPost);
-        const postId = result.insertId;
+        const postId = Number(result.insertId);
 
-        // 4. 태그 연결
+        const resolvedSlug = await this.resolvePostSlug(tx, input.title, postId);
+        if (resolvedSlug !== newPost.slug) {
+          await tx
+            .update(postTable)
+            .set({ slug: resolvedSlug })
+            .where(eq(postTable.id, postId));
+        }
+
+        // 3. 태그 연결
         if (tagIds.length > 0) {
           await tx
             .insert(postTagTable)
             .values(tagIds.map((tagId) => ({ postId, tagId })));
         }
 
-        // 5. 생성된 게시글 전체 조회
+        // 4. 생성된 게시글 전체 조회
         return await this.getPostByIdInternal(postId, tx);
       });
     };
@@ -343,6 +351,7 @@ export class PostService {
           input.publishedAt !== undefined
             ? input.publishedAt
             : existing[0].publishedAt;
+        const needsSlugRepair = needsLegacySlugRepair(existing[0].slug);
 
         // 2. 게시글 수정
         const updateData: Partial<NewPost> = {
@@ -363,6 +372,15 @@ export class PostService {
         // contentMd가 변경되면 contentModifiedAt 자동 갱신
         if (input.contentMd !== undefined) {
           updateData.contentModifiedAt = new Date();
+        }
+
+        if (needsSlugRepair) {
+          updateData.slug = await this.resolvePostSlug(
+            tx,
+            input.title ?? existing[0].title,
+            id,
+            id,
+          );
         }
 
         await tx.update(postTable).set(updateData).where(eq(postTable.id, id));
@@ -1044,6 +1062,57 @@ export class PostService {
         totalPageviews: statsMap.get(post.id) ?? 0,
         commentCount: commentMap.get(post.id) ?? 0,
       };
+    });
+  }
+
+  private buildPendingSlug(): string {
+    return `__pending__${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  private async resolvePostSlug(
+    tx: MySql2Database<typeof schema>,
+    title: string,
+    postId: number,
+    excludeId?: number,
+  ): Promise<string> {
+    const preferredSlug = generateUnicodeSlug(title);
+
+    if (isBlankSlug(preferredSlug)) {
+      return await this.resolveFallbackSlug(tx, postId, excludeId);
+    }
+
+    const existing = await tx
+      .select({ id: postTable.id })
+      .from(postTable)
+      .where(eq(postTable.slug, preferredSlug))
+      .limit(1);
+
+    if (existing.length === 0 || existing[0]?.id === excludeId) {
+      return preferredSlug;
+    }
+
+    return await this.resolveFallbackSlug(tx, postId, excludeId);
+  }
+
+  private async resolveFallbackSlug(
+    tx: MySql2Database<typeof schema>,
+    postId: number,
+    excludeId?: number,
+  ): Promise<string> {
+    const baseSlug = String(postId);
+
+    return await ensureUniqueSlug(baseSlug, async (checkSlug) => {
+      const existing = await tx
+        .select({ id: postTable.id })
+        .from(postTable)
+        .where(eq(postTable.slug, checkSlug))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return false;
+      }
+
+      return excludeId === undefined || existing[0]?.id !== excludeId;
     });
   }
 

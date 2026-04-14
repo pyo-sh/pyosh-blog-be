@@ -1,5 +1,5 @@
 /**
- * 텍스트를 URL-safe한 slug로 변환
+ * 텍스트를 URL-safe한 ASCII slug로 변환
  * @param text 원본 텍스트
  * @returns slug 문자열
  *
@@ -19,6 +19,23 @@ export function generateSlug(text: string): string {
       // 연속된 하이픈을 하나로
       .replace(/-+/g, "-")
       // 앞뒤 하이픈 제거
+      .replace(/^-+|-+$/g, "")
+  );
+}
+
+export function isBlankSlug(slug: string | null | undefined): boolean {
+  return slug === undefined || slug === null || slug.trim().length === 0;
+}
+
+export function generateUnicodeSlug(text: string): string {
+  return (
+    text
+      .normalize("NFKC")
+      .toLowerCase()
+      .trim()
+      .replace(/[^\p{L}\p{N}\s_-]+/gu, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
       .replace(/^-+|-+$/g, "")
   );
 }

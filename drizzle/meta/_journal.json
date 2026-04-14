@@ -64,6 +64,13 @@
       "when": 1775476800000,
       "tag": "0008_admin_username",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1776124800000,
+      "tag": "0009_fix_invalid_post_slugs",
+      "breakpoints": true
     }
   ]
 }
