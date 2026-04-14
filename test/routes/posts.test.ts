@@ -848,6 +848,26 @@ describe("Post Routes", () => {
       expect(response.statusCode).toBe(200);
       expect(response.json().post.slug).toBe("복구된-제목");
     });
+
+    it("legacy -숫자 slug 글을 수정하면 slug를 복구한다 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        title: "초기 제목",
+        slug: "-2",
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/admin/posts/${post.id}`,
+        headers: { cookie },
+        payload: { title: "복구된 제목" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().post.slug).toBe("복구된-제목");
+    });
   });
 
   // ===== GET /api/admin/posts/:id =====

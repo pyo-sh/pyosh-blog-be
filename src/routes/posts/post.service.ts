@@ -74,6 +74,14 @@ function normalizeSummary(summary: string | null | undefined) {
   return trimmed ? trimmed : null;
 }
 
+function needsLegacySlugRepair(slug: string | null | undefined) {
+  if (isBlankSlug(slug)) {
+    return true;
+  }
+
+  return /^-[0-9]+$/.test(slug.trim());
+}
+
 function resolvePublishedSummary(input: {
   status: "draft" | "published" | "archived";
   summary: string | null | undefined;
@@ -343,7 +351,7 @@ export class PostService {
           input.publishedAt !== undefined
             ? input.publishedAt
             : existing[0].publishedAt;
-        const needsSlugRepair = isBlankSlug(existing[0].slug);
+        const needsSlugRepair = needsLegacySlugRepair(existing[0].slug);
 
         // 2. 게시글 수정
         const updateData: Partial<NewPost> = {
