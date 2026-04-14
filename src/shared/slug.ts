@@ -1,20 +1,19 @@
 /**
- * 텍스트를 URL path에 넣을 수 있는 unicode slug로 변환
+ * 텍스트를 URL-safe한 ASCII slug로 변환
  * @param text 원본 텍스트
  * @returns slug 문자열
  *
  * @example
  * generateSlug("Hello World!") // "hello-world"
- * generateSlug("한글 제목 테스트") // "한글-제목-테스트"
+ * generateSlug("My Blog Post 2024") // "my-blog-post-2024"
  */
 export function generateSlug(text: string): string {
   return (
     text
-      .normalize("NFKC")
       .toLowerCase()
       .trim()
-      // URL path에서 의미가 큰 예약 문자와 일반 구두점을 제거
-      .replace(/[^\p{L}\p{N}\s_-]+/gu, "")
+      // 특수문자를 하이픈으로 변환
+      .replace(/[^\w\s-]/g, "")
       // 공백을 하이픈으로 변환
       .replace(/\s+/g, "-")
       // 연속된 하이픈을 하나로
@@ -26,6 +25,19 @@ export function generateSlug(text: string): string {
 
 export function isBlankSlug(slug: string | null | undefined): boolean {
   return slug === undefined || slug === null || slug.trim().length === 0;
+}
+
+export function generateUnicodeSlug(text: string): string {
+  return (
+    text
+      .normalize("NFKC")
+      .toLowerCase()
+      .trim()
+      .replace(/[^\p{L}\p{N}\s_-]+/gu, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "")
+  );
 }
 
 /**

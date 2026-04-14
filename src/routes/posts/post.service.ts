@@ -28,7 +28,11 @@ import {
   buildPaginatedResponse,
   calculateOffset,
 } from "@src/shared/pagination";
-import { ensureUniqueSlug, generateSlug, isBlankSlug } from "@src/shared/slug";
+import {
+  ensureUniqueSlug,
+  generateUnicodeSlug,
+  isBlankSlug,
+} from "@src/shared/slug";
 
 const MAX_PINNED_POSTS = 5;
 const PINNED_POST_LIMIT_ERROR =
@@ -1063,7 +1067,7 @@ export class PostService {
     postId: number,
     excludeId?: number,
   ): Promise<string> {
-    const preferredSlug = generateSlug(title);
+    const preferredSlug = generateUnicodeSlug(title);
 
     if (isBlankSlug(preferredSlug)) {
       return await this.resolveFallbackSlug(tx, postId, excludeId);
