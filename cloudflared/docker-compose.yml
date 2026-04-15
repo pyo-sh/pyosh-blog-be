@@ -1,0 +1,30 @@
+# Cloudflare Tunnel — api.pyosh.com 진입점
+#
+# 사전 준비:
+#   1) Cloudflare Zero Trust → Networks → Tunnels 에서 tunnel 생성
+#   2) Public Hostname: api.pyosh.com → HTTP → blog_container:5500
+#   3) "Install connector → Docker" 에서 보여주는 명령의 --token 뒤 긴 문자열 복사
+#   4) 이 파일과 같은 폴더에 .env 파일 만들고 한 줄: TUNNEL_TOKEN=<복사한 토큰>
+#   5) chmod 600 .env
+#
+# 운영:
+#   docker compose up -d        # 시작
+#   docker compose logs -f      # 연결 상태 확인 ("Registered tunnel connection")
+#
+# 이 서비스는 blog 앱 compose와 분리되어 있어, 앱을 재배포해도 tunnel 연결은 유지된다.
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    # cloudflared는 TUNNEL_TOKEN 환경변수를 자동 인식한다.
+    # 토큰을 command 인자로 전달하지 않아 docker inspect / ps 에 노출되지 않는다.
+    command: tunnel --no-autoupdate run
+    env_file:
+      - .env
+    networks:
+      - blog_network
+
+networks:
+  blog_network:
+    external: true
