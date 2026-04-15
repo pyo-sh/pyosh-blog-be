@@ -17,11 +17,10 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
     restart: unless-stopped
-    # cloudflared는 TUNNEL_TOKEN 환경변수를 자동 인식한다.
-    # 토큰을 command 인자로 전달하지 않아 docker inspect / ps 에 노출되지 않는다.
-    command: tunnel --no-autoupdate run
-    env_file:
-      - .env
+    # cloudflared의 `tunnel run` 서브커맨드는 --token 플래그를 명시적으로 요구한다.
+    # 토큰 값은 같은 폴더의 .env (compose가 ${...} 보간용으로 자동 로드) 에서 가져온다.
+    # ${TUNNEL_TOKEN:?...} 구문은 변수가 비어있으면 compose가 즉시 친절한 에러를 출력한다.
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:?TUNNEL_TOKEN must be set in cloudflared/.env}
     networks:
       - blog_network
 
