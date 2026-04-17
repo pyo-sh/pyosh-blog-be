@@ -1,0 +1,16 @@
+name: Deploy
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Run deploy script
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          cd "$HOME/backend"
+          ./scripts/deploy.sh "$TAG"
