@@ -1,9 +1,4 @@
-import {
-  mysqlTable,
-  int,
-  boolean,
-  timestamp,
-} from "drizzle-orm/mysql-core";
+import { mysqlTable, int, boolean, timestamp } from "drizzle-orm/mysql-core";
 
 /**
  * Site Settings Table - 사이트 설정 (싱글톤)

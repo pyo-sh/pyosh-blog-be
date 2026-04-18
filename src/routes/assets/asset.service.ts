@@ -3,13 +3,16 @@ import { MySql2Database } from "drizzle-orm/mysql2";
 import { assetTable, type Asset } from "@src/db/schema/assets";
 import * as schema from "@src/db/schema/index";
 import { HttpError } from "@src/errors/http-error";
-import { FileStorageService, type BufferedFile } from "@src/services/file-storage.service";
-import { toUploadUrl, UPLOADS_URL_PREFIX } from "@src/shared/uploads";
+import {
+  FileStorageService,
+  type BufferedFile,
+} from "@src/services/file-storage.service";
 import {
   buildPaginatedResponse,
   calculateOffset,
   type PaginatedResponse,
 } from "@src/shared/pagination";
+import { toUploadUrl, UPLOADS_URL_PREFIX } from "@src/shared/uploads";
 
 /**
  * 업로드된 Asset 응답
@@ -113,7 +116,9 @@ export class AssetService {
 
     // 2. 실제 파일 삭제 (실패해도 DB는 삭제)
     try {
-      await this.fileStorage.deleteFile(asset.url.replace(UPLOADS_URL_PREFIX, ""));
+      await this.fileStorage.deleteFile(
+        asset.url.replace(UPLOADS_URL_PREFIX, ""),
+      );
     } catch (error) {
       // 파일 삭제 실패는 로그만 남기고 계속 진행
       console.error(`Failed to delete file: ${asset.url}`, error);

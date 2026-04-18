@@ -33,16 +33,16 @@ import {
 } from "@src/routes/guestbook/guestbook.route";
 import { GuestbookService } from "@src/routes/guestbook/guestbook.service";
 import {
-  createSettingsRoute,
-  createAdminSettingsRoute,
-} from "@src/routes/settings/settings.route";
-import { SettingsService } from "@src/routes/settings/settings.service";
-import {
   createPostRoute,
   createAdminPostRoute,
 } from "@src/routes/posts/post.route";
 import { PostService } from "@src/routes/posts/post.service";
 import { createSeoRoute } from "@src/routes/seo/seo.route";
+import {
+  createSettingsRoute,
+  createAdminSettingsRoute,
+} from "@src/routes/settings/settings.route";
+import { SettingsService } from "@src/routes/settings/settings.service";
 import {
   createStatsRoute,
   createAdminStatsRoute,
@@ -254,19 +254,19 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(
     async (adminRoutes) => {
       const CSRF_SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
-      adminRoutes.addHook(
-        "onRequest",
-        (request, reply, done) => {
-          if (!CSRF_SAFE_METHODS.has(request.method)) {
-            return fastify.csrfProtection(request, reply, done);
-          }
-          done();
+      adminRoutes.addHook("onRequest", (request, reply, done) => {
+        if (!CSRF_SAFE_METHODS.has(request.method)) {
+          return fastify.csrfProtection(request, reply, done);
+        }
+        done();
+      });
+
+      await adminRoutes.register(
+        createAdminPostRoute(postService, adminService),
+        {
+          prefix: "/posts",
         },
       );
-
-      await adminRoutes.register(createAdminPostRoute(postService, adminService), {
-        prefix: "/posts",
-      });
       await adminRoutes.register(
         createAdminCommentRoute(commentService, adminService),
       );
@@ -276,9 +276,12 @@ export async function buildApp(): Promise<FastifyInstance> {
       await adminRoutes.register(
         createAdminSettingsRoute(settingsService, adminService),
       );
-      await adminRoutes.register(createAdminStatsRoute(statsService, adminService), {
-        prefix: "/stats",
-      });
+      await adminRoutes.register(
+        createAdminStatsRoute(statsService, adminService),
+        {
+          prefix: "/stats",
+        },
+      );
     },
     { prefix: "/admin" },
   );

@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
 import { commentTable } from "../schema/comments";
-import { postTable } from "../schema/posts";
 import { oauthAccountTable } from "../schema/oauth-accounts";
+import { postTable } from "../schema/posts";
 
 /**
  * Comment Relations

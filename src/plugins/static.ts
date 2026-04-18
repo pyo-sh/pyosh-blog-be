@@ -2,8 +2,8 @@ import * as fs from "fs/promises";
 import fastifyStatic from "@fastify/static";
 import { FastifyInstance } from "fastify";
 import fastifyPlugin from "fastify-plugin";
-import { getUploadDir, UPLOADS_URL_PREFIX } from "@src/shared/uploads";
 import { env } from "@src/shared/env";
+import { getUploadDir, UPLOADS_URL_PREFIX } from "@src/shared/uploads";
 
 /**
  * Static 파일 서빙 플러그인
@@ -24,10 +24,7 @@ async function staticPlugin(fastify: FastifyInstance) {
     setHeaders(res) {
       // Keep production constrained to same-site while allowing
       // localhost dev ports to embed uploaded images during development.
-      res.setHeader(
-        "Cross-Origin-Resource-Policy",
-        crossOriginResourcePolicy,
-      );
+      res.setHeader("Cross-Origin-Resource-Policy", crossOriginResourcePolicy);
     },
   });
 

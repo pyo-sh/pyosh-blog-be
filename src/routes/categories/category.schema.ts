@@ -21,8 +21,15 @@ export const CategoryListQuerySchema = z.object({
 
 export const CategoryDeleteQuerySchema = z
   .object({
-    action: z.enum(["move", "trash"]).describe("삭제 방식 (move: 게시글 이동, trash: 게시글 휴지통)"),
-    moveTo: z.coerce.number().int().positive().optional().describe("게시글을 이동할 카테고리 ID (action=move 시 필수)"),
+    action: z
+      .enum(["move", "trash"])
+      .describe("삭제 방식 (move: 게시글 이동, trash: 게시글 휴지통)"),
+    moveTo: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("게시글을 이동할 카테고리 ID (action=move 시 필수)"),
   })
   .refine((data) => data.action !== "move" || data.moveTo != null, {
     message: "moveTo is required when action is move",
@@ -34,13 +41,30 @@ export const CategoryDeleteQuerySchema = z
  */
 export const CategoryCreateBodySchema = z.object({
   name: z.string().min(1).max(50).describe("카테고리 이름 (최대 50자)"),
-  parentId: z.number().int().positive().nullable().optional().describe("부모 카테고리 ID (최상위이면 null)"),
+  parentId: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe("부모 카테고리 ID (최상위이면 null)"),
   isVisible: z.boolean().optional().describe("카테고리 공개 여부"),
 });
 
 export const CategoryUpdateBodySchema = z.object({
-  name: z.string().min(1).max(50).optional().describe("카테고리 이름 (최대 50자)"),
-  parentId: z.number().int().positive().nullable().optional().describe("부모 카테고리 ID"),
+  name: z
+    .string()
+    .min(1)
+    .max(50)
+    .optional()
+    .describe("카테고리 이름 (최대 50자)"),
+  parentId: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe("부모 카테고리 ID"),
   sortOrder: z.number().int().min(0).optional().describe("정렬 순서"),
   isVisible: z.boolean().optional().describe("카테고리 공개 여부"),
 });
@@ -48,7 +72,12 @@ export const CategoryUpdateBodySchema = z.object({
 const CategoryTreeItemSchema = z
   .object({
     id: z.number().int().positive().describe("카테고리 ID"),
-    parentId: z.number().int().positive().nullable().describe("새 부모 카테고리 ID"),
+    parentId: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .describe("새 부모 카테고리 ID"),
     sortOrder: z.number().int().min(0).describe("새 정렬 순서"),
   })
   .transform(
@@ -100,14 +129,18 @@ type CategoryTreeResponse = {
 export const CategoryTreeResponseSchema: z.ZodType<CategoryTreeResponse> =
   z.lazy(() =>
     CategoryResponseSchema.extend({
-      children: z.array(CategoryTreeResponseSchema).describe("하위 카테고리 목록"),
+      children: z
+        .array(CategoryTreeResponseSchema)
+        .describe("하위 카테고리 목록"),
     }),
   ) as z.ZodType<CategoryTreeResponse>;
 
 export type { CategoryTreeResponse };
 
 export const CategoryListResponseSchema = z.object({
-  categories: z.array(CategoryTreeResponseSchema).describe("카테고리 트리 목록"),
+  categories: z
+    .array(CategoryTreeResponseSchema)
+    .describe("카테고리 트리 목록"),
 });
 
 export const CategoryCreateResponseSchema = z.object({

@@ -1,17 +1,40 @@
 import { z } from "zod";
 
 export const StatsViewBodySchema = z.object({
-  postId: z.coerce.number().int().positive().optional().describe("조회수를 기록할 게시글 ID (없으면 사이트 전체 조회수로 집계)"),
+  postId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("조회수를 기록할 게시글 ID (없으면 사이트 전체 조회수로 집계)"),
 });
 
 export const PopularPostsQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(100).optional().default(10).describe("반환할 인기 게시글 수 (최대 100)"),
-  days: z.coerce.number().int().positive().max(365).optional().default(7).describe("집계 기간 (일, 최대 365)"),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .optional()
+    .default(10)
+    .describe("반환할 인기 게시글 수 (최대 100)"),
+  days: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(365)
+    .optional()
+    .default(7)
+    .describe("집계 기간 (일, 최대 365)"),
 });
 
 export const StatsViewResponseSchema = z.object({
   success: z.literal(true).describe("기록 성공 여부"),
-  deduplicated: z.boolean().describe("중복 요청으로 집계에서 제외되었는지 여부 (5분 이내 동일 IP 재요청)"),
+  deduplicated: z
+    .boolean()
+    .describe(
+      "중복 요청으로 집계에서 제외되었는지 여부 (5분 이내 동일 IP 재요청)",
+    ),
 });
 
 export const PostStatsSchema = z.object({
@@ -36,11 +59,13 @@ export const DashboardStatsResponseSchema = z.object({
   monthPageviews: z.number().describe("최근 30일 페이지뷰 수"),
   totalPosts: z.number().describe("전체 게시글 수"),
   totalComments: z.number().describe("전체 댓글 수"),
-  postsByStatus: z.object({
-    draft: z.number().describe("임시저장 게시글 수"),
-    published: z.number().describe("발행된 게시글 수"),
-    archived: z.number().describe("보관된 게시글 수"),
-  }).describe("상태별 게시글 수"),
+  postsByStatus: z
+    .object({
+      draft: z.number().describe("임시저장 게시글 수"),
+      published: z.number().describe("발행된 게시글 수"),
+      archived: z.number().describe("보관된 게시글 수"),
+    })
+    .describe("상태별 게시글 수"),
 });
 
 export type StatsViewBody = z.infer<typeof StatsViewBodySchema>;

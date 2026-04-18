@@ -1,4 +1,15 @@
-import { eq, and, isNull, sql, gte, lte, or, like, inArray, ne } from "drizzle-orm";
+import {
+  eq,
+  and,
+  isNull,
+  sql,
+  gte,
+  lte,
+  or,
+  like,
+  inArray,
+  ne,
+} from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import type {
   GuestbookEntryDetail,
@@ -308,6 +319,7 @@ export class GuestbookService {
     const items: AdminGuestbookItem[] = await Promise.all(
       entries.map(async (entry) => {
         const enriched = await this.enrichEntryWithAuthor(entry);
+
         return {
           id: enriched.id,
           parentId: enriched.parentId,
@@ -335,7 +347,10 @@ export class GuestbookService {
     action: AdminGuestbookDeleteQuery["action"],
   ): Promise<void> {
     const [entry] = await this.db
-      .select({ id: guestbookEntryTable.id, status: guestbookEntryTable.status })
+      .select({
+        id: guestbookEntryTable.id,
+        status: guestbookEntryTable.status,
+      })
       .from(guestbookEntryTable)
       .where(eq(guestbookEntryTable.id, entryId))
       .limit(1);

@@ -294,7 +294,9 @@ export const AdminCommentDeleteQuerySchema = z.object({
  * 관리자 댓글 복원 응답 스키마
  */
 export const AdminCommentRestoreResponseSchema = z.object({
-  success: z.literal(true).describe("복원 성공 여부 (deleted | hidden -> active)"),
+  success: z
+    .literal(true)
+    .describe("복원 성공 여부 (deleted | hidden -> active)"),
 });
 
 /**

@@ -522,7 +522,10 @@ export class CommentService {
         .where(visibleReplyCondition),
     ]);
 
-    return (rootCountResult[0]?.count ?? 0) + (visibleReplyCountResult[0]?.count ?? 0);
+    return (
+      (rootCountResult[0]?.count ?? 0) +
+      (visibleReplyCountResult[0]?.count ?? 0)
+    );
   }
 
   /**

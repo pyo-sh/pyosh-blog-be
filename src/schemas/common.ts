@@ -15,8 +15,19 @@ export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
  * 페이지네이션 쿼리 스키마
  */
 export const PaginationQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1).describe("페이지 번호 (1부터 시작)"),
-  limit: z.coerce.number().int().min(1).max(100).default(10).describe("페이지당 항목 수 (최대 100)"),
+  page: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(1)
+    .describe("페이지 번호 (1부터 시작)"),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(10)
+    .describe("페이지당 항목 수 (최대 100)"),
 });
 
 export type PaginationQuery = z.infer<typeof PaginationQuerySchema>;

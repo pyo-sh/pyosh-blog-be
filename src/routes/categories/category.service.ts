@@ -164,10 +164,8 @@ export class CategoryService {
     const postCounts = await this.db
       .select({
         categoryId: postTable.categoryId,
-        publishedPostCount:
-          sql<number>`SUM(CASE WHEN ${postTable.status} = 'published' AND ${postTable.visibility} = 'public' AND ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
-        totalPostCount:
-          sql<number>`SUM(CASE WHEN ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
+        publishedPostCount: sql<number>`SUM(CASE WHEN ${postTable.status} = 'published' AND ${postTable.visibility} = 'public' AND ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
+        totalPostCount: sql<number>`SUM(CASE WHEN ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
       })
       .from(postTable)
       .where(isNotNull(postTable.categoryId))
@@ -297,10 +295,8 @@ export class CategoryService {
     // 5. 게시글 카운트 조회
     const [counts] = await this.db
       .select({
-        publishedPostCount:
-          sql<number>`SUM(CASE WHEN ${postTable.status} = 'published' AND ${postTable.visibility} = 'public' AND ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
-        totalPostCount:
-          sql<number>`SUM(CASE WHEN ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
+        publishedPostCount: sql<number>`SUM(CASE WHEN ${postTable.status} = 'published' AND ${postTable.visibility} = 'public' AND ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
+        totalPostCount: sql<number>`SUM(CASE WHEN ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
       })
       .from(postTable)
       .where(eq(postTable.categoryId, id));
@@ -324,7 +320,9 @@ export class CategoryService {
     const seenIds = new Set<number>();
     for (const item of items) {
       if (seenIds.has(item.id)) {
-        throw HttpError.badRequest(`Duplicate category ID ${item.id} in changes.`);
+        throw HttpError.badRequest(
+          `Duplicate category ID ${item.id} in changes.`,
+        );
       }
       seenIds.add(item.id);
     }
@@ -466,7 +464,9 @@ export class CategoryService {
         await tx
           .update(postTable)
           .set({ categoryId: moveTo! })
-          .where(and(eq(postTable.categoryId, id), isNull(postTable.deletedAt)));
+          .where(
+            and(eq(postTable.categoryId, id), isNull(postTable.deletedAt)),
+          );
 
         // 이미 soft-delete된 게시글: categoryId 초기화 (복구 시 삭제된 카테고리 참조 방지)
         await tx
