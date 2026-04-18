@@ -2,7 +2,7 @@
 
 ## Admin Posts
 
-### GET `/api/admin/posts`
+### GET `/admin/posts`
 
 Auth: `requireAdmin`
 
@@ -32,7 +32,7 @@ Response `200`:
 
 ## Admin Comments
 
-### PUT `/api/admin/comments/:id/hide`
+### PUT `/admin/comments/:id/hide`
 
 Auth: `requireAdmin`
 
@@ -45,7 +45,7 @@ Response `200`:
 { "success": true }
 ```
 
-### PUT `/api/admin/comments/:id/restore`
+### PUT `/admin/comments/:id/restore`
 
 Auth: `requireAdmin`
 
@@ -58,7 +58,7 @@ Response `200`:
 { "success": true }
 ```
 
-### DELETE `/api/admin/comments/bulk`
+### DELETE `/admin/comments/bulk`
 
 Auth: `requireAdmin`
 
@@ -78,7 +78,7 @@ Request Body:
 
 ## Guestbook
 
-### POST `/api/guestbook`
+### POST `/guestbook`
 
 Auth: `optionalAuth`
 
@@ -111,7 +111,7 @@ Response `201`:
 { "data": GuestbookEntryDetail }
 ```
 
-### DELETE `/api/guestbook/:id`
+### DELETE `/guestbook/:id`
 
 Auth: `optionalAuth`
 

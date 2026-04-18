@@ -145,6 +145,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     });
   });
 
+  // Lightweight liveness check for load balancers and uptime probes.
+  fastify.get("/health", async () => {
+    return { status: "ok", timestamp: new Date().toISOString() };
+  });
+
   fastify.get("/health/live", async () => {
     return {
       status: "ok",
@@ -172,7 +177,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     };
   });
 
-  fastify.get("/health", async (_, reply) => {
+  fastify.get("/health/status", async (_, reply) => {
     const database = await getDatabaseHealth(fastify);
     const health = getHealthStatus("health", database);
 

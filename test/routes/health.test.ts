@@ -56,10 +56,10 @@ describe("Health Routes", () => {
     expect(body.database.status).toBe("up");
   });
 
-  it("GET /health should include uptime and database status", async () => {
+  it("GET /health/status should include uptime and database status", async () => {
     const response = await app.inject({
       method: "GET",
-      url: "/health",
+      url: "/health/status",
     });
 
     const body = response.json();
@@ -87,12 +87,12 @@ describe("Health Routes", () => {
     expect(body.database.message).toBe("Database is unavailable");
   });
 
-  it("GET /health should return 503 when DB is down", async () => {
+  it("GET /health/status should return 503 when DB is down", async () => {
     vi.spyOn(app.db, "execute").mockRejectedValueOnce(new Error("db down"));
 
     const response = await app.inject({
       method: "GET",
-      url: "/health",
+      url: "/health/status",
     });
 
     const body = response.json();
