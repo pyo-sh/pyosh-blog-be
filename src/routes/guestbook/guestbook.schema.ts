@@ -128,7 +128,7 @@ export const AdminGuestbookListQuerySchema = z.object({
 
 /**
  * 관리자 방명록 단건 삭제 쿼리 스키마 (DELETE - 비가역적 액션만)
- * hide는 PATCH /api/admin/guestbook/:id를 사용
+ * hide는 PATCH /admin/guestbook/:id를 사용
  */
 export const AdminGuestbookDeleteQuerySchema = z.object({
   action: z.enum(["soft_delete", "hard_delete"]).describe("삭제 방식 (soft_delete: 복원 가능, hard_delete: 영구 삭제)"),
@@ -147,7 +147,7 @@ export const AdminGuestbookPatchQuerySchema = z.object({
  * 관리자 방명록 벌크 삭제 요청 스키마 (DELETE - 비가역적 액션만)
  * - soft_delete: status=deleted, deletedAt 설정
  * - hard_delete: DB에서 완전 삭제
- * hide/restore는 PATCH /api/admin/guestbook/bulk를 사용
+ * hide/restore는 PATCH /admin/guestbook/bulk를 사용
  * 최대 100개까지 처리 가능
  */
 export const AdminGuestbookBulkDeleteBodySchema = z.object({

@@ -24,7 +24,7 @@ describe("Auth Routes", () => {
   async function getCsrfHeaders(cookie?: string): Promise<Record<string, string>> {
     const response = await app.inject({
       method: "GET",
-      url: "/api/auth/csrf-token",
+      url: "/auth/csrf-token",
       headers: cookie ? { cookie } : undefined,
     });
     const responseCookie = response.headers["set-cookie"];
@@ -52,9 +52,9 @@ describe("Auth Routes", () => {
     await truncateAll();
   });
 
-  // ===== POST /api/auth/admin/login =====
+  // ===== POST /auth/admin/login =====
 
-  describe("POST /api/auth/admin/login", () => {
+  describe("POST /auth/admin/login", () => {
     beforeEach(async () => {
       await seedAdmin();
     });
@@ -62,7 +62,7 @@ describe("Auth Routes", () => {
     it("올바른 자격증명 → 200 + 세션 쿠키", async () => {
       const response = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/login",
+        url: "/auth/admin/login",
         payload: {
           username: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
@@ -84,7 +84,7 @@ describe("Auth Routes", () => {
     it("잘못된 비밀번호 → 401", async () => {
       const response = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/login",
+        url: "/auth/admin/login",
         payload: {
           username: TEST_ADMIN_USERNAME,
           password: "WrongPassword1!",
@@ -97,7 +97,7 @@ describe("Auth Routes", () => {
     it("존재하지 않는 사용자명 → 401", async () => {
       const response = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/login",
+        url: "/auth/admin/login",
         payload: {
           username: "missing-user",
           password: TEST_ADMIN_PASSWORD,
@@ -113,7 +113,7 @@ describe("Auth Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/login",
+        url: "/auth/admin/login",
         payload: {
           username: "Admin@Test.pyosh.dev",
           password: TEST_ADMIN_PASSWORD,
@@ -130,7 +130,7 @@ describe("Auth Routes", () => {
     it("legacy email 필드를 보내면 → 400", async () => {
       const response = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/login",
+        url: "/auth/admin/login",
         payload: {
           username: TEST_ADMIN_USERNAME,
           email: TEST_ADMIN_USERNAME,
@@ -144,7 +144,7 @@ describe("Auth Routes", () => {
     it("username에 공백이 포함되면 → 400", async () => {
       const response = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/login",
+        url: "/auth/admin/login",
         payload: {
           username: "admin user",
           password: TEST_ADMIN_PASSWORD,
@@ -157,7 +157,7 @@ describe("Auth Routes", () => {
     it("username이 100자를 초과하면 → 400", async () => {
       const response = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/login",
+        url: "/auth/admin/login",
         payload: {
           username: "a".repeat(101),
           password: TEST_ADMIN_PASSWORD,
@@ -172,7 +172,7 @@ describe("Auth Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/login",
+        url: "/auth/admin/login",
         payload: {
           username: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
@@ -186,13 +186,13 @@ describe("Auth Routes", () => {
     });
   });
 
-  // ===== GET /api/auth/csrf-token =====
+  // ===== GET /auth/csrf-token =====
 
-  describe("GET /api/auth/csrf-token", () => {
+  describe("GET /auth/csrf-token", () => {
     it("CSRF 토큰 발급 + 세션 쿠키 설정 → 200", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/auth/csrf-token",
+        url: "/auth/csrf-token",
       });
 
       expect(response.statusCode).toBe(200);
@@ -200,15 +200,15 @@ describe("Auth Routes", () => {
     });
   });
 
-  // ===== GET /api/auth/me =====
+  // ===== GET /auth/me =====
 
-  describe("GET /api/auth/me", () => {
+  describe("GET /auth/me", () => {
     it("로그인 상태 → 200", async () => {
       await seedAdmin();
 
       const loginResponse = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/login",
+        url: "/auth/admin/login",
         payload: {
           username: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
@@ -219,7 +219,7 @@ describe("Auth Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/auth/me",
+        url: "/auth/me",
         headers: { cookie: sessionCookie },
       });
 
@@ -234,22 +234,22 @@ describe("Auth Routes", () => {
     it("비로그인 → 401", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/auth/me",
+        url: "/auth/me",
       });
 
       expect(response.statusCode).toBe(401);
     });
   });
 
-  // ===== POST /api/auth/admin/logout =====
+  // ===== POST /auth/admin/logout =====
 
-  describe("POST /api/auth/admin/logout", () => {
+  describe("POST /auth/admin/logout", () => {
     it("세션 파기 → 204, 이후 /me → 401", async () => {
       await seedAdmin();
 
       const loginResponse = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/login",
+        url: "/auth/admin/login",
         payload: {
           username: TEST_ADMIN_USERNAME,
           password: TEST_ADMIN_PASSWORD,
@@ -261,7 +261,7 @@ describe("Auth Routes", () => {
 
       const logoutResponse = await app.inject({
         method: "POST",
-        url: "/api/auth/admin/logout",
+        url: "/auth/admin/logout",
         headers: csrfHeaders,
       });
 
@@ -270,7 +270,7 @@ describe("Auth Routes", () => {
       // 세션 파기 후 /me 요청은 401
       const meResponse = await app.inject({
         method: "GET",
-        url: "/api/auth/me",
+        url: "/auth/me",
         headers: { cookie: sessionCookie },
       });
 

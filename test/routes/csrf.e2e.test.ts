@@ -59,14 +59,14 @@ describe("CSRF Route Wiring", () => {
   it("rejects guestbook creation when the issued session cookie is missing its CSRF token", async () => {
     const csrfResponse = await app.inject({
       method: "GET",
-      url: "/api/auth/csrf-token",
+      url: "/auth/csrf-token",
     });
 
     const sessionCookie = getSessionCookie(csrfResponse.headers["set-cookie"]);
 
     const response = await app.inject({
       method: "POST",
-      url: "/api/guestbook",
+      url: "/guestbook",
       headers: {
         cookie: sessionCookie,
       },
@@ -81,10 +81,10 @@ describe("CSRF Route Wiring", () => {
     expect(response.statusCode).toBe(403);
   });
 
-  it("accepts guestbook creation with the token and cookie issued by /api/auth/csrf-token", async () => {
+  it("accepts guestbook creation with the token and cookie issued by /auth/csrf-token", async () => {
     const csrfResponse = await app.inject({
       method: "GET",
-      url: "/api/auth/csrf-token",
+      url: "/auth/csrf-token",
     });
 
     const { token } = csrfResponse.json();
@@ -92,7 +92,7 @@ describe("CSRF Route Wiring", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/api/guestbook",
+      url: "/guestbook",
       headers: {
         cookie: sessionCookie,
         "x-csrf-token": token,

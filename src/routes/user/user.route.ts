@@ -17,7 +17,7 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
   const userRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/user/me — 내 프로필 조회
+    // GET /user/me — 내 프로필 조회
     typedFastify.get(
       "/me",
       {
@@ -42,7 +42,7 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
       },
     );
 
-    // PUT /api/user/me — 내 프로필 수정
+    // PUT /user/me — 내 프로필 수정
     typedFastify.put(
       "/me",
       {
@@ -71,7 +71,7 @@ export function createUserRoute(userService: UserService): FastifyPluginAsync {
       },
     );
 
-    // DELETE /api/user/me — 회원 탈퇴
+    // DELETE /user/me — 회원 탈퇴
     typedFastify.delete(
       "/me",
       {

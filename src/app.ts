@@ -145,12 +145,12 @@ export async function buildApp(): Promise<FastifyInstance> {
     });
   });
 
-  // Health check 엔드포인트
+  // Lightweight liveness check for load balancers and uptime probes.
   fastify.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
   });
 
-  fastify.get("/api/health/live", async () => {
+  fastify.get("/health/live", async () => {
     return {
       status: "ok",
       timestamp: new Date().toISOString(),
@@ -159,7 +159,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     };
   });
 
-  fastify.get("/api/health/ready", async (_, reply) => {
+  fastify.get("/health/ready", async (_, reply) => {
     const database = await getDatabaseHealth(fastify);
     const health = getHealthStatus("ready", database);
 
@@ -177,7 +177,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     };
   });
 
-  fastify.get("/api/health", async (_, reply) => {
+  fastify.get("/health/status", async (_, reply) => {
     const database = await getDatabaseHealth(fastify);
     const health = getHealthStatus("health", database);
 
@@ -213,41 +213,41 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // 라우트 등록
   await fastify.register(createAuthRoute(adminService), {
-    prefix: "/api/auth",
+    prefix: "/auth",
   });
   await fastify.register(createCategoryRoute(categoryService, adminService), {
-    prefix: "/api/categories",
+    prefix: "/categories",
   });
   await fastify.register(createAssetRoute(assetService, adminService), {
-    prefix: "/api/assets",
+    prefix: "/assets",
   });
   await fastify.register(createPostRoute(postService), {
-    prefix: "/api/posts",
+    prefix: "/posts",
   });
   await fastify.register(createTagRoute(tagService), {
-    prefix: "/api/tags",
+    prefix: "/tags",
   });
   // Comment routes (public)
   await fastify.register(createCommentRoute(commentService), {
-    prefix: "/api",
+    prefix: "",
   });
 
   // Guestbook routes (public)
   await fastify.register(
     createGuestbookRoute(guestbookService, settingsService),
     {
-      prefix: "/api",
+      prefix: "",
     },
   );
 
   // Settings routes (public)
   await fastify.register(createSettingsRoute(settingsService), {
-    prefix: "/api/settings",
+    prefix: "/settings",
   });
 
   // Stats routes (public)
   await fastify.register(createStatsRoute(statsService), {
-    prefix: "/api/stats",
+    prefix: "/stats",
   });
 
   // Admin routes: CSRF 보호 (GET 제외) 일괄 적용
@@ -280,13 +280,13 @@ export async function buildApp(): Promise<FastifyInstance> {
         prefix: "/stats",
       });
     },
-    { prefix: "/api/admin" },
+    { prefix: "/admin" },
   );
   await fastify.register(createSeoRoute());
 
   // User routes (OAuth 인증 필수)
   await fastify.register(createUserRoute(userService), {
-    prefix: "/api/user",
+    prefix: "/user",
   });
 
   return fastify;

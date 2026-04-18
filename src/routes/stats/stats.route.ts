@@ -22,7 +22,7 @@ export function createStatsRoute(
   const statsRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // POST /api/stats/view - 페이지 조회수 기록
+    // POST /stats/view - 페이지 조회수 기록
     typedFastify.post(
       "/view",
       {
@@ -38,7 +38,7 @@ export function createStatsRoute(
           summary: "조회수 기록",
           description:
             "게시글 조회수를 기록합니다. 동일 IP의 5분 이내 중복 요청은 집계에서 제외됩니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.\n\n" +
             "**Rate limit**: 30회/분",
           body: StatsViewBodySchema,
@@ -64,7 +64,7 @@ export function createStatsRoute(
       },
     );
 
-    // GET /api/stats/popular - 인기 게시글 조회
+    // GET /stats/popular - 인기 게시글 조회
     typedFastify.get(
       "/popular",
       {
@@ -88,7 +88,7 @@ export function createStatsRoute(
       },
     );
 
-    // GET /api/stats/total-views - 사이트 전체 누적 조회수
+    // GET /stats/total-views - 사이트 전체 누적 조회수
     typedFastify.get(
       "/total-views",
       {
@@ -127,7 +127,7 @@ export function createAdminStatsRoute(
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/admin/stats/dashboard - 통계 대시보드
+    // GET /admin/stats/dashboard - 통계 대시보드
     typedFastify.get(
       "/dashboard",
       {

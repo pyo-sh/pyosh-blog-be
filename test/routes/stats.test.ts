@@ -12,7 +12,7 @@ describe("Stats Routes", () => {
   async function getCsrfHeaders(cookie?: string): Promise<Record<string, string>> {
     const response = await app.inject({
       method: "GET",
-      url: "/api/auth/csrf-token",
+      url: "/auth/csrf-token",
       headers: cookie ? { cookie } : undefined,
     });
     const setCookie = response.headers["set-cookie"];
@@ -40,14 +40,14 @@ describe("Stats Routes", () => {
     await truncateAll();
   });
 
-  // ===== POST /api/stats/view =====
+  // ===== POST /stats/view =====
 
-  describe("POST /api/stats/view", () => {
+  describe("POST /stats/view", () => {
     it("postId 없이 사이트 전체 조회수 기록 → 200", async () => {
       const csrfHeaders = await getCsrfHeaders();
       const response = await app.inject({
         method: "POST",
-        url: "/api/stats/view",
+        url: "/stats/view",
         headers: csrfHeaders,
         remoteAddress: "10.0.0.1",
         payload: {},
@@ -67,7 +67,7 @@ describe("Stats Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/stats/view",
+        url: "/stats/view",
         headers: csrfHeaders,
         remoteAddress: "10.0.0.2",
         payload: { postId: post.id },
@@ -81,7 +81,7 @@ describe("Stats Routes", () => {
       const csrfHeaders = await getCsrfHeaders();
       const response = await app.inject({
         method: "POST",
-        url: "/api/stats/view",
+        url: "/stats/view",
         headers: csrfHeaders,
         remoteAddress: "10.0.0.3",
         payload: { postId: 99999 },
@@ -100,7 +100,7 @@ describe("Stats Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/stats/view",
+        url: "/stats/view",
         headers: csrfHeaders,
         remoteAddress: "10.0.0.4",
         payload: { postId: post.id },
@@ -119,7 +119,7 @@ describe("Stats Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/stats/view",
+        url: "/stats/view",
         headers: csrfHeaders,
         remoteAddress: "1.2.3.4",
         payload: { postId: post.id },
@@ -127,7 +127,7 @@ describe("Stats Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/stats/view",
+        url: "/stats/view",
         headers: csrfHeaders,
         remoteAddress: "1.2.3.4",
         payload: { postId: post.id },
@@ -147,7 +147,7 @@ describe("Stats Routes", () => {
 
       const postRes = await app.inject({
         method: "POST",
-        url: "/api/stats/view",
+        url: "/stats/view",
         headers: csrfHeaders,
         remoteAddress: "10.0.0.6",
         payload: { postId: post.id },
@@ -155,7 +155,7 @@ describe("Stats Routes", () => {
 
       const siteRes = await app.inject({
         method: "POST",
-        url: "/api/stats/view",
+        url: "/stats/view",
         headers: csrfHeaders,
         remoteAddress: "10.0.0.6",
         payload: {},
@@ -166,13 +166,13 @@ describe("Stats Routes", () => {
     });
   });
 
-  // ===== GET /api/stats/popular =====
+  // ===== GET /stats/popular =====
 
-  describe("GET /api/stats/popular", () => {
+  describe("GET /stats/popular", () => {
     it("데이터 없으면 빈 배열", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/stats/popular",
+        url: "/stats/popular",
       });
 
       expect(response.statusCode).toBe(200);
@@ -198,7 +198,7 @@ describe("Stats Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/stats/popular?limit=10&days=7",
+        url: "/stats/popular?limit=10&days=7",
       });
 
       expect(response.statusCode).toBe(200);
@@ -223,7 +223,7 @@ describe("Stats Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/stats/popular",
+        url: "/stats/popular",
       });
 
       expect(response.statusCode).toBe(200);
@@ -246,7 +246,7 @@ describe("Stats Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/stats/popular?limit=3",
+        url: "/stats/popular?limit=3",
       });
 
       expect(response.statusCode).toBe(200);
@@ -254,13 +254,13 @@ describe("Stats Routes", () => {
     });
   });
 
-  // ===== GET /api/stats/total-views =====
+  // ===== GET /stats/total-views =====
 
-  describe("GET /api/stats/total-views", () => {
+  describe("GET /stats/total-views", () => {
     it("데이터 없으면 0 반환", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/stats/total-views",
+        url: "/stats/total-views",
       });
 
       expect(response.statusCode).toBe(200);
@@ -279,7 +279,7 @@ describe("Stats Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/stats/total-views",
+        url: "/stats/total-views",
       });
 
       expect(response.statusCode).toBe(200);
@@ -298,7 +298,7 @@ describe("Stats Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/stats/total-views",
+        url: "/stats/total-views",
       });
 
       expect(response.statusCode).toBe(200);
@@ -306,13 +306,13 @@ describe("Stats Routes", () => {
     });
   });
 
-  // ===== GET /api/admin/stats/dashboard =====
+  // ===== GET /admin/stats/dashboard =====
 
-  describe("GET /api/admin/stats/dashboard", () => {
+  describe("GET /admin/stats/dashboard", () => {
     it("관리자 인증 없으면 403", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/stats/dashboard",
+        url: "/admin/stats/dashboard",
       });
 
       expect(response.statusCode).toBe(403);
@@ -329,7 +329,7 @@ describe("Stats Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/stats/dashboard",
+        url: "/admin/stats/dashboard",
         headers: { cookie },
       });
 
@@ -353,7 +353,7 @@ describe("Stats Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/stats/dashboard",
+        url: "/admin/stats/dashboard",
         headers: { cookie },
       });
 

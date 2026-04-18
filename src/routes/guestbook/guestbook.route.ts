@@ -37,7 +37,7 @@ export function createGuestbookRoute(
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/guestbook - 방명록 목록 조회 (Public, 페이지네이션)
+    // GET /guestbook - 방명록 목록 조회 (Public, 페이지네이션)
     typedFastify.get(
       "/guestbook",
       {
@@ -72,7 +72,7 @@ export function createGuestbookRoute(
       },
     );
 
-    // POST /api/guestbook - 방명록 작성 (OAuth 또는 Guest)
+    // POST /guestbook - 방명록 작성 (OAuth 또는 Guest)
     typedFastify.post(
       "/guestbook",
       {
@@ -88,7 +88,7 @@ export function createGuestbookRoute(
           summary: "방명록 작성",
           description:
             "OAuth 로그인 사용자 또는 게스트가 방명록을 작성합니다. 게스트는 이름, 이메일, 비밀번호를 함께 전달해야 합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.\n\n" +
             "**Rate limit**: 10회/분",
           body: z.union([
@@ -157,7 +157,7 @@ export function createGuestbookRoute(
       },
     );
 
-    // DELETE /api/guestbook/:id - 방명록 삭제 (본인 또는 게스트 비밀번호)
+    // DELETE /guestbook/:id - 방명록 삭제 (본인 또는 게스트 비밀번호)
     typedFastify.delete(
       "/guestbook/:id",
       {
@@ -167,7 +167,7 @@ export function createGuestbookRoute(
           summary: "방명록 삭제",
           description:
             "본인이 작성한 방명록을 삭제합니다. 게스트 방명록의 경우 비밀번호를 함께 전달해야 합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           params: GuestbookIdParamSchema,
           body: DeleteGuestbookGuestBodySchema.nullish(),
@@ -217,7 +217,7 @@ export function createAdminGuestbookRoute(
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/admin/guestbook - 관리자 방명록 목록 조회
+    // GET /admin/guestbook - 관리자 방명록 목록 조회
     typedFastify.get(
       "/guestbook",
       {
@@ -243,7 +243,7 @@ export function createAdminGuestbookRoute(
       },
     );
 
-    // DELETE /api/admin/guestbook/bulk - 관리자 방명록 벌크 삭제 (비가역: soft_delete | hard_delete)
+    // DELETE /admin/guestbook/bulk - 관리자 방명록 벌크 삭제 (비가역: soft_delete | hard_delete)
     typedFastify.delete(
       "/guestbook/bulk",
       {
@@ -251,8 +251,8 @@ export function createAdminGuestbookRoute(
           tags: ["admin", "guestbook"],
           summary: "관리자 방명록 벌크 삭제",
           description:
-            "방명록을 비가역적으로 삭제합니다. hide/restore는 PATCH /api/admin/guestbook/bulk를 사용하세요.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "방명록을 비가역적으로 삭제합니다. hide/restore는 PATCH /admin/guestbook/bulk를 사용하세요.\n\n" +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           body: AdminGuestbookBulkDeleteBodySchema,
@@ -271,7 +271,7 @@ export function createAdminGuestbookRoute(
       },
     );
 
-    // PATCH /api/admin/guestbook/bulk - 관리자 방명록 벌크 상태 변경 (가역: hide | restore)
+    // PATCH /admin/guestbook/bulk - 관리자 방명록 벌크 상태 변경 (가역: hide | restore)
     typedFastify.patch(
       "/guestbook/bulk",
       {
@@ -280,7 +280,7 @@ export function createAdminGuestbookRoute(
           summary: "관리자 방명록 벌크 상태 변경",
           description:
             "방명록 상태를 가역적으로 변경합니다. hide: 공개 목록에서 숨김, restore: active 복원.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           body: AdminGuestbookBulkPatchBodySchema,
@@ -299,7 +299,7 @@ export function createAdminGuestbookRoute(
       },
     );
 
-    // PATCH /api/admin/guestbook/:id - 관리자 방명록 상태 변경 (가역: hide | restore)
+    // PATCH /admin/guestbook/:id - 관리자 방명록 상태 변경 (가역: hide | restore)
     typedFastify.patch(
       "/guestbook/:id",
       {
@@ -308,7 +308,7 @@ export function createAdminGuestbookRoute(
           summary: "관리자 방명록 상태 변경",
           description:
             "방명록 상태를 가역적으로 변경합니다. hide: active→hidden, restore: hidden→active. 상태 조건 불일치 시 204를 반환하며 no-op 처리됩니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: GuestbookIdParamSchema,
@@ -329,7 +329,7 @@ export function createAdminGuestbookRoute(
       },
     );
 
-    // DELETE /api/admin/guestbook/:id - 관리자 방명록 삭제 (비가역: soft_delete | hard_delete)
+    // DELETE /admin/guestbook/:id - 관리자 방명록 삭제 (비가역: soft_delete | hard_delete)
     typedFastify.delete(
       "/guestbook/:id",
       {
@@ -338,7 +338,7 @@ export function createAdminGuestbookRoute(
           summary: "관리자 방명록 삭제",
           description:
             "방명록을 비가역적으로 삭제합니다. action 쿼리로 soft_delete | hard_delete를 지정합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: GuestbookIdParamSchema,

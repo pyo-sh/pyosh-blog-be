@@ -33,9 +33,9 @@ describe("Comment Routes", () => {
     await truncateAll();
   });
 
-  // ===== POST /api/posts/:postId/comments =====
+  // ===== POST /posts/:postId/comments =====
 
-  describe("POST /api/posts/:postId/comments", () => {
+  describe("POST /posts/:postId/comments", () => {
     it("게스트 댓글 작성 → 201", async () => {
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -45,7 +45,7 @@ describe("Comment Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "게스트 댓글입니다.",
           guestName: "홍길동",
@@ -74,7 +74,7 @@ describe("Comment Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "게스트 비밀 댓글입니다.",
           guestName: "홍길동",
@@ -104,7 +104,7 @@ describe("Comment Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         headers: { cookie },
         payload: {
           body: "OAuth 댓글입니다.",
@@ -132,7 +132,7 @@ describe("Comment Routes", () => {
       // 루트 댓글 작성
       const rootResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "루트 댓글입니다.",
           guestName: "부모",
@@ -146,7 +146,7 @@ describe("Comment Routes", () => {
       // 대댓글 작성
       const replyResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "대댓글입니다.",
           parentId: rootComment.id,
@@ -173,7 +173,7 @@ describe("Comment Routes", () => {
       // 루트 댓글 (depth=0)
       const rootResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "루트 댓글",
           guestName: "A",
@@ -186,7 +186,7 @@ describe("Comment Routes", () => {
       // 대댓글 (depth=1)
       const childResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "대댓글",
           parentId: rootComment.id,
@@ -200,7 +200,7 @@ describe("Comment Routes", () => {
       // depth=2 시도 → 400
       const grandChildResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "대대댓글 시도",
           parentId: childComment.id,
@@ -214,9 +214,9 @@ describe("Comment Routes", () => {
     });
   });
 
-  // ===== GET /api/posts/:postId/comments =====
+  // ===== GET /posts/:postId/comments =====
 
-  describe("GET /api/posts/:postId/comments", () => {
+  describe("GET /posts/:postId/comments", () => {
     it("댓글 목록 조회 → 계층 구조 + 페이지네이션 메타 확인", async () => {
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -227,7 +227,7 @@ describe("Comment Routes", () => {
       // 루트 댓글
       const rootResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "루트 댓글",
           guestName: "루트 작성자",
@@ -240,7 +240,7 @@ describe("Comment Routes", () => {
       // 대댓글
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "대댓글",
           parentId: rootComment.id,
@@ -253,7 +253,7 @@ describe("Comment Routes", () => {
       // 목록 조회
       const listResponse = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
       });
 
       expect(listResponse.statusCode).toBe(200);
@@ -285,7 +285,7 @@ describe("Comment Routes", () => {
       for (let i = 1; i <= 3; i++) {
         await app.inject({
           method: "POST",
-          url: `/api/posts/${post.id}/comments`,
+          url: `/posts/${post.id}/comments`,
           payload: {
             body: `댓글 ${i}`,
             guestName: `작성자${i}`,
@@ -298,7 +298,7 @@ describe("Comment Routes", () => {
       // page=1, limit=2
       const page1 = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.id}/comments?page=1&limit=2`,
+        url: `/posts/${post.id}/comments?page=1&limit=2`,
       });
 
       expect(page1.statusCode).toBe(200);
@@ -310,7 +310,7 @@ describe("Comment Routes", () => {
       // page=2, limit=2
       const page2 = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.id}/comments?page=2&limit=2`,
+        url: `/posts/${post.id}/comments?page=2&limit=2`,
       });
 
       expect(page2.statusCode).toBe(200);
@@ -331,7 +331,7 @@ describe("Comment Routes", () => {
       // 비밀 댓글 작성 (OAuth 사용자)
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         headers: { cookie },
         payload: {
           body: "비밀 내용입니다.",
@@ -342,7 +342,7 @@ describe("Comment Routes", () => {
       // 비인증 조회 → 마스킹
       const publicResponse = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
       });
 
       expect(publicResponse.statusCode).toBe(200);
@@ -352,7 +352,7 @@ describe("Comment Routes", () => {
       // 작성자 조회 → 원본
       const authorResponse = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         headers: { cookie },
       });
 
@@ -370,7 +370,7 @@ describe("Comment Routes", () => {
 
       const createResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "게스트 비밀 원문",
           guestName: "비밀 작성자",
@@ -384,7 +384,7 @@ describe("Comment Routes", () => {
 
       const publicResponse = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
       });
       expect(publicResponse.statusCode).toBe(200);
       expect(publicResponse.json().data[0].body).toBe(
@@ -393,7 +393,7 @@ describe("Comment Routes", () => {
 
       const revealResponse = await app.inject({
         method: "POST",
-        url: `/api/comments/${comment.id}/reveal`,
+        url: `/comments/${comment.id}/reveal`,
         payload: { revealToken },
       });
 
@@ -410,7 +410,7 @@ describe("Comment Routes", () => {
 
       const firstCreate = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "첫 번째 비밀 댓글",
           guestName: "작성자1",
@@ -420,7 +420,7 @@ describe("Comment Routes", () => {
       });
       const secondCreate = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "두 번째 비밀 댓글",
           guestName: "작성자2",
@@ -434,7 +434,7 @@ describe("Comment Routes", () => {
 
       const revealResponse = await app.inject({
         method: "POST",
-        url: `/api/comments/${second.data.id}/reveal`,
+        url: `/comments/${second.data.id}/reveal`,
         payload: { revealToken: first.revealToken },
       });
 
@@ -450,7 +450,7 @@ describe("Comment Routes", () => {
 
       const createResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "삭제될 비밀 댓글",
           guestName: "삭제자",
@@ -463,14 +463,14 @@ describe("Comment Routes", () => {
 
       const deleteResponse = await app.inject({
         method: "DELETE",
-        url: `/api/comments/${comment.id}`,
+        url: `/comments/${comment.id}`,
         payload: { guestPassword: "pass1234" },
       });
       expect(deleteResponse.statusCode).toBe(204);
 
       const revealResponse = await app.inject({
         method: "POST",
-        url: `/api/comments/${comment.id}/reveal`,
+        url: `/comments/${comment.id}/reveal`,
         payload: { revealToken },
       });
 
@@ -478,9 +478,9 @@ describe("Comment Routes", () => {
     });
   });
 
-  // ===== DELETE /api/comments/:id =====
+  // ===== DELETE /comments/:id =====
 
-  describe("DELETE /api/comments/:id", () => {
+  describe("DELETE /comments/:id", () => {
     it("게스트 댓글 삭제 (비밀번호) → 204", async () => {
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -491,7 +491,7 @@ describe("Comment Routes", () => {
       // 게스트 댓글 작성
       const createResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "삭제될 댓글",
           guestName: "삭제자",
@@ -504,7 +504,7 @@ describe("Comment Routes", () => {
       // 비밀번호로 삭제
       const deleteResponse = await app.inject({
         method: "DELETE",
-        url: `/api/comments/${comment.id}`,
+        url: `/comments/${comment.id}`,
         payload: { guestPassword: "mypassword123" },
       });
 
@@ -513,7 +513,7 @@ describe("Comment Routes", () => {
       // 삭제 후 목록에서 사라짐 확인
       const listResponse = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
       });
       expect(listResponse.json().data).toHaveLength(0);
     });
@@ -534,7 +534,7 @@ describe("Comment Routes", () => {
       // User A가 댓글 작성
       const createResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         headers: { cookie: cookieA },
         payload: { body: "User A의 댓글" },
       });
@@ -543,7 +543,7 @@ describe("Comment Routes", () => {
       // User B가 삭제 시도 → 403
       const deleteResponse = await app.inject({
         method: "DELETE",
-        url: `/api/comments/${comment.id}`,
+        url: `/comments/${comment.id}`,
         headers: { cookie: cookieB },
       });
 
@@ -551,13 +551,13 @@ describe("Comment Routes", () => {
     });
   });
 
-  // ===== GET /api/admin/comments =====
+  // ===== GET /admin/comments =====
 
-  describe("GET /api/admin/comments", () => {
+  describe("GET /admin/comments", () => {
     it("관리자 인증 없이 접근 → 403", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/comments",
+        url: "/admin/comments",
       });
 
       expect(response.statusCode).toBe(403);
@@ -577,7 +577,7 @@ describe("Comment Routes", () => {
       // 댓글 2개 작성
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "첫 번째 댓글",
           guestName: "작성자1",
@@ -587,7 +587,7 @@ describe("Comment Routes", () => {
       });
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "두 번째 댓글",
           guestName: "작성자2",
@@ -598,7 +598,7 @@ describe("Comment Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/comments",
+        url: "/admin/comments",
         headers: { cookie: adminCookie },
       });
 
@@ -625,7 +625,7 @@ describe("Comment Routes", () => {
 
       const createResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "삭제될 댓글",
           guestName: "작성자",
@@ -638,14 +638,14 @@ describe("Comment Routes", () => {
       // 댓글 soft delete
       await app.inject({
         method: "DELETE",
-        url: `/api/admin/comments/${comment.id}?action=soft_delete`,
+        url: `/admin/comments/${comment.id}?action=soft_delete`,
         headers: { cookie: adminCookie },
       });
 
       // status=active 필터 → 0개
       const activeResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments?status=active",
+        url: "/admin/comments?status=active",
         headers: { cookie: adminCookie },
       });
       expect(activeResponse.json().data).toHaveLength(0);
@@ -653,7 +653,7 @@ describe("Comment Routes", () => {
       // status=deleted 필터 → 1개
       const deletedResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments?status=deleted",
+        url: "/admin/comments?status=deleted",
         headers: { cookie: adminCookie },
       });
       expect(deletedResponse.json().data).toHaveLength(1);
@@ -675,7 +675,7 @@ describe("Comment Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post1.id}/comments`,
+        url: `/posts/${post1.id}/comments`,
         payload: {
           body: "post1 댓글",
           guestName: "작성자",
@@ -685,7 +685,7 @@ describe("Comment Routes", () => {
       });
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post2.id}/comments`,
+        url: `/posts/${post2.id}/comments`,
         payload: {
           body: "post2 댓글",
           guestName: "작성자",
@@ -696,7 +696,7 @@ describe("Comment Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: `/api/admin/comments?postId=${post1.id}`,
+        url: `/admin/comments?postId=${post1.id}`,
         headers: { cookie: adminCookie },
       });
 
@@ -722,7 +722,7 @@ describe("Comment Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         headers: { cookie: userCookie },
         payload: {
           body: "비밀 내용 원문",
@@ -732,7 +732,7 @@ describe("Comment Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/comments",
+        url: "/admin/comments",
         headers: { cookie: adminCookie },
       });
 
@@ -756,7 +756,7 @@ describe("Comment Routes", () => {
       // OAuth 댓글
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         headers: { cookie: userCookie },
         payload: { body: "OAuth 댓글" },
       });
@@ -764,7 +764,7 @@ describe("Comment Routes", () => {
       // 게스트 댓글
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "게스트 댓글",
           guestName: "게스트",
@@ -776,7 +776,7 @@ describe("Comment Routes", () => {
       // authorType=guest 필터 → 1개 (게스트만)
       const guestResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments?authorType=guest",
+        url: "/admin/comments?authorType=guest",
         headers: { cookie: adminCookie },
       });
       expect(guestResponse.statusCode).toBe(200);
@@ -787,7 +787,7 @@ describe("Comment Routes", () => {
       // authorType=oauth 필터 → 1개 (OAuth만)
       const oauthResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments?authorType=oauth",
+        url: "/admin/comments?authorType=oauth",
         headers: { cookie: adminCookie },
       });
       expect(oauthResponse.statusCode).toBe(200);
@@ -823,12 +823,12 @@ describe("Comment Routes", () => {
 
       const descResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments?order=desc",
+        url: "/admin/comments?order=desc",
         headers: { cookie: adminCookie },
       });
       const ascResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments?order=asc",
+        url: "/admin/comments?order=asc",
         headers: { cookie: adminCookie },
       });
 
@@ -847,9 +847,9 @@ describe("Comment Routes", () => {
     });
   });
 
-  // ===== GET /api/admin/comments/:id/thread =====
+  // ===== GET /admin/comments/:id/thread =====
 
-  describe("GET /api/admin/comments/:id/thread", () => {
+  describe("GET /admin/comments/:id/thread", () => {
     it("루트 댓글 ID로 스레드 조회 → 부모 + 답글 반환", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
@@ -863,7 +863,7 @@ describe("Comment Routes", () => {
       // 루트 댓글
       const rootResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "루트 댓글",
           guestName: "부모",
@@ -876,7 +876,7 @@ describe("Comment Routes", () => {
       // 답글 2개
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "답글 1",
           parentId: rootComment.id,
@@ -887,7 +887,7 @@ describe("Comment Routes", () => {
       });
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "답글 2",
           parentId: rootComment.id,
@@ -899,7 +899,7 @@ describe("Comment Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: `/api/admin/comments/${rootComment.id}/thread`,
+        url: `/admin/comments/${rootComment.id}/thread`,
         headers: { cookie: adminCookie },
       });
 
@@ -923,7 +923,7 @@ describe("Comment Routes", () => {
       // 루트 댓글
       const rootResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "루트 댓글",
           guestName: "부모",
@@ -936,7 +936,7 @@ describe("Comment Routes", () => {
       // 답글
       const replyResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "답글",
           parentId: rootComment.id,
@@ -950,7 +950,7 @@ describe("Comment Routes", () => {
       // 답글 ID로 스레드 조회 → parent.id는 루트 ID
       const response = await app.inject({
         method: "GET",
-        url: `/api/admin/comments/${replyComment.id}/thread`,
+        url: `/admin/comments/${replyComment.id}/thread`,
         headers: { cookie: adminCookie },
       });
 
@@ -966,7 +966,7 @@ describe("Comment Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/comments/99999/thread",
+        url: "/admin/comments/99999/thread",
         headers: { cookie: adminCookie },
       });
 
@@ -974,16 +974,16 @@ describe("Comment Routes", () => {
     });
   });
 
-  // ===== PUT /api/admin/comments/:id/hide =====
+  // ===== PUT /admin/comments/:id/hide =====
 
-  describe("PUT /api/admin/comments/:id/hide", () => {
+  describe("PUT /admin/comments/:id/hide", () => {
     it("active 댓글 숨김 → 200 + hidden 전환", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
       const csrfToken = (
         await app.inject({
           method: "GET",
-          url: "/api/auth/csrf-token",
+          url: "/auth/csrf-token",
           headers: { cookie: adminCookie },
         })
       ).json().token;
@@ -1001,7 +1001,7 @@ describe("Comment Routes", () => {
 
       const hideResponse = await app.inject({
         method: "PUT",
-        url: `/api/admin/comments/${comment.id}/hide`,
+        url: `/admin/comments/${comment.id}/hide`,
         headers: {
           cookie: adminCookie,
           "x-csrf-token": csrfToken,
@@ -1026,7 +1026,7 @@ describe("Comment Routes", () => {
       const csrfToken = (
         await app.inject({
           method: "GET",
-          url: "/api/auth/csrf-token",
+          url: "/auth/csrf-token",
           headers: { cookie: adminCookie },
         })
       ).json().token;
@@ -1045,7 +1045,7 @@ describe("Comment Routes", () => {
 
       const hideResponse = await app.inject({
         method: "PUT",
-        url: `/api/admin/comments/${comment.id}/hide`,
+        url: `/admin/comments/${comment.id}/hide`,
         headers: {
           cookie: adminCookie,
           "x-csrf-token": csrfToken,
@@ -1061,7 +1061,7 @@ describe("Comment Routes", () => {
       const csrfToken = (
         await app.inject({
           method: "GET",
-          url: "/api/auth/csrf-token",
+          url: "/auth/csrf-token",
           headers: { cookie: adminCookie },
         })
       ).json().token;
@@ -1085,7 +1085,7 @@ describe("Comment Routes", () => {
 
       const hideResponse = await app.inject({
         method: "PUT",
-        url: `/api/admin/comments/${rootComment.id}/hide`,
+        url: `/admin/comments/${rootComment.id}/hide`,
         headers: {
           cookie: adminCookie,
           "x-csrf-token": csrfToken,
@@ -1096,7 +1096,7 @@ describe("Comment Routes", () => {
 
       const publicResponse = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
       });
 
       expect(publicResponse.statusCode).toBe(200);
@@ -1106,9 +1106,9 @@ describe("Comment Routes", () => {
     });
   });
 
-  // ===== PUT /api/admin/comments/:id/restore =====
+  // ===== PUT /admin/comments/:id/restore =====
 
-  describe("PUT /api/admin/comments/:id/restore", () => {
+  describe("PUT /admin/comments/:id/restore", () => {
     it("삭제된 댓글 복원 → 200 + success:true", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
@@ -1122,7 +1122,7 @@ describe("Comment Routes", () => {
       // 댓글 작성 후 삭제
       const createResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "복원될 댓글",
           guestName: "작성자",
@@ -1134,14 +1134,14 @@ describe("Comment Routes", () => {
 
       await app.inject({
         method: "DELETE",
-        url: `/api/admin/comments/${comment.id}?action=soft_delete`,
+        url: `/admin/comments/${comment.id}?action=soft_delete`,
         headers: { cookie: adminCookie },
       });
 
       // 복원
       const restoreResponse = await app.inject({
         method: "PUT",
-        url: `/api/admin/comments/${comment.id}/restore`,
+        url: `/admin/comments/${comment.id}/restore`,
         headers: { cookie: adminCookie },
       });
 
@@ -1151,7 +1151,7 @@ describe("Comment Routes", () => {
       // active 상태로 복원됐는지 확인
       const listResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments?status=active",
+        url: "/admin/comments?status=active",
         headers: { cookie: adminCookie },
       });
       expect(listResponse.json().data).toHaveLength(1);
@@ -1174,7 +1174,7 @@ describe("Comment Routes", () => {
 
       const restoreResponse = await app.inject({
         method: "PUT",
-        url: `/api/admin/comments/${comment.id}/restore`,
+        url: `/admin/comments/${comment.id}/restore`,
         headers: { cookie: adminCookie },
       });
 
@@ -1202,7 +1202,7 @@ describe("Comment Routes", () => {
 
       const createResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "활성 댓글",
           guestName: "작성자",
@@ -1214,7 +1214,7 @@ describe("Comment Routes", () => {
 
       const restoreResponse = await app.inject({
         method: "PUT",
-        url: `/api/admin/comments/${comment.id}/restore`,
+        url: `/admin/comments/${comment.id}/restore`,
         headers: { cookie: adminCookie },
       });
 
@@ -1222,9 +1222,9 @@ describe("Comment Routes", () => {
     });
   });
 
-  // ===== DELETE /api/admin/comments/:id =====
+  // ===== DELETE /admin/comments/:id =====
 
-  describe("DELETE /api/admin/comments/:id", () => {
+  describe("DELETE /admin/comments/:id", () => {
     it("soft_delete → 204, 관리자 목록에서 deleted 상태로 조회 가능", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
@@ -1237,7 +1237,7 @@ describe("Comment Routes", () => {
 
       const createResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "소프트 삭제될 댓글",
           guestName: "작성자",
@@ -1249,7 +1249,7 @@ describe("Comment Routes", () => {
 
       const deleteResponse = await app.inject({
         method: "DELETE",
-        url: `/api/admin/comments/${comment.id}?action=soft_delete`,
+        url: `/admin/comments/${comment.id}?action=soft_delete`,
         headers: { cookie: adminCookie },
       });
 
@@ -1258,7 +1258,7 @@ describe("Comment Routes", () => {
       // 관리자 목록에서 deleted로 조회 가능
       const listResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments?status=deleted",
+        url: "/admin/comments?status=deleted",
         headers: { cookie: adminCookie },
       });
       expect(listResponse.json().data).toHaveLength(1);
@@ -1276,7 +1276,7 @@ describe("Comment Routes", () => {
 
       const rootResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "루트 댓글",
           guestName: "부모",
@@ -1289,7 +1289,7 @@ describe("Comment Routes", () => {
       // 답글 작성
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "답글",
           parentId: rootComment.id,
@@ -1302,7 +1302,7 @@ describe("Comment Routes", () => {
       // hard_delete
       const deleteResponse = await app.inject({
         method: "DELETE",
-        url: `/api/admin/comments/${rootComment.id}?action=hard_delete`,
+        url: `/admin/comments/${rootComment.id}?action=hard_delete`,
         headers: { cookie: adminCookie },
       });
 
@@ -1311,7 +1311,7 @@ describe("Comment Routes", () => {
       // 관리자 목록에서도 사라짐 (hard delete)
       const listResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments",
+        url: "/admin/comments",
         headers: { cookie: adminCookie },
       });
       expect(listResponse.json().data).toHaveLength(0);
@@ -1329,7 +1329,7 @@ describe("Comment Routes", () => {
 
       const createResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "관리자가 삭제할 댓글",
           guestName: "작성자",
@@ -1341,7 +1341,7 @@ describe("Comment Routes", () => {
 
       const deleteResponse = await app.inject({
         method: "DELETE",
-        url: `/api/admin/comments/${comment.id}`,
+        url: `/admin/comments/${comment.id}`,
         headers: { cookie: adminCookie },
       });
 
@@ -1349,16 +1349,16 @@ describe("Comment Routes", () => {
     });
   });
 
-  // ===== DELETE /api/admin/comments/bulk =====
+  // ===== DELETE /admin/comments/bulk =====
 
-  describe("DELETE /api/admin/comments/bulk", () => {
+  describe("DELETE /admin/comments/bulk", () => {
     it("벌크 hide → 204, active 상태만 hidden으로 전환", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
       const csrfToken = (
         await app.inject({
           method: "GET",
-          url: "/api/auth/csrf-token",
+          url: "/auth/csrf-token",
           headers: { cookie: adminCookie },
         })
       ).json().token;
@@ -1381,7 +1381,7 @@ describe("Comment Routes", () => {
 
       const bulkResponse = await app.inject({
         method: "DELETE",
-        url: "/api/admin/comments/bulk",
+        url: "/admin/comments/bulk",
         headers: {
           cookie: adminCookie,
           "x-csrf-token": csrfToken,
@@ -1414,7 +1414,7 @@ describe("Comment Routes", () => {
       const csrfToken = (
         await app.inject({
           method: "GET",
-          url: "/api/auth/csrf-token",
+          url: "/auth/csrf-token",
           headers: { cookie: adminCookie },
         })
       ).json().token;
@@ -1429,7 +1429,7 @@ describe("Comment Routes", () => {
       for (let i = 1; i <= 3; i++) {
         const r = await app.inject({
           method: "POST",
-          url: `/api/posts/${post.id}/comments`,
+          url: `/posts/${post.id}/comments`,
           payload: {
             body: `댓글 ${i}`,
             guestName: `작성자${i}`,
@@ -1442,7 +1442,7 @@ describe("Comment Routes", () => {
 
       const bulkResponse = await app.inject({
         method: "DELETE",
-        url: "/api/admin/comments/bulk",
+        url: "/admin/comments/bulk",
         headers: {
           cookie: adminCookie,
           "x-csrf-token": csrfToken,
@@ -1454,7 +1454,7 @@ describe("Comment Routes", () => {
 
       const listResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments?status=deleted",
+        url: "/admin/comments?status=deleted",
         headers: { cookie: adminCookie },
       });
       expect(listResponse.json().data).toHaveLength(3);
@@ -1466,7 +1466,7 @@ describe("Comment Routes", () => {
       const csrfToken = (
         await app.inject({
           method: "GET",
-          url: "/api/auth/csrf-token",
+          url: "/auth/csrf-token",
           headers: { cookie: adminCookie },
         })
       ).json().token;
@@ -1481,7 +1481,7 @@ describe("Comment Routes", () => {
       for (let i = 1; i <= 2; i++) {
         const r = await app.inject({
           method: "POST",
-          url: `/api/posts/${post.id}/comments`,
+          url: `/posts/${post.id}/comments`,
           payload: {
             body: `댓글 ${i}`,
             guestName: `작성자${i}`,
@@ -1495,7 +1495,7 @@ describe("Comment Routes", () => {
       // 먼저 soft_delete
       await app.inject({
         method: "DELETE",
-        url: "/api/admin/comments/bulk",
+        url: "/admin/comments/bulk",
         headers: {
           cookie: adminCookie,
           "x-csrf-token": csrfToken,
@@ -1506,7 +1506,7 @@ describe("Comment Routes", () => {
       // 복원
       const restoreResponse = await app.inject({
         method: "DELETE",
-        url: "/api/admin/comments/bulk",
+        url: "/admin/comments/bulk",
         headers: {
           cookie: adminCookie,
           "x-csrf-token": csrfToken,
@@ -1518,7 +1518,7 @@ describe("Comment Routes", () => {
 
       const listResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments?status=active",
+        url: "/admin/comments?status=active",
         headers: { cookie: adminCookie },
       });
       expect(listResponse.json().data).toHaveLength(2);
@@ -1530,7 +1530,7 @@ describe("Comment Routes", () => {
       const csrfToken = (
         await app.inject({
           method: "GET",
-          url: "/api/auth/csrf-token",
+          url: "/auth/csrf-token",
           headers: { cookie: adminCookie },
         })
       ).json().token;
@@ -1553,7 +1553,7 @@ describe("Comment Routes", () => {
 
       const restoreResponse = await app.inject({
         method: "DELETE",
-        url: "/api/admin/comments/bulk",
+        url: "/admin/comments/bulk",
         headers: {
           cookie: adminCookie,
           "x-csrf-token": csrfToken,
@@ -1586,7 +1586,7 @@ describe("Comment Routes", () => {
       const csrfToken = (
         await app.inject({
           method: "GET",
-          url: "/api/auth/csrf-token",
+          url: "/auth/csrf-token",
           headers: { cookie: adminCookie },
         })
       ).json().token;
@@ -1599,7 +1599,7 @@ describe("Comment Routes", () => {
 
       const rootResponse = await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "루트 댓글",
           guestName: "부모",
@@ -1612,7 +1612,7 @@ describe("Comment Routes", () => {
       // 답글 추가
       await app.inject({
         method: "POST",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
         payload: {
           body: "답글",
           parentId: rootComment.id,
@@ -1624,7 +1624,7 @@ describe("Comment Routes", () => {
 
       const bulkResponse = await app.inject({
         method: "DELETE",
-        url: "/api/admin/comments/bulk",
+        url: "/admin/comments/bulk",
         headers: {
           cookie: adminCookie,
           "x-csrf-token": csrfToken,
@@ -1637,7 +1637,7 @@ describe("Comment Routes", () => {
       // 루트 + 대댓글 모두 삭제됨
       const listResponse = await app.inject({
         method: "GET",
-        url: "/api/admin/comments",
+        url: "/admin/comments",
         headers: { cookie: adminCookie },
       });
       expect(listResponse.json().data).toHaveLength(0);

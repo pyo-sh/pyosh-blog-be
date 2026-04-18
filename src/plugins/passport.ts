@@ -38,7 +38,7 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
         {
           clientID: env.GOOGLE_CLIENT_ID,
           clientSecret: env.GOOGLE_CLIENT_SECRET,
-          callbackURL: "/api/auth/google/callback",
+          callbackURL: "/auth/google/callback",
         },
         async (_accessToken, _refreshToken, profile, done) => {
           try {
@@ -103,7 +103,7 @@ const passportPlugin: FastifyPluginAsync = async (fastify) => {
         {
           clientID: env.GITHUB_CLIENT_ID,
           clientSecret: env.GITHUB_CLIENT_SECRET,
-          callbackURL: "/api/auth/github/callback",
+          callbackURL: "/auth/github/callback",
         },
         async (_accessToken, _refreshToken, profile, done) => {
           try {

@@ -21,11 +21,11 @@ describe("Tag Routes", () => {
     await truncateAll();
   });
 
-  describe("GET /api/tags", () => {
+  describe("GET /tags", () => {
     it("게시글이 없으면 빈 배열 반환", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/tags",
+        url: "/tags",
       });
 
       expect(response.statusCode).toBe(200);
@@ -39,7 +39,7 @@ describe("Tag Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Post One",
@@ -53,7 +53,7 @@ describe("Tag Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Post Two",
@@ -67,7 +67,7 @@ describe("Tag Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Private Post",
@@ -81,7 +81,7 @@ describe("Tag Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Draft Post",
@@ -95,7 +95,7 @@ describe("Tag Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/tags",
+        url: "/tags",
       });
 
       expect(response.statusCode).toBe(200);
@@ -119,7 +119,7 @@ describe("Tag Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Post One",
@@ -133,7 +133,7 @@ describe("Tag Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Post Two",
@@ -152,7 +152,7 @@ describe("Tag Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/tags",
+        url: "/tags",
       });
 
       expect(response.statusCode).toBe(200);

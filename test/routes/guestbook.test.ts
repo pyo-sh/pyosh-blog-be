@@ -17,7 +17,7 @@ describe("Guestbook Routes", () => {
   async function getCsrfHeaders(cookie?: string): Promise<Record<string, string>> {
     const response = await app.inject({
       method: "GET",
-      url: "/api/auth/csrf-token",
+      url: "/auth/csrf-token",
       headers: cookie ? { cookie } : undefined,
     });
     const setCookie = response.headers["set-cookie"];
@@ -45,14 +45,14 @@ describe("Guestbook Routes", () => {
     await truncateAll();
   });
 
-  // ===== POST /api/guestbook =====
+  // ===== POST /guestbook =====
 
-  describe("POST /api/guestbook", () => {
+  describe("POST /guestbook", () => {
     it("게스트 방명록 작성 → 201", async () => {
       const csrfHeaders = await getCsrfHeaders();
       const response = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: csrfHeaders,
         payload: {
           body: "안녕하세요! 방명록입니다.",
@@ -78,7 +78,7 @@ describe("Guestbook Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: csrfHeaders,
         payload: {
           body: "OAuth로 작성한 방명록입니다.",
@@ -101,7 +101,7 @@ describe("Guestbook Routes", () => {
       // 부모 방명록 작성
       const parentResponse = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: parentHeaders,
         payload: {
           body: "부모 방명록",
@@ -117,7 +117,7 @@ describe("Guestbook Routes", () => {
       // 대댓글 작성
       const replyResponse = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: replyHeaders,
         payload: {
           body: "대댓글 방명록",
@@ -135,16 +135,16 @@ describe("Guestbook Routes", () => {
     });
   });
 
-  // ===== GET /api/guestbook =====
+  // ===== GET /guestbook =====
 
-  describe("GET /api/guestbook", () => {
+  describe("GET /guestbook", () => {
     it("목록 조회 → 계층 구조 + 페이지네이션", async () => {
       const firstHeaders = await getCsrfHeaders();
 
       // 부모 방명록 2개 + 대댓글 1개 작성
       const p1Response = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: firstHeaders,
         payload: {
           body: "첫 번째 방명록",
@@ -158,7 +158,7 @@ describe("Guestbook Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: secondHeaders,
         payload: {
           body: "두 번째 방명록",
@@ -171,7 +171,7 @@ describe("Guestbook Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: replyHeaders,
         payload: {
           body: "첫 번째 방명록의 대댓글",
@@ -185,7 +185,7 @@ describe("Guestbook Routes", () => {
       // limit=10으로 목록 조회 (child entry 포함하여 계층 구조 확인)
       const listResponse = await app.inject({
         method: "GET",
-        url: "/api/guestbook?page=1&limit=10",
+        url: "/guestbook?page=1&limit=10",
       });
 
       expect(listResponse.statusCode).toBe(200);
@@ -205,16 +205,16 @@ describe("Guestbook Routes", () => {
     });
   });
 
-  // ===== DELETE /api/guestbook/:id =====
+  // ===== DELETE /guestbook/:id =====
 
-  describe("DELETE /api/guestbook/:id", () => {
+  describe("DELETE /guestbook/:id", () => {
     it("게스트 삭제 (비밀번호) → 204", async () => {
       const createHeaders = await getCsrfHeaders();
 
       // 방명록 작성
       const createResponse = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: createHeaders,
         payload: {
           body: "삭제될 방명록",
@@ -229,7 +229,7 @@ describe("Guestbook Routes", () => {
       // 비밀번호로 삭제
       const deleteResponse = await app.inject({
         method: "DELETE",
-        url: `/api/guestbook/${entry.id}`,
+        url: `/guestbook/${entry.id}`,
         headers: deleteHeaders,
         payload: { guestPassword: "deletepass123" },
       });
@@ -239,7 +239,7 @@ describe("Guestbook Routes", () => {
       // 삭제 후 목록에서 사라짐 확인
       const listResponse = await app.inject({
         method: "GET",
-        url: "/api/guestbook",
+        url: "/guestbook",
       });
       expect(listResponse.json().data).toHaveLength(0);
     });
@@ -256,7 +256,7 @@ describe("Guestbook Routes", () => {
       // User A가 방명록 작성
       const createResponse = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: headersA,
         payload: { body: "User A의 방명록" },
       });
@@ -265,7 +265,7 @@ describe("Guestbook Routes", () => {
       // User B가 삭제 시도 → 403
       const deleteResponse = await app.inject({
         method: "DELETE",
-        url: `/api/guestbook/${entry.id}`,
+        url: `/guestbook/${entry.id}`,
         headers: headersB,
       });
 
@@ -273,13 +273,13 @@ describe("Guestbook Routes", () => {
     });
   });
 
-  // ===== GET /api/admin/guestbook =====
+  // ===== GET /admin/guestbook =====
 
-  describe("GET /api/admin/guestbook", () => {
+  describe("GET /admin/guestbook", () => {
     it("관리자 인증 없이 접근 → 403", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/guestbook",
+        url: "/admin/guestbook",
       });
 
       expect(response.statusCode).toBe(403);
@@ -294,7 +294,7 @@ describe("Guestbook Routes", () => {
       // 방명록 2개 작성
       await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: firstHeaders,
         payload: {
           body: "첫 번째 방명록",
@@ -305,7 +305,7 @@ describe("Guestbook Routes", () => {
       });
       await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: secondHeaders,
         payload: {
           body: "두 번째 방명록",
@@ -317,7 +317,7 @@ describe("Guestbook Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/guestbook",
+        url: "/admin/guestbook",
         headers: { cookie: adminCookie },
       });
 
@@ -341,7 +341,7 @@ describe("Guestbook Routes", () => {
       // OAuth 방명록
       await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: userHeaders,
         payload: { body: "OAuth 방명록" },
       });
@@ -349,7 +349,7 @@ describe("Guestbook Routes", () => {
       // Guest 방명록
       await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: guestHeaders,
         payload: {
           body: "게스트 방명록",
@@ -361,7 +361,7 @@ describe("Guestbook Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/guestbook?authorType=guest",
+        url: "/admin/guestbook?authorType=guest",
         headers: { cookie: adminCookie },
       });
 
@@ -382,7 +382,7 @@ describe("Guestbook Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: userHeaders,
         payload: {
           body: "비밀 방명록 원문",
@@ -392,7 +392,7 @@ describe("Guestbook Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/guestbook",
+        url: "/admin/guestbook",
         headers: { cookie: adminCookie },
       });
 
@@ -401,9 +401,9 @@ describe("Guestbook Routes", () => {
     });
   });
 
-  // ===== DELETE /api/admin/guestbook/:id =====
+  // ===== DELETE /admin/guestbook/:id =====
 
-  describe("DELETE /api/admin/guestbook/:id", () => {
+  describe("DELETE /admin/guestbook/:id", () => {
     it("관리자 강제 삭제 → 204", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
@@ -412,7 +412,7 @@ describe("Guestbook Routes", () => {
 
       const createResponse = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: createHeaders,
         payload: {
           body: "관리자가 삭제할 방명록",
@@ -425,7 +425,7 @@ describe("Guestbook Routes", () => {
 
       const deleteResponse = await app.inject({
         method: "DELETE",
-        url: `/api/admin/guestbook/${entry.id}?action=soft_delete`,
+        url: `/admin/guestbook/${entry.id}?action=soft_delete`,
         headers: adminHeaders,
       });
 
@@ -433,9 +433,9 @@ describe("Guestbook Routes", () => {
     });
   });
 
-  // ===== PATCH /api/admin/guestbook/:id =====
+  // ===== PATCH /admin/guestbook/:id =====
 
-  describe("PATCH /api/admin/guestbook/:id", () => {
+  describe("PATCH /admin/guestbook/:id", () => {
     it("active 방명록 숨김 후 hidden 상태만 restore → 204", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
@@ -444,7 +444,7 @@ describe("Guestbook Routes", () => {
 
       const createResponse = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: createHeaders,
         payload: {
           body: "상태 변경 대상",
@@ -457,7 +457,7 @@ describe("Guestbook Routes", () => {
 
       const hideResponse = await app.inject({
         method: "PATCH",
-        url: `/api/admin/guestbook/${entry.id}?action=hide`,
+        url: `/admin/guestbook/${entry.id}?action=hide`,
         headers: adminHeaders,
       });
 
@@ -472,7 +472,7 @@ describe("Guestbook Routes", () => {
 
       const restoreResponse = await app.inject({
         method: "PATCH",
-        url: `/api/admin/guestbook/${entry.id}?action=restore`,
+        url: `/admin/guestbook/${entry.id}?action=restore`,
         headers: adminHeaders,
       });
 
@@ -487,9 +487,9 @@ describe("Guestbook Routes", () => {
     });
   });
 
-  // ===== DELETE /api/admin/guestbook/bulk =====
+  // ===== DELETE /admin/guestbook/bulk =====
 
-  describe("DELETE /api/admin/guestbook/bulk", () => {
+  describe("DELETE /admin/guestbook/bulk", () => {
     it("벌크 soft_delete → 204, deleted 상태로 전환", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
@@ -499,7 +499,7 @@ describe("Guestbook Routes", () => {
 
       const firstResponse = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: firstHeaders,
         payload: {
           body: "첫 번째 벌크 삭제",
@@ -510,7 +510,7 @@ describe("Guestbook Routes", () => {
       });
       const secondResponse = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: secondHeaders,
         payload: {
           body: "두 번째 벌크 삭제",
@@ -523,7 +523,7 @@ describe("Guestbook Routes", () => {
       const ids = [firstResponse.json().data.id, secondResponse.json().data.id];
       const response = await app.inject({
         method: "DELETE",
-        url: "/api/admin/guestbook/bulk",
+        url: "/admin/guestbook/bulk",
         headers: adminHeaders,
         payload: { ids, action: "soft_delete" },
       });
@@ -540,9 +540,9 @@ describe("Guestbook Routes", () => {
     });
   });
 
-  // ===== PATCH /api/admin/guestbook/bulk =====
+  // ===== PATCH /admin/guestbook/bulk =====
 
-  describe("PATCH /api/admin/guestbook/bulk", () => {
+  describe("PATCH /admin/guestbook/bulk", () => {
     it("벌크 hide/restore → 상태 조건에 맞는 엔트리만 변경", async () => {
       await seedAdmin();
       const adminCookie = await injectAuth(app);
@@ -552,7 +552,7 @@ describe("Guestbook Routes", () => {
 
       const activeResponse = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: firstHeaders,
         payload: {
           body: "active 엔트리",
@@ -563,7 +563,7 @@ describe("Guestbook Routes", () => {
       });
       const deletedResponse = await app.inject({
         method: "POST",
-        url: "/api/guestbook",
+        url: "/guestbook",
         headers: secondHeaders,
         payload: {
           body: "deleted 엔트리",
@@ -578,13 +578,13 @@ describe("Guestbook Routes", () => {
 
       await app.inject({
         method: "DELETE",
-        url: `/api/admin/guestbook/${deletedId}?action=soft_delete`,
+        url: `/admin/guestbook/${deletedId}?action=soft_delete`,
         headers: adminHeaders,
       });
 
       const hideResponse = await app.inject({
         method: "PATCH",
-        url: "/api/admin/guestbook/bulk",
+        url: "/admin/guestbook/bulk",
         headers: adminHeaders,
         payload: { ids: [activeId, deletedId], action: "hide" },
       });
@@ -601,7 +601,7 @@ describe("Guestbook Routes", () => {
 
       const restoreResponse = await app.inject({
         method: "PATCH",
-        url: "/api/admin/guestbook/bulk",
+        url: "/admin/guestbook/bulk",
         headers: adminHeaders,
         payload: { ids: [activeId, deletedId], action: "restore" },
       });

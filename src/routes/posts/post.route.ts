@@ -27,7 +27,7 @@ export function createPostRoute(postService: PostService): FastifyPluginAsync {
   const postRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/posts - 게시글 목록 조회 (Public)
+    // GET /posts - 게시글 목록 조회 (Public)
     typedFastify.get(
       "/",
       {
@@ -71,7 +71,7 @@ export function createPostRoute(postService: PostService): FastifyPluginAsync {
       },
     );
 
-    // GET /api/posts/slugs - 발행된 글 slug 목록 (sitemap용)
+    // GET /posts/slugs - 발행된 글 slug 목록 (sitemap용)
     typedFastify.get(
       "/slugs",
       {
@@ -96,7 +96,7 @@ export function createPostRoute(postService: PostService): FastifyPluginAsync {
       },
     );
 
-    // GET /api/posts/:slug - 게시글 상세 조회 (Public)
+    // GET /posts/:slug - 게시글 상세 조회 (Public)
     typedFastify.get(
       "/:slug",
       {
@@ -151,7 +151,7 @@ export function createAdminPostRoute(
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/admin/posts - 게시글 목록 조회 (Admin)
+    // GET /admin/posts - 게시글 목록 조회 (Admin)
     typedFastify.get(
       "/",
       {
@@ -192,7 +192,7 @@ export function createAdminPostRoute(
       },
     );
 
-    // GET /api/admin/posts/pinned-count - pinned 게시글 수 조회 (Admin)
+    // GET /admin/posts/pinned-count - pinned 게시글 수 조회 (Admin)
     typedFastify.get(
       "/pinned-count",
       {
@@ -216,7 +216,7 @@ export function createAdminPostRoute(
       },
     );
 
-    // GET /api/admin/posts/:id - 게시글 상세 조회 (Admin)
+    // GET /admin/posts/:id - 게시글 상세 조회 (Admin)
     typedFastify.get(
       "/:id",
       {
@@ -253,7 +253,7 @@ export function createAdminPostRoute(
       },
     );
 
-    // POST /api/admin/posts - 게시글 생성 (Admin)
+    // POST /admin/posts - 게시글 생성 (Admin)
     typedFastify.post(
       "/",
       {
@@ -263,7 +263,7 @@ export function createAdminPostRoute(
           summary: "Create post (Admin)",
           description:
             "새 게시글을 생성합니다. 태그는 자동으로 생성/연결됩니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           body: CreatePostBodySchema,
@@ -309,7 +309,7 @@ export function createAdminPostRoute(
       },
     );
 
-    // PATCH /api/admin/posts/bulk - 게시글 벌크 작업 (Admin)
+    // PATCH /admin/posts/bulk - 게시글 벌크 작업 (Admin)
     typedFastify.patch(
       "/bulk",
       {
@@ -319,7 +319,7 @@ export function createAdminPostRoute(
           summary: "Bulk action on posts (Admin)",
           description:
             "여러 게시글에 대해 일괄 작업을 수행합니다. 단일 트랜잭션으로 전체 성공 or 전체 실패합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           body: BulkPostActionBodySchema,
@@ -345,7 +345,7 @@ export function createAdminPostRoute(
       },
     );
 
-    // PATCH /api/admin/posts/:id - 게시글 수정 (Admin)
+    // PATCH /admin/posts/:id - 게시글 수정 (Admin)
     typedFastify.patch(
       "/:id",
       {
@@ -355,7 +355,7 @@ export function createAdminPostRoute(
           summary: "Update post (Admin)",
           description:
             "게시글을 수정합니다. 수정할 필드만 전달하면 됩니다. tags를 전달하면 기존 태그를 덮어씁니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: PostIdParamSchema,
@@ -396,7 +396,7 @@ export function createAdminPostRoute(
       },
     );
 
-    // DELETE /api/admin/posts/:id - 게시글 Soft Delete (Admin)
+    // DELETE /admin/posts/:id - 게시글 Soft Delete (Admin)
     typedFastify.delete(
       "/:id",
       {
@@ -406,7 +406,7 @@ export function createAdminPostRoute(
           summary: "Delete post (Soft Delete) (Admin)",
           description:
             "게시글을 Soft Delete합니다. deletedAt 타임스탬프가 설정됩니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: PostIdParamSchema,
@@ -426,7 +426,7 @@ export function createAdminPostRoute(
       },
     );
 
-    // PUT /api/admin/posts/:id/restore - 게시글 복원 (Admin)
+    // PUT /admin/posts/:id/restore - 게시글 복원 (Admin)
     typedFastify.put(
       "/:id/restore",
       {
@@ -436,7 +436,7 @@ export function createAdminPostRoute(
           summary: "Restore deleted post (Admin)",
           description:
             "Soft Delete된 게시글을 복원합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: PostIdParamSchema,
@@ -466,7 +466,7 @@ export function createAdminPostRoute(
       },
     );
 
-    // DELETE /api/admin/posts/:id/hard - 게시글 Hard Delete (Admin)
+    // DELETE /admin/posts/:id/hard - 게시글 Hard Delete (Admin)
     typedFastify.delete(
       "/:id/hard",
       {
@@ -476,7 +476,7 @@ export function createAdminPostRoute(
           summary: "Hard delete post (Admin)",
           description:
             "게시글을 완전히 삭제합니다. 복구할 수 없습니다. 연결된 태그 관계도 삭제됩니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: PostIdParamSchema,
