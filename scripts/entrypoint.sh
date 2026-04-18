@@ -8,4 +8,5 @@ echo "[Entrypoint] Running database migrations..."
 node ./build/src/scripts/migrate.js
 
 echo "[Entrypoint] Starting server..."
+export APP_VERSION="$(node -p "require('./package.json').version")"
 exec node ./build/src/server.js
