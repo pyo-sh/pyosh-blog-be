@@ -71,6 +71,7 @@ function extractPlainText(markdown: string, maxLength = SUMMARY_MAX_LENGTH) {
 
 function normalizeSummary(summary: string | null | undefined) {
   const trimmed = summary?.trim();
+
   return trimmed ? trimmed : null;
 }
 
@@ -285,7 +286,11 @@ export class PostService {
         const [result] = await tx.insert(postTable).values(newPost);
         const postId = Number(result.insertId);
 
-        const resolvedSlug = await this.resolvePostSlug(tx, input.title, postId);
+        const resolvedSlug = await this.resolvePostSlug(
+          tx,
+          input.title,
+          postId,
+        );
         if (resolvedSlug !== newPost.slug) {
           await tx
             .update(postTable)
@@ -693,7 +698,7 @@ export class PostService {
    */
   async getPostSlugs(): Promise<PostSlugItem[]> {
     const rows = await this.db
-      // TODO: cursor 기반 페이지네이션으로 전환 필요. Google Sitemap 50,000 URLs/file 제한에 맞춰 임시 상한 적용.
+      // Google Sitemap 50,000 URLs/file 제한에 맞춰 현재는 상한을 둔다.
       .select({ slug: postTable.slug, updatedAt: postTable.updatedAt })
       .from(postTable)
       .where(
@@ -1031,7 +1036,9 @@ export class PostService {
           .select({ postId: commentTable.postId, count: sql<number>`COUNT(*)` })
           .from(commentTable)
           .where(
-            this.buildVisibleCommentWhere(inArray(commentTable.postId, postIds)),
+            this.buildVisibleCommentWhere(
+              inArray(commentTable.postId, postIds),
+            ),
           )
           .groupBy(commentTable.postId),
       ],
@@ -1147,7 +1154,9 @@ export class PostService {
         this.db
           .select({ count: sql<number>`COUNT(*)` })
           .from(commentTable)
-          .where(this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)))
+          .where(
+            this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)),
+          )
           .then((rows) => Number(rows[0]?.count ?? 0)),
         this.fetchCategoryAncestors(post.categoryId, this.db),
       ]);
@@ -1252,7 +1261,9 @@ export class PostService {
         tx
           .select({ count: sql<number>`COUNT(*)` })
           .from(commentTable)
-          .where(this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)))
+          .where(
+            this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)),
+          )
           .then((rows) => Number(rows[0]?.count ?? 0)),
         this.fetchCategoryAncestors(post.categoryId, tx),
       ]);

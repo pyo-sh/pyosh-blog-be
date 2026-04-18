@@ -28,16 +28,14 @@ export function isBlankSlug(slug: string | null | undefined): boolean {
 }
 
 export function generateUnicodeSlug(text: string): string {
-  return (
-    text
-      .normalize("NFKC")
-      .toLowerCase()
-      .trim()
-      .replace(/[^\p{L}\p{N}\s_-]+/gu, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-+|-+$/g, "")
-  );
+  return text
+    .normalize("NFKC")
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N}\s_-]+/gu, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 /**

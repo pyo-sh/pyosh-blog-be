@@ -37,7 +37,13 @@ export const uploadAssetsResponseSchema = z.object({
  */
 export const assetListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1).describe("페이지 번호"),
-  limit: z.coerce.number().int().min(1).max(100).default(20).describe("페이지당 항목 수 (최대 100)"),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .default(20)
+    .describe("페이지당 항목 수 (최대 100)"),
 });
 
 /**
@@ -59,7 +65,11 @@ export const assetIdParamSchema = z.object({
  * Asset 벌크 삭제 요청 스키마
  */
 export const bulkDeleteAssetsBodySchema = z.object({
-  ids: z.array(z.number().positive()).min(1).max(100).describe("삭제할 에셋 ID 배열 (최대 100개)"),
+  ids: z
+    .array(z.number().positive())
+    .min(1)
+    .max(100)
+    .describe("삭제할 에셋 ID 배열 (최대 100개)"),
 });
 
 /**

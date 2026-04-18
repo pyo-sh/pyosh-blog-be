@@ -182,48 +182,54 @@ export class StatsService {
     const weekDate = this.startOfDay(this.subtractDays(today, 6));
     const monthDate = this.startOfDay(this.subtractDays(today, 29));
 
-    const [todayView, weekView, monthView, postCount, commentCount, postsByStatus] =
-      await Promise.all([
-        this.db
-          .select({
-            value: sql<number>`coalesce(sum(${statsDailyTable.pageviews}), 0)`,
-          })
-          .from(statsDailyTable)
-          .where(eq(statsDailyTable.date, todayDate)),
-        this.db
-          .select({
-            value: sql<number>`coalesce(sum(${statsDailyTable.pageviews}), 0)`,
-          })
-          .from(statsDailyTable)
-          .where(gte(statsDailyTable.date, weekDate)),
-        this.db
-          .select({
-            value: sql<number>`coalesce(sum(${statsDailyTable.pageviews}), 0)`,
-          })
-          .from(statsDailyTable)
-          .where(gte(statsDailyTable.date, monthDate)),
-        this.db
-          .select({ value: sql<number>`count(*)` })
-          .from(postTable)
-          .where(isNull(postTable.deletedAt)),
-        this.db
-          .select({ value: sql<number>`count(*)` })
-          .from(commentTable)
-          .where(
-            and(
-              eq(commentTable.status, "active"),
-              isNull(commentTable.deletedAt),
-            ),
+    const [
+      todayView,
+      weekView,
+      monthView,
+      postCount,
+      commentCount,
+      postsByStatus,
+    ] = await Promise.all([
+      this.db
+        .select({
+          value: sql<number>`coalesce(sum(${statsDailyTable.pageviews}), 0)`,
+        })
+        .from(statsDailyTable)
+        .where(eq(statsDailyTable.date, todayDate)),
+      this.db
+        .select({
+          value: sql<number>`coalesce(sum(${statsDailyTable.pageviews}), 0)`,
+        })
+        .from(statsDailyTable)
+        .where(gte(statsDailyTable.date, weekDate)),
+      this.db
+        .select({
+          value: sql<number>`coalesce(sum(${statsDailyTable.pageviews}), 0)`,
+        })
+        .from(statsDailyTable)
+        .where(gte(statsDailyTable.date, monthDate)),
+      this.db
+        .select({ value: sql<number>`count(*)` })
+        .from(postTable)
+        .where(isNull(postTable.deletedAt)),
+      this.db
+        .select({ value: sql<number>`count(*)` })
+        .from(commentTable)
+        .where(
+          and(
+            eq(commentTable.status, "active"),
+            isNull(commentTable.deletedAt),
           ),
-        this.db
-          .select({
-            status: postTable.status,
-            count: sql<number>`count(*)`,
-          })
-          .from(postTable)
-          .where(isNull(postTable.deletedAt))
-          .groupBy(postTable.status),
-      ]);
+        ),
+      this.db
+        .select({
+          status: postTable.status,
+          count: sql<number>`count(*)`,
+        })
+        .from(postTable)
+        .where(isNull(postTable.deletedAt))
+        .groupBy(postTable.status),
+    ]);
 
     const statusCounts = { draft: 0, published: 0, archived: 0 };
     for (const row of postsByStatus) {

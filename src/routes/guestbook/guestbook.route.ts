@@ -17,13 +17,13 @@ import {
   AdminGuestbookBulkPatchBodySchema,
 } from "./guestbook.schema";
 import { GuestbookService } from "./guestbook.service";
-import { SettingsService } from "@src/routes/settings/settings.service";
 import { OAuthAccount } from "@src/db/schema/oauth-accounts";
+import { HttpError } from "@src/errors/http-error";
 import { optionalAuth, requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
-import { resolveAuthorFromRequest, Author } from "@src/shared/interaction";
-import { HttpError } from "@src/errors/http-error";
+import { SettingsService } from "@src/routes/settings/settings.service";
 import { ErrorResponseSchema } from "@src/schemas/common";
+import { resolveAuthorFromRequest, Author } from "@src/shared/interaction";
 
 /**
  * Guestbook 라우트 플러그인 (Public)
@@ -239,6 +239,7 @@ export function createAdminGuestbookRoute(
       async (request, reply) => {
         const query = request.query;
         const result = await guestbookService.getAdminGuestbook(query);
+
         return reply.status(200).send(result);
       },
     );
@@ -267,6 +268,7 @@ export function createAdminGuestbookRoute(
       async (request, reply) => {
         const { ids, action } = request.body;
         await guestbookService.bulkDeleteEntries(ids, action);
+
         return reply.status(204).send();
       },
     );
@@ -295,6 +297,7 @@ export function createAdminGuestbookRoute(
       async (request, reply) => {
         const { ids, action } = request.body;
         await guestbookService.bulkPatchEntries(ids, action);
+
         return reply.status(204).send();
       },
     );
@@ -325,6 +328,7 @@ export function createAdminGuestbookRoute(
         const { id } = request.params;
         const { action } = request.query;
         await guestbookService.adminPatchEntry(id, action);
+
         return reply.status(204).send();
       },
     );
@@ -355,6 +359,7 @@ export function createAdminGuestbookRoute(
         const { id } = request.params;
         const { action } = request.query;
         await guestbookService.adminDeleteEntry(id, action);
+
         return reply.status(204).send();
       },
     );

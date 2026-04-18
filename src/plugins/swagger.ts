@@ -35,7 +35,10 @@ const swaggerPlugin: FastifyPluginAsync = async (fastify) => {
         { name: "tags", description: "태그 조회" },
         { name: "stats", description: "통계 (조회수, 대시보드)" },
         { name: "user", description: "OAuth 사용자 프로필" },
-        { name: "admin", description: "Admin 전용 엔드포인트 (다른 태그와 함께 사용)" },
+        {
+          name: "admin",
+          description: "Admin 전용 엔드포인트 (다른 태그와 함께 사용)",
+        },
         { name: "seo", description: "sitemap.xml, rss.xml" },
       ],
       components: {

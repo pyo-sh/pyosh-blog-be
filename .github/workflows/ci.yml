@@ -73,6 +73,15 @@ jobs:
           GITHUB_CLIENT_SECRET=
           EOF
 
+      - name: Align MySQL test collation
+        run: |
+          docker exec "${{ job.services.mysql.id }}" mysql -uroot -proot <<'EOF'
+          SET GLOBAL init_connect = 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci';
+          ALTER DATABASE `pyosh_blog_test`
+            CHARACTER SET utf8mb4
+            COLLATE utf8mb4_unicode_ci;
+          EOF
+
       - name: Type check
         run: pnpm compile:types
 

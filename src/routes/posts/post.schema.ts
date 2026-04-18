@@ -8,6 +8,7 @@ const isAllowedThumbnailUrl = (value: string): boolean => {
 
   try {
     const url = new URL(value);
+
     return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
@@ -46,9 +47,27 @@ export const PostIdParamSchema = z.object({
  * Query Parameter Schemas
  */
 export const PostListQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional().default(1).describe("페이지 번호"),
-  limit: z.coerce.number().int().positive().max(100).optional().default(10).describe("페이지당 항목 수 (최대 100)"),
-  categoryId: z.coerce.number().int().positive().optional().describe("카테고리 ID로 필터"),
+  page: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .default(1)
+    .describe("페이지 번호"),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .optional()
+    .default(10)
+    .describe("페이지당 항목 수 (최대 100)"),
+  categoryId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("카테고리 ID로 필터"),
   tagSlug: z.string().min(1).optional().describe("태그 슬러그로 필터"),
   q: z.string().min(1).max(200).optional().describe("검색어"),
   filter: z
@@ -56,32 +75,74 @@ export const PostListQuerySchema = z.object({
     .optional()
     .default("title_content")
     .describe("검색 대상 필드"),
-  status: z.enum(["draft", "published", "archived"]).optional().describe("게시 상태 필터"),
-  visibility: z.enum(["public", "private"]).optional().describe("공개 범위 필터"),
+  status: z
+    .enum(["draft", "published", "archived"])
+    .optional()
+    .describe("게시 상태 필터"),
+  visibility: z
+    .enum(["public", "private"])
+    .optional()
+    .describe("공개 범위 필터"),
   sort: z
     .enum(["published_at", "created_at"])
     .optional()
     .default("published_at")
     .describe("정렬 기준 필드"),
-  order: z.enum(["asc", "desc"]).optional().default("desc").describe("정렬 방향"),
-  includeDeleted: BooleanQueryParam.optional().default(false).describe("삭제된 게시글 포함 여부"),
+  order: z
+    .enum(["asc", "desc"])
+    .optional()
+    .default("desc")
+    .describe("정렬 방향"),
+  includeDeleted: BooleanQueryParam.optional()
+    .default(false)
+    .describe("삭제된 게시글 포함 여부"),
 });
 
 export const AdminPostListQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional().default(1).describe("페이지 번호"),
-  limit: z.coerce.number().int().positive().max(100).optional().default(20).describe("페이지당 항목 수 (최대 100)"),
-  categoryId: z.coerce.number().int().positive().optional().describe("카테고리 ID로 필터"),
+  page: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .default(1)
+    .describe("페이지 번호"),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(100)
+    .optional()
+    .default(20)
+    .describe("페이지당 항목 수 (최대 100)"),
+  categoryId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("카테고리 ID로 필터"),
   tagSlug: z.string().min(1).optional().describe("태그 슬러그로 필터"),
   q: z.string().min(1).max(200).optional().describe("검색어"),
-  status: z.enum(["draft", "published", "archived"]).optional().describe("게시 상태 필터"),
-  visibility: z.enum(["public", "private"]).optional().describe("공개 범위 필터"),
+  status: z
+    .enum(["draft", "published", "archived"])
+    .optional()
+    .describe("게시 상태 필터"),
+  visibility: z
+    .enum(["public", "private"])
+    .optional()
+    .describe("공개 범위 필터"),
   sort: z
     .enum(["published_at", "created_at", "totalPageviews", "commentCount"])
     .optional()
     .default("created_at")
     .describe("정렬 기준 필드"),
-  order: z.enum(["asc", "desc"]).optional().default("desc").describe("정렬 방향"),
-  includeDeleted: BooleanQueryParam.optional().default(false).describe("삭제된 게시글 포함 여부"),
+  order: z
+    .enum(["asc", "desc"])
+    .optional()
+    .default("desc")
+    .describe("정렬 방향"),
+  includeDeleted: BooleanQueryParam.optional()
+    .default(false)
+    .describe("삭제된 게시글 포함 여부"),
 });
 
 /**
@@ -107,8 +168,14 @@ export const CreatePostBodySchema = z.object({
     .nullable()
     .optional()
     .describe("SEO 메타 설명 (최대 300자, null 허용)"),
-  thumbnailUrl: ThumbnailUrlInputSchema.optional().describe("썸네일 URL (/uploads/... 또는 http(s) URL)"),
-  visibility: z.enum(["public", "private"]).optional().default("public").describe("공개 범위"),
+  thumbnailUrl: ThumbnailUrlInputSchema.optional().describe(
+    "썸네일 URL (/uploads/... 또는 http(s) URL)",
+  ),
+  visibility: z
+    .enum(["public", "private"])
+    .optional()
+    .default("public")
+    .describe("공개 범위"),
   status: z
     .enum(["draft", "published", "archived"])
     .optional()
@@ -120,7 +187,10 @@ export const CreatePostBodySchema = z.object({
     .default("open")
     .describe("댓글 허용 상태"),
   isPinned: z.boolean().optional().default(false).describe("상단 고정 여부"),
-  tags: z.array(z.string().min(1).max(30)).optional().describe("태그 이름 배열"),
+  tags: z
+    .array(z.string().min(1).max(30))
+    .optional()
+    .describe("태그 이름 배열"),
   publishedAt: z.string().datetime().optional().describe("발행일 (ISO 8601)"),
 });
 
@@ -128,36 +198,78 @@ export const UpdatePostBodySchema = z.object({
   title: z.string().min(1).max(200).optional().describe("게시글 제목"),
   contentMd: z.string().min(1).optional().describe("마크다운 본문"),
   categoryId: z.number().int().positive().optional().describe("카테고리 ID"),
-  summary: z.string().trim().min(1).max(200).nullable().optional().describe("게시글 요약"),
-  description: z.string().trim().min(1).max(300).nullable().optional().describe("SEO 메타 설명"),
+  summary: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .nullable()
+    .optional()
+    .describe("게시글 요약"),
+  description: z
+    .string()
+    .trim()
+    .min(1)
+    .max(300)
+    .nullable()
+    .optional()
+    .describe("SEO 메타 설명"),
   thumbnailUrl: ThumbnailUrlInputSchema.optional().describe("썸네일 URL"),
   visibility: z.enum(["public", "private"]).optional().describe("공개 범위"),
-  status: z.enum(["draft", "published", "archived"]).optional().describe("게시 상태"),
-  commentStatus: z.enum(["open", "locked", "disabled"]).optional().describe("댓글 허용 상태"),
+  status: z
+    .enum(["draft", "published", "archived"])
+    .optional()
+    .describe("게시 상태"),
+  commentStatus: z
+    .enum(["open", "locked", "disabled"])
+    .optional()
+    .describe("댓글 허용 상태"),
   isPinned: z.boolean().optional().describe("상단 고정 여부"),
-  tags: z.array(z.string().min(1).max(30)).optional().describe("태그 이름 배열 (전체 덮어쓰기)"),
+  tags: z
+    .array(z.string().min(1).max(30))
+    .optional()
+    .describe("태그 이름 배열 (전체 덮어쓰기)"),
   publishedAt: z.string().datetime().optional().describe("발행일 (ISO 8601)"),
 });
 
 export const BulkPostActionBodySchema = z
   .object({
-    ids: z.array(z.number().int().positive()).min(1).max(100).describe("대상 게시글 ID 배열 (최대 100개)"),
-    action: z.enum(["update", "soft_delete", "restore", "hard_delete"]).describe("수행할 작업"),
-    categoryId: z.number().int().positive().optional().describe("이동할 카테고리 ID (action=update 시 사용)"),
-    commentStatus: z.enum(["open", "locked", "disabled"]).optional().describe("변경할 댓글 상태 (action=update 시 사용)"),
+    ids: z
+      .array(z.number().int().positive())
+      .min(1)
+      .max(100)
+      .describe("대상 게시글 ID 배열 (최대 100개)"),
+    action: z
+      .enum(["update", "soft_delete", "restore", "hard_delete"])
+      .describe("수행할 작업"),
+    categoryId: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("이동할 카테고리 ID (action=update 시 사용)"),
+    commentStatus: z
+      .enum(["open", "locked", "disabled"])
+      .optional()
+      .describe("변경할 댓글 상태 (action=update 시 사용)"),
   })
   .refine(
     (data) =>
       data.action !== "update" ||
       data.categoryId !== undefined ||
       data.commentStatus !== undefined,
-    { message: "action=update requires at least one of categoryId or commentStatus" },
+    {
+      message:
+        "action=update requires at least one of categoryId or commentStatus",
+    },
   )
   .refine(
     (data) =>
       data.action === "update" ||
       (data.categoryId === undefined && data.commentStatus === undefined),
-    { message: "categoryId and commentStatus are only valid for action=update" },
+    {
+      message: "categoryId and commentStatus are only valid for action=update",
+    },
   );
 
 /**
@@ -181,7 +293,9 @@ const PostAncestorSchema = z.object({
 });
 
 export const PostDetailCategorySchema = PostCategorySchema.extend({
-  ancestors: z.array(PostAncestorSchema).describe("상위 카테고리 목록 (루트부터 순서대로)"),
+  ancestors: z
+    .array(PostAncestorSchema)
+    .describe("상위 카테고리 목록 (루트부터 순서대로)"),
 });
 
 const PostBaseFields = {
@@ -194,10 +308,15 @@ const PostBaseFields = {
   thumbnailUrl: z.string().nullable().describe("썸네일 URL"),
   visibility: z.enum(["public", "private"]).describe("공개 범위"),
   status: z.enum(["draft", "published", "archived"]).describe("게시 상태"),
-  commentStatus: z.enum(["open", "locked", "disabled"]).describe("댓글 허용 상태"),
+  commentStatus: z
+    .enum(["open", "locked", "disabled"])
+    .describe("댓글 허용 상태"),
   isPinned: z.boolean().describe("상단 고정 여부"),
   publishedAt: z.string().nullable().describe("발행일 (ISO 8601)"),
-  contentModifiedAt: z.string().nullable().describe("본문 최종 수정일 (ISO 8601)"),
+  contentModifiedAt: z
+    .string()
+    .nullable()
+    .describe("본문 최종 수정일 (ISO 8601)"),
   createdAt: z.string().describe("생성일 (ISO 8601)"),
   updatedAt: z.string().describe("수정일 (ISO 8601)"),
   deletedAt: z.string().nullable().describe("삭제일 (ISO 8601, soft delete)"),
@@ -223,12 +342,14 @@ export const PostNavigationSchema = z.object({
 });
 
 export const PostSlugsResponseSchema = z.object({
-  slugs: z.array(
-    z.object({
-      slug: z.string().describe("게시글 슬러그"),
-      updatedAt: z.string().describe("최종 수정일 (ISO 8601)"),
-    }),
-  ).describe("발행된 게시글 슬러그 목록"),
+  slugs: z
+    .array(
+      z.object({
+        slug: z.string().describe("게시글 슬러그"),
+        updatedAt: z.string().describe("최종 수정일 (ISO 8601)"),
+      }),
+    )
+    .describe("발행된 게시글 슬러그 목록"),
 });
 
 export const PostListResponseSchema = z.object({
@@ -242,12 +363,18 @@ export const PostDetailResponseSchema = z.object({
 
 export const PostDetailWithNavigationResponseSchema = z.object({
   post: PostDetailSchema,
-  prevPost: PostNavigationSchema.nullable().describe("이전 게시글 (없으면 null)"),
-  nextPost: PostNavigationSchema.nullable().describe("다음 게시글 (없으면 null)"),
+  prevPost:
+    PostNavigationSchema.nullable().describe("이전 게시글 (없으면 null)"),
+  nextPost:
+    PostNavigationSchema.nullable().describe("다음 게시글 (없으면 null)"),
 });
 
 export const PinnedPostCountResponseSchema = z.object({
-  pinnedCount: z.number().int().nonnegative().describe("삭제되지 않은 pinned 게시글 수"),
+  pinnedCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("삭제되지 않은 pinned 게시글 수"),
 });
 
 /**

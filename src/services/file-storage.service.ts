@@ -32,11 +32,13 @@ const MAGIC_BYTES: Record<string, number[]> = {
 function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
   const expected = MAGIC_BYTES[mimeType];
   if (!expected) return true;
+
   return expected.every((byte, i) => buffer[i] === byte);
 }
 
 function validateWebP(buffer: Buffer): boolean {
   if (buffer.length < 12) return false;
+
   return (
     buffer[0] === 0x52 &&
     buffer[1] === 0x49 &&

@@ -9,39 +9,6 @@ import { siteSettingsTable } from "@src/db/schema/settings";
 export class SettingsService {
   constructor(private readonly db: MySql2Database<typeof schema>) {}
 
-  private isMissingSettingsTableError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-
-    const cause = (
-      error as Error & { cause?: { code?: string; errno?: number } }
-    ).cause;
-
-    return (
-      cause?.code === "ER_NO_SUCH_TABLE" ||
-      cause?.errno === 1146 ||
-      error.message.includes("site_settings_tb")
-    );
-  }
-
-  private async ensureSettingsTable(): Promise<void> {
-    await this.db.execute(sql.raw(`
-      CREATE TABLE IF NOT EXISTS \`site_settings_tb\` (
-        \`id\` int NOT NULL AUTO_INCREMENT,
-        \`guestbook_enabled\` boolean NOT NULL DEFAULT true,
-        \`created_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        \`updated_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        CONSTRAINT \`site_settings_tb_id\` PRIMARY KEY (\`id\`)
-      )
-    `));
-
-    await this.db.execute(sql.raw(`
-      INSERT IGNORE INTO \`site_settings_tb\` (\`id\`, \`guestbook_enabled\`)
-      VALUES (1, true)
-    `));
-  }
-
   /**
    * 방명록 활성 상태 조회
    */
@@ -91,5 +58,42 @@ export class SettingsService {
         .values({ id: 1, guestbookEnabled: enabled })
         .onDuplicateKeyUpdate({ set: { guestbookEnabled: enabled } });
     }
+  }
+
+  private isMissingSettingsTableError(error: unknown): boolean {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    const cause = (
+      error as Error & { cause?: { code?: string; errno?: number } }
+    ).cause;
+
+    return (
+      cause?.code === "ER_NO_SUCH_TABLE" ||
+      cause?.errno === 1146 ||
+      error.message.includes("site_settings_tb")
+    );
+  }
+
+  private async ensureSettingsTable(): Promise<void> {
+    await this.db.execute(
+      sql.raw(`
+      CREATE TABLE IF NOT EXISTS \`site_settings_tb\` (
+        \`id\` int NOT NULL AUTO_INCREMENT,
+        \`guestbook_enabled\` boolean NOT NULL DEFAULT true,
+        \`created_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT \`site_settings_tb_id\` PRIMARY KEY (\`id\`)
+      )
+    `),
+    );
+
+    await this.db.execute(
+      sql.raw(`
+      INSERT IGNORE INTO \`site_settings_tb\` (\`id\`, \`guestbook_enabled\`)
+      VALUES (1, true)
+    `),
+    );
   }
 }

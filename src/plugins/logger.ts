@@ -1,8 +1,7 @@
 import { mkdirSync } from "fs";
 import { resolve } from "path";
-import pino from "pino";
-import { FastifyInstance } from "fastify";
 import fp from "fastify-plugin";
+import pino from "pino";
 import { NodeEnv } from "@src/constants/node-env";
 import { env } from "@src/shared/env";
 
@@ -112,7 +111,10 @@ export function buildProdLoggerInstance(): pino.Logger {
 
 type FastifyLoggerConfig =
   | { loggerInstance: pino.Logger }
-  | { logger: ReturnType<typeof buildLoggerOptions>; disableRequestLogging?: boolean };
+  | {
+      logger: ReturnType<typeof buildLoggerOptions>;
+      disableRequestLogging?: boolean;
+    };
 
 /**
  * Fastify 생성자에 전달할 로거 설정 반환
@@ -134,7 +136,7 @@ export function buildFastifyLoggerConfig(): FastifyLoggerConfig {
   };
 }
 
-async function loggerPlugin(_fastify: FastifyInstance) {
+async function loggerPlugin() {
   // 5xx 로그는 app.ts 에러 핸들러에서 err 객체와 함께 기록하므로 여기서 중복 로깅하지 않음
 }
 

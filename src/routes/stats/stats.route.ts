@@ -10,8 +10,8 @@ import {
 } from "./stats.schema";
 import { requireAdmin } from "@src/hooks/auth.hook";
 import { AdminService } from "@src/routes/auth/admin.service";
-import { StatsService } from "@src/services/stats.service";
 import { ErrorResponseSchema } from "@src/schemas/common";
+import { StatsService } from "@src/services/stats.service";
 
 /**
  * Stats 라우트 플러그인 (Public)
@@ -95,8 +95,7 @@ export function createStatsRoute(
         schema: {
           tags: ["stats"],
           summary: "사이트 전체 누적 조회수",
-          description:
-            "postId가 없는 행의 pageviews 합산을 반환합니다.",
+          description: "postId가 없는 행의 pageviews 합산을 반환합니다.",
           response: {
             200: TotalViewsResponseSchema,
           },

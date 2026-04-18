@@ -78,7 +78,8 @@ export function createPostRoute(postService: PostService): FastifyPluginAsync {
         schema: {
           tags: ["posts"],
           summary: "Get published post slugs (Public)",
-          description: "발행된 글의 slug와 updatedAt을 반환합니다. sitemap 생성에 사용됩니다.",
+          description:
+            "발행된 글의 slug와 updatedAt을 반환합니다. sitemap 생성에 사용됩니다.",
           response: {
             200: PostSlugsResponseSchema,
           },

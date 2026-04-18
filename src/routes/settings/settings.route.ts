@@ -5,8 +5,8 @@ import {
   UpdateGuestbookSettingsBodySchema,
 } from "./settings.schema";
 import { SettingsService } from "./settings.service";
-import { AdminService } from "@src/routes/auth/admin.service";
 import { requireAdmin } from "@src/hooks/auth.hook";
+import { AdminService } from "@src/routes/auth/admin.service";
 import { ErrorResponseSchema } from "@src/schemas/common";
 
 /**
@@ -35,6 +35,7 @@ export function createSettingsRoute(
       },
       async (_request, reply) => {
         const enabled = await settingsService.getGuestbookEnabled();
+
         return reply.status(200).send({ enabled });
       },
     );
@@ -79,6 +80,7 @@ export function createAdminSettingsRoute(
       async (request, reply) => {
         const { enabled } = request.body;
         await settingsService.setGuestbookEnabled(enabled);
+
         return reply.status(200).send({ enabled });
       },
     );
