@@ -27,8 +27,6 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --character-set-server=utf8mb4
-          --collation-server=utf8mb4_unicode_ci
           --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
           --health-interval=10s
           --health-timeout=5s
@@ -73,6 +71,15 @@ jobs:
           GOOGLE_CLIENT_SECRET=
           GITHUB_CLIENT_ID=
           GITHUB_CLIENT_SECRET=
+          EOF
+
+      - name: Align MySQL test collation
+        run: |
+          docker exec "${{ job.services.mysql.id }}" mysql -uroot -proot <<'EOF'
+          SET GLOBAL init_connect = 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci';
+          ALTER DATABASE `pyosh_blog_test`
+            CHARACTER SET utf8mb4
+            COLLATE utf8mb4_unicode_ci;
           EOF
 
       - name: Type check
