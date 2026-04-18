@@ -171,7 +171,7 @@ export function createAuthRoute(
           summary: "Admin logout",
           description:
             "관리자 세션을 종료합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           response: {

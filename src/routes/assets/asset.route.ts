@@ -27,7 +27,7 @@ export function createAssetRoute(
   const assetRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // POST /api/assets/upload - 파일 업로드 (Admin)
+    // POST /assets/upload - 파일 업로드 (Admin)
     typedFastify.post(
       "/upload",
       {
@@ -44,7 +44,7 @@ export function createAssetRoute(
             "- 최대 파일 크기: 10MB\n" +
             "- 최대 동시 업로드: 5개\n" +
             "- 허용 MIME 타입: `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `image/svg+xml`\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           response: {
@@ -77,7 +77,7 @@ export function createAssetRoute(
       },
     );
 
-    // GET /api/assets - Asset 목록 조회 (Admin)
+    // GET /assets - Asset 목록 조회 (Admin)
     typedFastify.get(
       "/",
       {
@@ -103,7 +103,7 @@ export function createAssetRoute(
       },
     );
 
-    // GET /api/assets/:id - Asset 메타데이터 조회 (Public, 선택)
+    // GET /assets/:id - Asset 메타데이터 조회 (Public, 선택)
     typedFastify.get(
       "/:id",
       {
@@ -126,7 +126,7 @@ export function createAssetRoute(
       },
     );
 
-    // DELETE /api/assets/bulk - Asset 벌크 삭제 (Admin)
+    // DELETE /assets/bulk - Asset 벌크 삭제 (Admin)
     typedFastify.delete(
       "/bulk",
       {
@@ -137,7 +137,7 @@ export function createAssetRoute(
           summary: "Bulk delete assets",
           description:
             "여러 Asset을 한 번에 삭제합니다. Admin 권한이 필요합니다. DB는 단일 트랜잭션, 파일 삭제는 best-effort.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           body: bulkDeleteAssetsBodySchema,
@@ -156,7 +156,7 @@ export function createAssetRoute(
       },
     );
 
-    // DELETE /api/assets/:id - Asset 삭제 (Admin)
+    // DELETE /assets/:id - Asset 삭제 (Admin)
     typedFastify.delete(
       "/:id",
       {
@@ -167,7 +167,7 @@ export function createAssetRoute(
           summary: "Delete asset",
           description:
             "Asset을 삭제합니다. Admin 권한이 필요합니다. DB 레코드와 실제 파일 모두 삭제됩니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: assetIdParamSchema,

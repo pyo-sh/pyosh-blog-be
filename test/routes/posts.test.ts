@@ -27,9 +27,9 @@ describe("Post Routes", () => {
     await truncateAll();
   });
 
-  // ===== POST /api/admin/posts =====
+  // ===== POST /admin/posts =====
 
-  describe("POST /api/admin/posts", () => {
+  describe("POST /admin/posts", () => {
     it("게시글 생성 성공 (태그 포함) → 201", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -37,7 +37,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "My First Post",
@@ -69,7 +69,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Post Without Thumbnail",
@@ -91,7 +91,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Invalid Thumbnail URL",
@@ -111,7 +111,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           contentMd: "# Hello",
@@ -125,7 +125,7 @@ describe("Post Routes", () => {
     it("비인증 → 403", async () => {
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         payload: {
           title: "My Post",
           contentMd: "# Hello",
@@ -143,7 +143,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Hello World Post",
@@ -164,7 +164,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "한글 제목만 있는 글",
@@ -184,13 +184,13 @@ describe("Post Routes", () => {
 
       const first = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: { title: "Duplicate Title", contentMd: "# A", categoryId: category.id },
       });
       const second = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: { title: "Duplicate Title", contentMd: "# B", categoryId: category.id },
       });
@@ -210,7 +210,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "!!!",
@@ -231,7 +231,7 @@ describe("Post Routes", () => {
 
       const existingNumericSlug = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "2",
@@ -245,7 +245,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "!!!",
@@ -267,7 +267,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Auto Publish",
@@ -289,7 +289,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Auto Summary",
@@ -313,7 +313,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Null Meta Post",
@@ -347,7 +347,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Overflow Pinned Post",
@@ -362,9 +362,9 @@ describe("Post Routes", () => {
     });
   });
 
-  // ===== GET /api/posts =====
+  // ===== GET /posts =====
 
-  describe("GET /api/posts", () => {
+  describe("GET /posts", () => {
     it("Public 목록 — published + public 게시글만 반환", async () => {
       const category = await seedCategory();
 
@@ -383,7 +383,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts",
+        url: "/posts",
       });
 
       expect(response.statusCode).toBe(200);
@@ -408,7 +408,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?page=1&limit=2",
+        url: "/posts?page=1&limit=2",
       });
 
       expect(response.statusCode).toBe(200);
@@ -427,7 +427,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: `/api/posts?categoryId=${cat1.id}`,
+        url: `/posts?categoryId=${cat1.id}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -455,7 +455,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?q=TypeScript",
+        url: "/posts?q=TypeScript",
       });
 
       expect(response.statusCode).toBe(200);
@@ -483,7 +483,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?q=Drizzle",
+        url: "/posts?q=Drizzle",
       });
 
       expect(response.statusCode).toBe(200);
@@ -512,7 +512,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: `/api/posts?q=Fastify&categoryId=${cat1.id}`,
+        url: `/posts?q=Fastify&categoryId=${cat1.id}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -530,7 +530,7 @@ describe("Post Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "TypeScript Post",
@@ -544,7 +544,7 @@ describe("Post Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "React Post",
@@ -558,7 +558,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?tagSlug=typescript",
+        url: "/posts?tagSlug=typescript",
       });
 
       expect(response.statusCode).toBe(200);
@@ -572,9 +572,9 @@ describe("Post Routes", () => {
     });
   });
 
-  // ===== GET /api/posts/:slug =====
+  // ===== GET /posts/:slug =====
 
-  describe("GET /api/posts/:slug", () => {
+  describe("GET /posts/:slug", () => {
     it("상세 조회 + 이전/다음 네비게이션", async () => {
       const category = await seedCategory();
       const now = Date.now();
@@ -600,7 +600,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: `/api/posts/${current.slug}`,
+        url: `/posts/${current.slug}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -616,16 +616,16 @@ describe("Post Routes", () => {
     it("존재하지 않는 slug → 404", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts/not-existing-slug",
+        url: "/posts/not-existing-slug",
       });
 
       expect(response.statusCode).toBe(404);
     });
   });
 
-  // ===== PATCH /api/admin/posts/:id =====
+  // ===== PATCH /admin/posts/:id =====
 
-  describe("PATCH /api/admin/posts/:id", () => {
+  describe("PATCH /admin/posts/:id", () => {
     it("수정 성공 (태그 변경 포함) → 200", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -637,7 +637,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
         payload: {
           title: "Updated Title",
@@ -663,7 +663,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
         payload: { contentMd: "# Updated Content" },
       });
@@ -686,7 +686,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
         payload: { status: "published" },
       });
@@ -710,7 +710,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
         payload: { summary: null },
       });
@@ -728,7 +728,7 @@ describe("Post Routes", () => {
       // 태그가 있는 게시글 생성
       const createRes = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Tagged Post",
@@ -741,7 +741,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: `/api/admin/posts/${postId}`,
+        url: `/admin/posts/${postId}`,
         headers: { cookie },
         payload: { tags: [] },
       });
@@ -756,7 +756,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/99999",
+        url: "/admin/posts/99999",
         headers: { cookie },
         payload: { title: "Nope" },
       });
@@ -767,7 +767,7 @@ describe("Post Routes", () => {
     it("비인증 → 403", async () => {
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/1",
+        url: "/admin/posts/1",
         payload: { title: "Nope" },
       });
 
@@ -790,7 +790,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: `/api/admin/posts/${pinnedPost.id}`,
+        url: `/admin/posts/${pinnedPost.id}`,
         headers: { cookie },
         payload: { title: "Pinned Title Updated", isPinned: true },
       });
@@ -820,7 +820,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: `/api/admin/posts/${targetPost.id}`,
+        url: `/admin/posts/${targetPost.id}`,
         headers: { cookie },
         payload: { isPinned: true },
       });
@@ -840,7 +840,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
         payload: { title: "복구된 제목" },
       });
@@ -860,7 +860,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
         payload: { title: "복구된 제목" },
       });
@@ -870,9 +870,9 @@ describe("Post Routes", () => {
     });
   });
 
-  // ===== GET /api/admin/posts/:id =====
+  // ===== GET /admin/posts/:id =====
 
-  describe("GET /api/admin/posts/:id", () => {
+  describe("GET /admin/posts/:id", () => {
     it("상세 조회 성공 — contentMd 포함 PostDetail 반환 → 200", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -884,7 +884,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
       });
 
@@ -905,7 +905,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
       });
 
@@ -922,7 +922,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts/99999",
+        url: "/admin/posts/99999",
         headers: { cookie },
       });
 
@@ -932,16 +932,16 @@ describe("Post Routes", () => {
     it("비인증 → 403", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts/1",
+        url: "/admin/posts/1",
       });
 
       expect(response.statusCode).toBe(403);
     });
   });
 
-  // ===== DELETE /api/admin/posts/:id =====
+  // ===== DELETE /admin/posts/:id =====
 
-  describe("DELETE /api/admin/posts/:id", () => {
+  describe("DELETE /admin/posts/:id", () => {
     it("Soft Delete → 204", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -950,14 +950,14 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
       });
 
       expect(response.statusCode).toBe(204);
     });
 
-    it("Soft Delete된 글 → Public GET /api/posts/:slug → 404", async () => {
+    it("Soft Delete된 글 → Public GET /posts/:slug → 404", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
       const category = await seedCategory();
@@ -969,23 +969,23 @@ describe("Post Routes", () => {
       // Soft Delete
       await app.inject({
         method: "DELETE",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
       });
 
       // Public 조회 → 404
       const response = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.slug}`,
+        url: `/posts/${post.slug}`,
       });
 
       expect(response.statusCode).toBe(404);
     });
   });
 
-  // ===== GET /api/admin/posts =====
+  // ===== GET /admin/posts =====
 
-  describe("GET /api/admin/posts", () => {
+  describe("GET /admin/posts", () => {
     it("Admin은 모든 상태 게시글 조회 가능", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -1003,7 +1003,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
       });
 
@@ -1024,7 +1024,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts?status=draft",
+        url: "/admin/posts?status=draft",
         headers: { cookie },
       });
 
@@ -1044,7 +1044,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts?visibility=private",
+        url: "/admin/posts?visibility=private",
         headers: { cookie },
       });
 
@@ -1063,18 +1063,18 @@ describe("Post Routes", () => {
       // soft delete
       await app.inject({
         method: "DELETE",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
       });
 
       const withoutDeleted = await app.inject({
         method: "GET",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
       });
       const withDeleted = await app.inject({
         method: "GET",
-        url: "/api/admin/posts?includeDeleted=true",
+        url: "/admin/posts?includeDeleted=true",
         headers: { cookie },
       });
 
@@ -1094,13 +1094,13 @@ describe("Post Routes", () => {
       const deletedPost = await seedPost(category.id);
       await app.inject({
         method: "DELETE",
-        url: `/api/admin/posts/${deletedPost.id}`,
+        url: `/admin/posts/${deletedPost.id}`,
         headers: { cookie },
       });
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts?includeDeleted=false",
+        url: "/admin/posts?includeDeleted=false",
         headers: { cookie },
       });
 
@@ -1121,7 +1121,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts?limit=2&page=1",
+        url: "/admin/posts?limit=2&page=1",
         headers: { cookie },
       });
 
@@ -1150,7 +1150,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts?sort=totalPageviews&order=desc",
+        url: "/admin/posts?sort=totalPageviews&order=desc",
         headers: { cookie },
       });
 
@@ -1181,7 +1181,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts?sort=totalPageviews&order=asc",
+        url: "/admin/posts?sort=totalPageviews&order=asc",
         headers: { cookie },
       });
 
@@ -1212,7 +1212,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts?sort=commentCount&order=desc",
+        url: "/admin/posts?sort=commentCount&order=desc",
         headers: { cookie },
       });
 
@@ -1255,7 +1255,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts?status=published&sort=commentCount&order=asc&limit=2&page=2",
+        url: "/admin/posts?status=published&sort=commentCount&order=asc&limit=2&page=2",
         headers: { cookie },
       });
 
@@ -1272,16 +1272,16 @@ describe("Post Routes", () => {
     it("비인증 → 403", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
       });
 
       expect(response.statusCode).toBe(403);
     });
   });
 
-  // ===== GET /api/admin/posts/pinned-count =====
+  // ===== GET /admin/posts/pinned-count =====
 
-  describe("GET /api/admin/posts/pinned-count", () => {
+  describe("GET /admin/posts/pinned-count", () => {
     it("삭제된 글을 제외한 pinned 수를 반환", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -1297,7 +1297,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts/pinned-count",
+        url: "/admin/posts/pinned-count",
         headers: { cookie },
       });
 
@@ -1308,16 +1308,16 @@ describe("Post Routes", () => {
     it("비인증 → 403", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/admin/posts/pinned-count",
+        url: "/admin/posts/pinned-count",
       });
 
       expect(response.statusCode).toBe(403);
     });
   });
 
-  // ===== GET /api/posts/slugs =====
+  // ===== GET /posts/slugs =====
 
-  describe("GET /api/posts/slugs", () => {
+  describe("GET /posts/slugs", () => {
     it("발행된 공개 글의 slug + updatedAt 반환", async () => {
       const category = await seedCategory();
 
@@ -1335,7 +1335,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts/slugs",
+        url: "/posts/slugs",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1349,7 +1349,7 @@ describe("Post Routes", () => {
     it("발행된 글이 없으면 빈 배열 반환", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts/slugs",
+        url: "/posts/slugs",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1358,9 +1358,9 @@ describe("Post Routes", () => {
     });
   });
 
-  // ===== GET /api/posts - filter param =====
+  // ===== GET /posts - filter param =====
 
-  describe("GET /api/posts - filter 파라미터 (tag/category/comment)", () => {
+  describe("GET /posts - filter 파라미터 (tag/category/comment)", () => {
     it("filter=tag 로 태그 이름 검색", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -1368,7 +1368,7 @@ describe("Post Routes", () => {
 
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Post with Drizzle tag",
@@ -1381,7 +1381,7 @@ describe("Post Routes", () => {
       });
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Post with React tag",
@@ -1395,7 +1395,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?q=drizzle&filter=tag",
+        url: "/posts?q=drizzle&filter=tag",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1410,7 +1410,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?q=nonexistenttag&filter=tag",
+        url: "/posts?q=nonexistenttag&filter=tag",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1426,7 +1426,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?q=Backend&filter=category",
+        url: "/posts?q=Backend&filter=category",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1441,7 +1441,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?q=NonExistentCategory&filter=category",
+        url: "/posts?q=NonExistentCategory&filter=category",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1464,7 +1464,7 @@ describe("Post Routes", () => {
       // postA에 "unique keyword" 포함 댓글 추가
       await app.inject({
         method: "POST",
-        url: `/api/posts/${postA.id}/comments`,
+        url: `/posts/${postA.id}/comments`,
         payload: {
           body: "This is a unique keyword comment",
           guestName: "Tester",
@@ -1475,7 +1475,7 @@ describe("Post Routes", () => {
       // postB에는 다른 댓글
       await app.inject({
         method: "POST",
-        url: `/api/posts/${postB.id}/comments`,
+        url: `/posts/${postB.id}/comments`,
         payload: {
           body: "Different comment here",
           guestName: "Tester",
@@ -1486,7 +1486,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?q=unique+keyword&filter=comment",
+        url: "/posts?q=unique+keyword&filter=comment",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1501,7 +1501,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?q=nomatchcomment&filter=comment",
+        url: "/posts?q=nomatchcomment&filter=comment",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1509,7 +1509,7 @@ describe("Post Routes", () => {
     });
   });
 
-  describe("GET /api/posts - filter 파라미터", () => {
+  describe("GET /posts - filter 파라미터", () => {
     it("filter=title 로 제목에서만 검색", async () => {
       const category = await seedCategory();
 
@@ -1528,7 +1528,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?q=Drizzle&filter=title",
+        url: "/posts?q=Drizzle&filter=title",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1556,7 +1556,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts?q=Fastify&filter=content",
+        url: "/posts?q=Fastify&filter=content",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1569,7 +1569,7 @@ describe("Post Routes", () => {
 
   // ===== PostDetail schema - category.ancestors =====
 
-  describe("GET /api/posts/:slug - category ancestors", () => {
+  describe("GET /posts/:slug - category ancestors", () => {
     it("중첩 카테고리의 ancestors 반환", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -1579,7 +1579,7 @@ describe("Post Routes", () => {
 
       const createRes = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "TypeScript Tips",
@@ -1594,7 +1594,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.slug}`,
+        url: `/posts/${post.slug}`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -1608,7 +1608,7 @@ describe("Post Routes", () => {
 
   // ===== PostListItem schema - totalPageviews and commentCount =====
 
-  describe("GET /api/posts - totalPageviews and commentCount in response", () => {
+  describe("GET /posts - totalPageviews and commentCount in response", () => {
     it("목록 응답에 totalPageviews와 commentCount 포함", async () => {
       const category = await seedCategory();
 
@@ -1619,7 +1619,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/posts",
+        url: "/posts",
       });
 
       expect(response.statusCode).toBe(200);
@@ -1652,7 +1652,7 @@ describe("Post Routes", () => {
 
       const listResponse = await app.inject({
         method: "GET",
-        url: "/api/posts",
+        url: "/posts",
       });
 
       expect(listResponse.statusCode).toBe(200);
@@ -1660,7 +1660,7 @@ describe("Post Routes", () => {
 
       const detailResponse = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.slug}`,
+        url: `/posts/${post.slug}`,
       });
 
       expect(detailResponse.statusCode).toBe(200);
@@ -1668,7 +1668,7 @@ describe("Post Routes", () => {
 
       const searchResponse = await app.inject({
         method: "GET",
-        url: "/api/posts?q=hidden-thread-keyword&filter=comment",
+        url: "/posts?q=hidden-thread-keyword&filter=comment",
       });
 
       expect(searchResponse.statusCode).toBe(200);
@@ -1676,9 +1676,9 @@ describe("Post Routes", () => {
     });
   });
 
-  // ===== DELETE /api/admin/posts/:id/hard =====
+  // ===== DELETE /admin/posts/:id/hard =====
 
-  describe("DELETE /api/admin/posts/:id/hard", () => {
+  describe("DELETE /admin/posts/:id/hard", () => {
     it("Hard Delete → 204, 게시글 영구 삭제", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -1687,7 +1687,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/admin/posts/${post.id}/hard`,
+        url: `/admin/posts/${post.id}/hard`,
         headers: { cookie },
       });
 
@@ -1696,7 +1696,7 @@ describe("Post Routes", () => {
       // Admin GET → 404
       const getResponse = await app.inject({
         method: "GET",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
       });
       expect(getResponse.statusCode).toBe(404);
@@ -1710,7 +1710,7 @@ describe("Post Routes", () => {
       // 태그 있는 게시글 생성
       const createRes = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Tagged Post",
@@ -1724,7 +1724,7 @@ describe("Post Routes", () => {
       // Hard Delete
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/admin/posts/${postId}/hard`,
+        url: `/admin/posts/${postId}/hard`,
         headers: { cookie },
       });
       expect(response.statusCode).toBe(204);
@@ -1745,7 +1745,7 @@ describe("Post Routes", () => {
       // 두 게시글에 같은 태그
       const res1 = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Post 1",
@@ -1756,7 +1756,7 @@ describe("Post Routes", () => {
       });
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Post 2",
@@ -1770,7 +1770,7 @@ describe("Post Routes", () => {
       // 첫 번째 게시글 Hard Delete
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/admin/posts/${postId}/hard`,
+        url: `/admin/posts/${postId}/hard`,
         headers: { cookie },
       });
       expect(response.statusCode).toBe(204);
@@ -1789,16 +1789,16 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: "/api/admin/posts/99999/hard",
+        url: "/admin/posts/99999/hard",
         headers: { cookie },
       });
       expect(response.statusCode).toBe(404);
     });
   });
 
-  // ===== PUT /api/admin/posts/:id/restore =====
+  // ===== PUT /admin/posts/:id/restore =====
 
-  describe("PUT /api/admin/posts/:id/restore", () => {
+  describe("PUT /admin/posts/:id/restore", () => {
     it("복원 성공 → 200, deletedAt이 null", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -1808,14 +1808,14 @@ describe("Post Routes", () => {
       // Soft Delete
       await app.inject({
         method: "DELETE",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
       });
 
       // Restore
       const response = await app.inject({
         method: "PUT",
-        url: `/api/admin/posts/${post.id}/restore`,
+        url: `/admin/posts/${post.id}/restore`,
         headers: { cookie },
       });
 
@@ -1844,7 +1844,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PUT",
-        url: `/api/admin/posts/${deletedPinnedPost.id}/restore`,
+        url: `/admin/posts/${deletedPinnedPost.id}/restore`,
         headers: { cookie },
       });
 
@@ -1853,9 +1853,9 @@ describe("Post Routes", () => {
     });
   });
 
-  // ===== PATCH /api/admin/posts/bulk =====
+  // ===== PATCH /admin/posts/bulk =====
 
-  describe("PATCH /api/admin/posts/bulk", () => {
+  describe("PATCH /admin/posts/bulk", () => {
     it("action=update: categoryId 일괄 변경 → 204", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -1867,7 +1867,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post1.id, post2.id], action: "update", categoryId: cat2.id },
       });
@@ -1876,7 +1876,7 @@ describe("Post Routes", () => {
 
       const getRes = await app.inject({
         method: "GET",
-        url: `/api/admin/posts/${post1.id}`,
+        url: `/admin/posts/${post1.id}`,
         headers: { cookie },
       });
       expect(getRes.json().post.categoryId).toBe(cat2.id);
@@ -1892,7 +1892,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post1.id, post2.id], action: "update", commentStatus: "locked" },
       });
@@ -1901,7 +1901,7 @@ describe("Post Routes", () => {
 
       const getRes = await app.inject({
         method: "GET",
-        url: `/api/admin/posts/${post1.id}`,
+        url: `/admin/posts/${post1.id}`,
         headers: { cookie },
       });
       expect(getRes.json().post.commentStatus).toBe("locked");
@@ -1915,7 +1915,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post.id], action: "update", categoryId: 99999 },
       });
@@ -1931,7 +1931,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post.id], action: "update" },
       });
@@ -1949,7 +1949,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post1.id, post2.id], action: "soft_delete" },
       });
@@ -1959,7 +1959,7 @@ describe("Post Routes", () => {
       // includeDeleted=true로 조회 시 deletedAt이 있어야 함
       const listRes = await app.inject({
         method: "GET",
-        url: "/api/admin/posts?includeDeleted=true",
+        url: "/admin/posts?includeDeleted=true",
         headers: { cookie },
       });
       const data = listRes.json().data;
@@ -1981,7 +1981,7 @@ describe("Post Routes", () => {
       // 먼저 소프트 삭제
       await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post1.id, post2.id], action: "soft_delete" },
       });
@@ -1989,7 +1989,7 @@ describe("Post Routes", () => {
       // 복원
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post1.id, post2.id], action: "restore" },
       });
@@ -1998,7 +1998,7 @@ describe("Post Routes", () => {
 
       const getRes = await app.inject({
         method: "GET",
-        url: `/api/admin/posts/${post1.id}`,
+        url: `/admin/posts/${post1.id}`,
         headers: { cookie },
       });
       expect(getRes.json().post.deletedAt).toBeNull();
@@ -2025,7 +2025,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [deletedPinnedPost.id], action: "restore" },
       });
@@ -2044,7 +2044,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post1.id, post2.id], action: "hard_delete" },
       });
@@ -2053,7 +2053,7 @@ describe("Post Routes", () => {
 
       const getRes = await app.inject({
         method: "GET",
-        url: `/api/admin/posts/${post1.id}`,
+        url: `/admin/posts/${post1.id}`,
         headers: { cookie },
       });
       expect(getRes.statusCode).toBe(404);
@@ -2067,7 +2067,7 @@ describe("Post Routes", () => {
       // post1: orphan-tag-bulk (다른 글 없음)
       const res1 = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Bulk Post 1",
@@ -2079,7 +2079,7 @@ describe("Post Routes", () => {
       // post2: shared-tag-bulk (post3과 공유)
       const res2 = await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Bulk Post 2",
@@ -2091,7 +2091,7 @@ describe("Post Routes", () => {
       // post3: shared-tag-bulk 공유
       await app.inject({
         method: "POST",
-        url: "/api/admin/posts",
+        url: "/admin/posts",
         headers: { cookie },
         payload: {
           title: "Bulk Post 3",
@@ -2103,7 +2103,7 @@ describe("Post Routes", () => {
 
       const bulkRes = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: {
           ids: [res1.json().post.id, res2.json().post.id],
@@ -2135,7 +2135,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post.id, post.id], action: "soft_delete" },
       });
@@ -2152,7 +2152,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post.id], action: "soft_delete", categoryId: cat2.id },
       });
@@ -2168,7 +2168,7 @@ describe("Post Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         headers: { cookie },
         payload: { ids: [post.id, 99999], action: "soft_delete" },
       });
@@ -2178,7 +2178,7 @@ describe("Post Routes", () => {
       // post는 삭제되지 않아야 함 (트랜잭션 롤백)
       const getRes = await app.inject({
         method: "GET",
-        url: `/api/admin/posts/${post.id}`,
+        url: `/admin/posts/${post.id}`,
         headers: { cookie },
       });
       expect(getRes.json().post.deletedAt).toBeNull();
@@ -2187,7 +2187,7 @@ describe("Post Routes", () => {
     it("비인증 → 403", async () => {
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/posts/bulk",
+        url: "/admin/posts/bulk",
         payload: { ids: [1], action: "soft_delete" },
       });
       expect(response.statusCode).toBe(403);

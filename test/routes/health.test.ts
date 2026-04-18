@@ -29,10 +29,10 @@ describe("Health Routes", () => {
     });
   });
 
-  it("GET /api/health/live should return liveness payload", async () => {
+  it("GET /health/live should return liveness payload", async () => {
     const response = await app.inject({
       method: "GET",
-      url: "/api/health/live",
+      url: "/health/live",
     });
 
     const body = response.json();
@@ -43,10 +43,10 @@ describe("Health Routes", () => {
     expect(typeof body.version).toBe("string");
   });
 
-  it("GET /api/health/ready should include database status", async () => {
+  it("GET /health/ready should include database status", async () => {
     const response = await app.inject({
       method: "GET",
-      url: "/api/health/ready",
+      url: "/health/ready",
     });
 
     const body = response.json();
@@ -56,10 +56,10 @@ describe("Health Routes", () => {
     expect(body.database.status).toBe("up");
   });
 
-  it("GET /api/health should include uptime and database status", async () => {
+  it("GET /health should include uptime and database status", async () => {
     const response = await app.inject({
       method: "GET",
-      url: "/api/health",
+      url: "/health",
     });
 
     const body = response.json();
@@ -71,12 +71,12 @@ describe("Health Routes", () => {
     expect(body.database.status).toBe("up");
   });
 
-  it("GET /api/health/ready should return 503 when DB is down", async () => {
+  it("GET /health/ready should return 503 when DB is down", async () => {
     vi.spyOn(app.db, "execute").mockRejectedValueOnce(new Error("db down"));
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/health/ready",
+      url: "/health/ready",
     });
 
     const body = response.json();
@@ -87,12 +87,12 @@ describe("Health Routes", () => {
     expect(body.database.message).toBe("Database is unavailable");
   });
 
-  it("GET /api/health should return 503 when DB is down", async () => {
+  it("GET /health should return 503 when DB is down", async () => {
     vi.spyOn(app.db, "execute").mockRejectedValueOnce(new Error("db down"));
 
     const response = await app.inject({
       method: "GET",
-      url: "/api/health",
+      url: "/health",
     });
 
     const body = response.json();

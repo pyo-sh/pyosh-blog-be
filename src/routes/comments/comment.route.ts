@@ -36,7 +36,7 @@ export function createCommentRoute(
   const commentRoute: FastifyPluginAsync = async (fastify: FastifyInstance) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/posts/:postId/comments - 댓글 목록 조회 (Public, 페이지네이션)
+    // GET /posts/:postId/comments - 댓글 목록 조회 (Public, 페이지네이션)
     typedFastify.get(
       "/posts/:postId/comments",
       {
@@ -73,7 +73,7 @@ export function createCommentRoute(
       },
     );
 
-    // POST /api/posts/:postId/comments - 댓글 작성 (OAuth 또는 Guest)
+    // POST /posts/:postId/comments - 댓글 작성 (OAuth 또는 Guest)
     typedFastify.post(
       "/posts/:postId/comments",
       {
@@ -89,7 +89,7 @@ export function createCommentRoute(
           summary: "댓글 작성",
           description:
             "OAuth 로그인 사용자 또는 게스트가 댓글을 작성합니다. 게스트는 이름과 비밀번호를 전달해야 하며, 비밀 댓글이면 복원 토큰이 함께 발급됩니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.\n\n" +
             "**Rate limit**: 10회/분",
           params: PostIdParamSchema,
@@ -193,7 +193,7 @@ export function createCommentRoute(
       },
     );
 
-    // DELETE /api/comments/:id - 댓글 삭제 (본인 또는 게스트 비밀번호)
+    // DELETE /comments/:id - 댓글 삭제 (본인 또는 게스트 비밀번호)
     typedFastify.delete(
       "/comments/:id",
       {
@@ -203,7 +203,7 @@ export function createCommentRoute(
           summary: "댓글 삭제",
           description:
             "본인이 작성한 댓글을 삭제합니다. 게스트 댓글의 경우 비밀번호를 함께 전달해야 합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           params: CommentIdParamSchema,
           body: DeleteCommentGuestBodySchema.nullish(),
@@ -252,7 +252,7 @@ export function createAdminCommentRoute(
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/admin/comments - 관리자 댓글 목록 조회
+    // GET /admin/comments - 관리자 댓글 목록 조회
     typedFastify.get(
       "/comments",
       {
@@ -279,7 +279,7 @@ export function createAdminCommentRoute(
       },
     );
 
-    // GET /api/admin/comments/:id/thread - 스레드 조회 (부모 + 모든 답글)
+    // GET /admin/comments/:id/thread - 스레드 조회 (부모 + 모든 답글)
     typedFastify.get(
       "/comments/:id/thread",
       {
@@ -305,7 +305,7 @@ export function createAdminCommentRoute(
       },
     );
 
-    // PUT /api/admin/comments/:id/hide - 댓글 숨김 (active → hidden)
+    // PUT /admin/comments/:id/hide - 댓글 숨김 (active → hidden)
     typedFastify.put(
       "/comments/:id/hide",
       {
@@ -315,7 +315,7 @@ export function createAdminCommentRoute(
           summary: "관리자 댓글 숨김",
           description:
             "active 상태 댓글을 hidden 상태로 전환합니다. deleted 또는 hidden 상태 댓글은 400을 반환합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: CommentIdParamSchema,
@@ -336,7 +336,7 @@ export function createAdminCommentRoute(
       },
     );
 
-    // PUT /api/admin/comments/:id/restore - 댓글 복원 (deleted | hidden → active)
+    // PUT /admin/comments/:id/restore - 댓글 복원 (deleted | hidden → active)
     typedFastify.put(
       "/comments/:id/restore",
       {
@@ -345,7 +345,7 @@ export function createAdminCommentRoute(
           summary: "관리자 댓글 복원",
           description:
             "deleted 또는 hidden 상태 댓글을 active 상태로 복원합니다. active 상태 댓글은 400을 반환합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: CommentIdParamSchema,
@@ -366,7 +366,7 @@ export function createAdminCommentRoute(
       },
     );
 
-    // DELETE /api/admin/comments/bulk - 벌크 삭제/복원
+    // DELETE /admin/comments/bulk - 벌크 삭제/복원
     // Static path '/bulk' takes priority over '/:id' in find-my-way; ordering is for readability only.
     typedFastify.delete(
       "/comments/bulk",
@@ -377,7 +377,7 @@ export function createAdminCommentRoute(
           summary: "관리자 댓글 벌크 작업",
           description:
             "여러 댓글을 한 번에 숨김, 복원, 소프트 삭제, 또는 하드 삭제합니다. hide는 active 상태만 hidden으로 전환하고, restore는 deleted 또는 hidden 상태를 active로 복원합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           body: AdminCommentBulkBodySchema,
@@ -397,7 +397,7 @@ export function createAdminCommentRoute(
       },
     );
 
-    // DELETE /api/admin/comments/:id - 관리자 댓글 삭제 (soft/hard)
+    // DELETE /admin/comments/:id - 관리자 댓글 삭제 (soft/hard)
     typedFastify.delete(
       "/comments/:id",
       {
@@ -406,7 +406,7 @@ export function createAdminCommentRoute(
           summary: "관리자 댓글 삭제",
           description:
             "관리자가 댓글을 삭제합니다. ?action=soft_delete(기본) 또는 ?action=hard_delete.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: CommentIdParamSchema,

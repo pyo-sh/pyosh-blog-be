@@ -35,7 +35,7 @@ export async function injectAuth(
 ): Promise<string> {
   const response = await app.inject({
     method: "POST",
-    url: "/api/auth/admin/login",
+    url: "/auth/admin/login",
     payload: {
       username: TEST_ADMIN_USERNAME,
       password: TEST_ADMIN_PASSWORD,

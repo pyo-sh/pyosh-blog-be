@@ -12,7 +12,7 @@ describe("Settings Routes", () => {
   async function getCsrfHeaders(cookie?: string): Promise<Record<string, string>> {
     const response = await app.inject({
       method: "GET",
-      url: "/api/auth/csrf-token",
+      url: "/auth/csrf-token",
       headers: cookie ? { cookie } : undefined,
     });
     const setCookie = response.headers["set-cookie"];
@@ -40,11 +40,11 @@ describe("Settings Routes", () => {
     await truncateAll();
   });
 
-  describe("GET /api/settings/guestbook", () => {
+  describe("GET /settings/guestbook", () => {
     it("기본 방명록 활성 상태 조회 → 200 + enabled=true", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/settings/guestbook",
+        url: "/settings/guestbook",
       });
 
       expect(response.statusCode).toBe(200);
@@ -52,12 +52,12 @@ describe("Settings Routes", () => {
     });
   });
 
-  describe("PATCH /api/admin/settings/guestbook", () => {
+  describe("PATCH /admin/settings/guestbook", () => {
     it("관리자 인증 없이 접근 → 403", async () => {
       const csrfHeaders = await getCsrfHeaders();
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/settings/guestbook",
+        url: "/admin/settings/guestbook",
         headers: csrfHeaders,
         payload: { enabled: false },
       });
@@ -72,7 +72,7 @@ describe("Settings Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/admin/settings/guestbook",
+        url: "/admin/settings/guestbook",
         headers: csrfHeaders,
         payload: { enabled: false },
       });

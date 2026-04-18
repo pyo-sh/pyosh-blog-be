@@ -15,7 +15,7 @@ import {
   seedPost,
 } from "@test/helpers/seed";
 
-describe("User Routes (/api/user)", () => {
+describe("User Routes (/user)", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -30,9 +30,9 @@ describe("User Routes (/api/user)", () => {
     await truncateAll();
   });
 
-  // ===== GET /api/user/me =====
+  // ===== GET /user/me =====
 
-  describe("GET /api/user/me", () => {
+  describe("GET /user/me", () => {
     it("인증된 OAuth 유저 → 200 + 프로필 반환", async () => {
       const user = await seedOAuthUser({
         displayName: "테스트 유저",
@@ -43,7 +43,7 @@ describe("User Routes (/api/user)", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/user/me",
+        url: "/user/me",
         headers: { cookie },
       });
 
@@ -62,23 +62,23 @@ describe("User Routes (/api/user)", () => {
     it("인증 없이 접근 → 401", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/user/me",
+        url: "/user/me",
       });
 
       expect(response.statusCode).toBe(401);
     });
   });
 
-  // ===== PUT /api/user/me =====
+  // ===== PUT /user/me =====
 
-  describe("PUT /api/user/me", () => {
+  describe("PUT /user/me", () => {
     it("displayName 수정 → 200 + 수정된 프로필", async () => {
       const user = await seedOAuthUser({ displayName: "이전 이름" });
       const cookie = await injectOAuthUser(user.id);
 
       const response = await app.inject({
         method: "PUT",
-        url: "/api/user/me",
+        url: "/user/me",
         headers: { cookie },
         payload: { displayName: "새 이름" },
       });
@@ -95,7 +95,7 @@ describe("User Routes (/api/user)", () => {
 
       const response = await app.inject({
         method: "PUT",
-        url: "/api/user/me",
+        url: "/user/me",
         headers: { cookie },
         payload: { avatarUrl: null },
       });
@@ -110,7 +110,7 @@ describe("User Routes (/api/user)", () => {
 
       const response = await app.inject({
         method: "PUT",
-        url: "/api/user/me",
+        url: "/user/me",
         headers: { cookie },
         payload: {},
       });
@@ -122,7 +122,7 @@ describe("User Routes (/api/user)", () => {
     it("인증 없이 접근 → 401", async () => {
       const response = await app.inject({
         method: "PUT",
-        url: "/api/user/me",
+        url: "/user/me",
         payload: { displayName: "테스트" },
       });
 
@@ -130,16 +130,16 @@ describe("User Routes (/api/user)", () => {
     });
   });
 
-  // ===== DELETE /api/user/me =====
+  // ===== DELETE /user/me =====
 
-  describe("DELETE /api/user/me", () => {
+  describe("DELETE /user/me", () => {
     it("회원 탈퇴 → 204 + deletedAt 설정", async () => {
       const user = await seedOAuthUser();
       const cookie = await injectOAuthUser(user.id);
 
       const response = await app.inject({
         method: "DELETE",
-        url: "/api/user/me",
+        url: "/user/me",
         headers: { cookie },
       });
 
@@ -154,20 +154,20 @@ describe("User Routes (/api/user)", () => {
       expect(updated?.deletedAt).not.toBeNull();
     });
 
-    it("탈퇴 후 세션 파기 → GET /api/user/me 401", async () => {
+    it("탈퇴 후 세션 파기 → GET /user/me 401", async () => {
       const user = await seedOAuthUser();
       const cookie = await injectOAuthUser(user.id);
 
       await app.inject({
         method: "DELETE",
-        url: "/api/user/me",
+        url: "/user/me",
         headers: { cookie },
       });
 
       // 동일 세션으로 재접근
       const meResponse = await app.inject({
         method: "GET",
-        url: "/api/user/me",
+        url: "/user/me",
         headers: { cookie },
       });
 
@@ -177,7 +177,7 @@ describe("User Routes (/api/user)", () => {
     it("인증 없이 접근 → 401", async () => {
       const response = await app.inject({
         method: "DELETE",
-        url: "/api/user/me",
+        url: "/user/me",
       });
 
       expect(response.statusCode).toBe(401);
@@ -211,7 +211,7 @@ describe("User Routes (/api/user)", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: `/api/posts/${post.id}/comments`,
+        url: `/posts/${post.id}/comments`,
       });
 
       expect(response.statusCode).toBe(200);
@@ -241,7 +241,7 @@ describe("User Routes (/api/user)", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/guestbook",
+        url: "/guestbook",
       });
 
       expect(response.statusCode).toBe(200);

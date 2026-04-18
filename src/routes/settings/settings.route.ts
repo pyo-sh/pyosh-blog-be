@@ -20,7 +20,7 @@ export function createSettingsRoute(
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/settings/guestbook - 방명록 활성 상태 조회
+    // GET /settings/guestbook - 방명록 활성 상태 조회
     typedFastify.get(
       "/guestbook",
       {
@@ -55,7 +55,7 @@ export function createAdminSettingsRoute(
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // PATCH /api/admin/settings/guestbook - 방명록 활성 상태 변경
+    // PATCH /admin/settings/guestbook - 방명록 활성 상태 변경
     typedFastify.patch(
       "/settings/guestbook",
       {
@@ -64,7 +64,7 @@ export function createAdminSettingsRoute(
           summary: "방명록 활성 상태 변경",
           description:
             "방명록 기능의 활성 상태를 변경합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           body: UpdateGuestbookSettingsBodySchema,

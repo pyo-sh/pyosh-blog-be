@@ -40,13 +40,13 @@ describe("Category Routes", () => {
     await truncateAll();
   });
 
-  // ===== GET /api/categories =====
+  // ===== GET /categories =====
 
-  describe("GET /api/categories", () => {
+  describe("GET /categories", () => {
     it("빈 목록 → 200 + []", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/categories",
+        url: "/categories",
       });
 
       expect(response.statusCode).toBe(200);
@@ -61,7 +61,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/categories",
+        url: "/categories",
       });
 
       expect(response.statusCode).toBe(200);
@@ -80,7 +80,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "GET",
-        url: "/api/categories",
+        url: "/categories",
       });
 
       expect(response.statusCode).toBe(200);
@@ -97,16 +97,16 @@ describe("Category Routes", () => {
     it("slug 단건 조회 경로 제거됨 → 404", async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/api/categories/some-category",
+        url: "/categories/some-category",
       });
 
       expect(response.statusCode).toBe(404);
     });
   });
 
-  // ===== POST /api/categories =====
+  // ===== POST /categories =====
 
-  describe("POST /api/categories", () => {
+  describe("POST /categories", () => {
     it("route에 CSRF onRequest hook 등록", () => {
       const routes = app.printRoutes({
         commonPrefix: false,
@@ -114,7 +114,7 @@ describe("Category Routes", () => {
         method: "POST",
       });
 
-      expectRouteHasOnRequestHook(routes, "/api/categories", "POST");
+      expectRouteHasOnRequestHook(routes, "/categories", "POST");
     });
 
     it("Admin 생성 성공 → 201", async () => {
@@ -123,7 +123,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "POST",
-        url: "/api/categories",
+        url: "/categories",
         headers: { cookie },
         payload: {
           name: "New Category",
@@ -145,7 +145,7 @@ describe("Category Routes", () => {
     it("비인증 → 403", async () => {
       const response = await app.inject({
         method: "POST",
-        url: "/api/categories",
+        url: "/categories",
         payload: {
           name: "Unauthorized Category",
         },
@@ -155,9 +155,9 @@ describe("Category Routes", () => {
     });
   });
 
-  // ===== PATCH /api/categories/:id =====
+  // ===== PATCH /categories/:id =====
 
-  describe("PATCH /api/categories/:id", () => {
+  describe("PATCH /categories/:id", () => {
     it("route에 CSRF onRequest hook 등록", () => {
       const routes = app.printRoutes({
         commonPrefix: false,
@@ -165,7 +165,7 @@ describe("Category Routes", () => {
         method: "PATCH",
       });
 
-      expectRouteHasOnRequestHook(routes, "/api/categories/:id", "PATCH");
+      expectRouteHasOnRequestHook(routes, "/categories/:id", "PATCH");
     });
 
     it("이름 변경", async () => {
@@ -175,7 +175,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: `/api/categories/${category.id}`,
+        url: `/categories/${category.id}`,
         headers: { cookie },
         payload: {
           name: "Updated Name",
@@ -190,9 +190,9 @@ describe("Category Routes", () => {
     });
   });
 
-  // ===== PATCH /api/categories/tree =====
+  // ===== PATCH /categories/tree =====
 
-  describe("PATCH /api/categories/tree", () => {
+  describe("PATCH /categories/tree", () => {
     it("route에 CSRF onRequest hook 등록", () => {
       const routes = app.printRoutes({
         commonPrefix: false,
@@ -200,7 +200,7 @@ describe("Category Routes", () => {
         method: "PATCH",
       });
 
-      expectRouteHasOnRequestHook(routes, "/api/categories/tree", "PATCH");
+      expectRouteHasOnRequestHook(routes, "/categories/tree", "PATCH");
     });
 
     it("트리 배치 변경 → 200", async () => {
@@ -211,7 +211,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/categories/tree",
+        url: "/categories/tree",
         headers: { cookie },
         payload: {
           changes: [
@@ -230,7 +230,7 @@ describe("Category Routes", () => {
     it("비인증 → 403", async () => {
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/categories/tree",
+        url: "/categories/tree",
         payload: {
           changes: [{ id: 999999, parentId: null, sortOrder: 0 }],
         },
@@ -247,7 +247,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/categories/tree",
+        url: "/categories/tree",
         headers: { cookie },
         payload: {
           changes: [
@@ -268,7 +268,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/categories/tree",
+        url: "/categories/tree",
         headers: { cookie },
         payload: {
           changes: [
@@ -288,7 +288,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "PATCH",
-        url: "/api/categories/tree",
+        url: "/categories/tree",
         headers: { cookie },
         payload: {
           changes: [{ id: a.id, parentId: a.id, sortOrder: 0 }],
@@ -299,9 +299,9 @@ describe("Category Routes", () => {
     });
   });
 
-  // ===== DELETE /api/categories/:id =====
+  // ===== DELETE /categories/:id =====
 
-  describe("DELETE /api/categories/:id", () => {
+  describe("DELETE /categories/:id", () => {
     it("route에 CSRF onRequest hook 등록", () => {
       const routes = app.printRoutes({
         commonPrefix: false,
@@ -309,7 +309,7 @@ describe("Category Routes", () => {
         method: "DELETE",
       });
 
-      expectRouteHasOnRequestHook(routes, "/api/categories/:id", "DELETE");
+      expectRouteHasOnRequestHook(routes, "/categories/:id", "DELETE");
     });
 
     it("하위 카테고리 있으면 409", async () => {
@@ -320,7 +320,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/categories/${parent.id}?action=trash`,
+        url: `/categories/${parent.id}?action=trash`,
         headers: { cookie },
       });
 
@@ -334,7 +334,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/categories/${category.id}?action=trash`,
+        url: `/categories/${category.id}?action=trash`,
         headers: { cookie },
       });
 
@@ -349,7 +349,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/categories/${category.id}?action=trash`,
+        url: `/categories/${category.id}?action=trash`,
         headers: { cookie },
       });
 
@@ -372,7 +372,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/categories/${source.id}?action=move&moveTo=${target.id}`,
+        url: `/categories/${source.id}?action=move&moveTo=${target.id}`,
         headers: { cookie },
       });
 
@@ -392,7 +392,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/categories/${category.id}?action=move`,
+        url: `/categories/${category.id}?action=move`,
         headers: { cookie },
       });
 
@@ -406,7 +406,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/categories/${category.id}`,
+        url: `/categories/${category.id}`,
         headers: { cookie },
       });
 
@@ -420,7 +420,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/categories/${category.id}?action=move&moveTo=999999`,
+        url: `/categories/${category.id}?action=move&moveTo=999999`,
         headers: { cookie },
       });
 
@@ -434,7 +434,7 @@ describe("Category Routes", () => {
 
       const response = await app.inject({
         method: "DELETE",
-        url: `/api/categories/${category.id}?action=move&moveTo=${category.id}`,
+        url: `/categories/${category.id}?action=move&moveTo=${category.id}`,
         headers: { cookie },
       });
 

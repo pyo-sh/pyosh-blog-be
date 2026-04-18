@@ -44,7 +44,7 @@ export function createCategoryRoute(
   ) => {
     const typedFastify = fastify.withTypeProvider<ZodTypeProvider>();
 
-    // GET /api/categories - 전체 카테고리 트리 조회 (Public)
+    // GET /categories - 전체 카테고리 트리 조회 (Public)
     typedFastify.get(
       "/",
       {
@@ -79,7 +79,7 @@ export function createCategoryRoute(
       },
     );
 
-    // POST /api/categories - 카테고리 생성 (Admin)
+    // POST /categories - 카테고리 생성 (Admin)
     typedFastify.post(
       "/",
       {
@@ -90,7 +90,7 @@ export function createCategoryRoute(
           summary: "Create category",
           description:
             "새 카테고리를 생성합니다. Admin 권한이 필요합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           body: CategoryCreateBodySchema,
@@ -119,7 +119,7 @@ export function createCategoryRoute(
       },
     );
 
-    // PATCH /api/categories/tree - 카테고리 트리 배치 변경 (Admin)
+    // PATCH /categories/tree - 카테고리 트리 배치 변경 (Admin)
     // 반드시 /:id 앞에 등록해야 정적 경로 우선 매칭 보장
     typedFastify.patch(
       "/tree",
@@ -131,7 +131,7 @@ export function createCategoryRoute(
           summary: "Batch update category tree",
           description:
             "여러 카테고리의 parentId와 sortOrder를 단일 트랜잭션으로 변경합니다. Admin 권한이 필요합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           body: CategoryTreeUpdateBodySchema,
@@ -150,7 +150,7 @@ export function createCategoryRoute(
       },
     );
 
-    // PATCH /api/categories/:id - 카테고리 수정 (Admin)
+    // PATCH /categories/:id - 카테고리 수정 (Admin)
     typedFastify.patch(
       "/:id",
       {
@@ -161,7 +161,7 @@ export function createCategoryRoute(
           summary: "Update category",
           description:
             "카테고리 정보를 수정합니다. Admin 권한이 필요합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: CategoryIdParamSchema,
@@ -196,7 +196,7 @@ export function createCategoryRoute(
       },
     );
 
-    // DELETE /api/categories/:id - 카테고리 삭제 (Admin)
+    // DELETE /categories/:id - 카테고리 삭제 (Admin)
     typedFastify.delete(
       "/:id",
       {
@@ -207,7 +207,7 @@ export function createCategoryRoute(
           summary: "Delete category",
           description:
             "카테고리를 삭제합니다. action=move면 게시글을 지정 카테고리로 이동, action=trash면 게시글을 휴지통으로 이동합니다. 하위 카테고리가 있으면 삭제할 수 없습니다. Admin 권한이 필요합니다.\n\n" +
-            "**CSRF 토큰 필요**: `GET /api/auth/csrf-token`으로 토큰을 발급받아 " +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.",
           security: [{ cookieAuth: [] }],
           params: CategoryIdParamSchema,

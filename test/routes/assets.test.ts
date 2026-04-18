@@ -84,18 +84,18 @@ describe("Asset Routes", () => {
     authCookie = await injectAuth(app);
   });
 
-  // ===== GET /api/assets =====
+  // ===== GET /assets =====
 
-  describe("GET /api/assets", () => {
+  describe("GET /assets", () => {
     it("인증 없이 → 403", async () => {
-      const res = await app.inject({ method: "GET", url: "/api/assets" });
+      const res = await app.inject({ method: "GET", url: "/assets" });
       expect(res.statusCode).toBe(403);
     });
 
     it("빈 목록 → 200 + data[]", async () => {
       const res = await app.inject({
         method: "GET",
-        url: "/api/assets",
+        url: "/assets",
         headers: { cookie: authCookie },
       });
       expect(res.statusCode).toBe(200);
@@ -109,7 +109,7 @@ describe("Asset Routes", () => {
 
       const res = await app.inject({
         method: "GET",
-        url: "/api/assets?page=1&limit=2",
+        url: "/assets?page=1&limit=2",
         headers: { cookie: authCookie },
       });
       expect(res.statusCode).toBe(200);
@@ -124,9 +124,9 @@ describe("Asset Routes", () => {
     });
   });
 
-  // ===== POST /api/assets/upload =====
+  // ===== POST /assets/upload =====
 
-  describe("POST /api/assets/upload", () => {
+  describe("POST /assets/upload", () => {
     afterEach(async () => {
       // 업로드된 파일 정리
       const uploadDir = getUploadDir();
@@ -144,7 +144,7 @@ describe("Asset Routes", () => {
         method: "POST",
       });
 
-      expectRouteHasOnRequestHook(routes, "/api/assets/upload", "POST");
+      expectRouteHasOnRequestHook(routes, "/assets/upload", "POST");
     });
 
     it("인증 없이 → 403", async () => {
@@ -155,7 +155,7 @@ describe("Asset Routes", () => {
       );
       const res = await app.inject({
         method: "POST",
-        url: "/api/assets/upload",
+        url: "/assets/upload",
         headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
         payload,
       });
@@ -170,7 +170,7 @@ describe("Asset Routes", () => {
       );
       const res = await app.inject({
         method: "POST",
-        url: "/api/assets/upload",
+        url: "/assets/upload",
         headers: {
           cookie: authCookie,
           "content-type": `multipart/form-data; boundary=${boundary}`,
@@ -195,7 +195,7 @@ describe("Asset Routes", () => {
       );
       const uploadRes = await app.inject({
         method: "POST",
-        url: "/api/assets/upload",
+        url: "/assets/upload",
         headers: {
           cookie: authCookie,
           "content-type": `multipart/form-data; boundary=${boundary}`,
@@ -229,7 +229,7 @@ describe("Asset Routes", () => {
       );
       const res = await app.inject({
         method: "POST",
-        url: "/api/assets/upload",
+        url: "/assets/upload",
         headers: {
           cookie: authCookie,
           "content-type": `multipart/form-data; boundary=${boundary}`,
@@ -250,7 +250,7 @@ describe("Asset Routes", () => {
       );
       const res = await app.inject({
         method: "POST",
-        url: "/api/assets/upload",
+        url: "/assets/upload",
         headers: {
           cookie: authCookie,
           "content-type": `multipart/form-data; boundary=${boundary}`,
@@ -268,7 +268,7 @@ describe("Asset Routes", () => {
       );
       const res = await app.inject({
         method: "POST",
-        url: "/api/assets/upload",
+        url: "/assets/upload",
         headers: {
           cookie: authCookie,
           "content-type": `multipart/form-data; boundary=${boundary}`,
@@ -286,7 +286,7 @@ describe("Asset Routes", () => {
       );
       const res = await app.inject({
         method: "POST",
-        url: "/api/assets/upload",
+        url: "/assets/upload",
         headers: {
           cookie: authCookie,
           "content-type": `multipart/form-data; boundary=${boundary}`,
@@ -304,7 +304,7 @@ describe("Asset Routes", () => {
       );
       const res = await app.inject({
         method: "POST",
-        url: "/api/assets/upload",
+        url: "/assets/upload",
         headers: {
           cookie: authCookie,
           "content-type": `multipart/form-data; boundary=${boundary}`,
@@ -319,7 +319,7 @@ describe("Asset Routes", () => {
       const payload = Buffer.from(`--${boundary}--\r\n`);
       const res = await app.inject({
         method: "POST",
-        url: "/api/assets/upload",
+        url: "/assets/upload",
         headers: {
           cookie: authCookie,
           "content-type": `multipart/form-data; boundary=${boundary}`,
@@ -338,7 +338,7 @@ describe("Asset Routes", () => {
       );
       const res = await app.inject({
         method: "POST",
-        url: "/api/assets/upload",
+        url: "/assets/upload",
         headers: {
           cookie: authCookie,
           "content-type": `multipart/form-data; boundary=${boundary}`,
@@ -349,14 +349,14 @@ describe("Asset Routes", () => {
     });
   });
 
-  // ===== GET /api/assets/:id =====
+  // ===== GET /assets/:id =====
 
-  describe("GET /api/assets/:id", () => {
+  describe("GET /assets/:id", () => {
     it("존재하는 asset → 200", async () => {
       const asset = await seedAsset({ width: 800, height: 600 });
       const res = await app.inject({
         method: "GET",
-        url: `/api/assets/${asset.id}`,
+        url: `/assets/${asset.id}`,
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
@@ -369,15 +369,15 @@ describe("Asset Routes", () => {
     it("없는 id → 404", async () => {
       const res = await app.inject({
         method: "GET",
-        url: "/api/assets/999999",
+        url: "/assets/999999",
       });
       expect(res.statusCode).toBe(404);
     });
   });
 
-  // ===== DELETE /api/assets/:id =====
+  // ===== DELETE /assets/:id =====
 
-  describe("DELETE /api/assets/:id", () => {
+  describe("DELETE /assets/:id", () => {
     it("route에 CSRF onRequest hook 등록", () => {
       const routes = app.printRoutes({
         commonPrefix: false,
@@ -385,14 +385,14 @@ describe("Asset Routes", () => {
         method: "DELETE",
       });
 
-      expectRouteHasOnRequestHook(routes, "/api/assets/:id", "DELETE");
+      expectRouteHasOnRequestHook(routes, "/assets/:id", "DELETE");
     });
 
     it("인증 없이 → 403", async () => {
       const asset = await seedAsset();
       const res = await app.inject({
         method: "DELETE",
-        url: `/api/assets/${asset.id}`,
+        url: `/assets/${asset.id}`,
       });
       expect(res.statusCode).toBe(403);
     });
@@ -401,7 +401,7 @@ describe("Asset Routes", () => {
       const asset = await seedAsset();
       const res = await app.inject({
         method: "DELETE",
-        url: `/api/assets/${asset.id}`,
+        url: `/assets/${asset.id}`,
         headers: { cookie: authCookie },
       });
       expect(res.statusCode).toBe(204);
@@ -409,7 +409,7 @@ describe("Asset Routes", () => {
       // 삭제 후 조회 → 404
       const check = await app.inject({
         method: "GET",
-        url: `/api/assets/${asset.id}`,
+        url: `/assets/${asset.id}`,
       });
       expect(check.statusCode).toBe(404);
     });
@@ -417,16 +417,16 @@ describe("Asset Routes", () => {
     it("없는 id → 404", async () => {
       const res = await app.inject({
         method: "DELETE",
-        url: "/api/assets/999999",
+        url: "/assets/999999",
         headers: { cookie: authCookie },
       });
       expect(res.statusCode).toBe(404);
     });
   });
 
-  // ===== DELETE /api/assets/bulk =====
+  // ===== DELETE /assets/bulk =====
 
-  describe("DELETE /api/assets/bulk", () => {
+  describe("DELETE /assets/bulk", () => {
     it("route에 CSRF onRequest hook 등록", () => {
       const routes = app.printRoutes({
         commonPrefix: false,
@@ -434,13 +434,13 @@ describe("Asset Routes", () => {
         method: "DELETE",
       });
 
-      expectRouteHasOnRequestHook(routes, "/api/assets/bulk", "DELETE");
+      expectRouteHasOnRequestHook(routes, "/assets/bulk", "DELETE");
     });
 
     it("인증 없이 → 403", async () => {
       const res = await app.inject({
         method: "DELETE",
-        url: "/api/assets/bulk",
+        url: "/assets/bulk",
         payload: { ids: [1] },
       });
       expect(res.statusCode).toBe(403);
@@ -455,27 +455,27 @@ describe("Asset Routes", () => {
 
       const res = await app.inject({
         method: "DELETE",
-        url: "/api/assets/bulk",
+        url: "/assets/bulk",
         headers: { cookie: authCookie },
         payload: { ids: [a1.id, a2.id] },
       });
       expect(res.statusCode).toBe(204);
 
       // 삭제된 id 조회 → 404
-      const check1 = await app.inject({ method: "GET", url: `/api/assets/${a1.id}` });
-      const check2 = await app.inject({ method: "GET", url: `/api/assets/${a2.id}` });
+      const check1 = await app.inject({ method: "GET", url: `/assets/${a1.id}` });
+      const check2 = await app.inject({ method: "GET", url: `/assets/${a2.id}` });
       expect(check1.statusCode).toBe(404);
       expect(check2.statusCode).toBe(404);
 
       // 삭제 안 된 id는 유지
-      const check3 = await app.inject({ method: "GET", url: `/api/assets/${a3.id}` });
+      const check3 = await app.inject({ method: "GET", url: `/assets/${a3.id}` });
       expect(check3.statusCode).toBe(200);
     });
 
     it("ids 없이 → 400", async () => {
       const res = await app.inject({
         method: "DELETE",
-        url: "/api/assets/bulk",
+        url: "/assets/bulk",
         headers: { cookie: authCookie },
         payload: { ids: [] },
       });
