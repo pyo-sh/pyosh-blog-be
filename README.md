@@ -26,6 +26,7 @@ Key variables:
 | `CLIENT_PROTOCOL` / `CLIENT_HOST` / `CLIENT_PORT` | Frontend origin (used for CORS and redirects) |
 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PSWD` / `DB_DTBS` | MySQL connection |
 | `SESSION_SECRET` | Session signing secret |
+| `SESSION_COOKIE_DOMAIN` | Optional shared cookie domain for cross-subdomain session reuse |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth app credentials |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app credentials |
 | `LOGIN_SUCCESS_PATH` / `LOGIN_FAILURE_PATH` | Post-OAuth redirect paths on the frontend |
