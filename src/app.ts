@@ -99,6 +99,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   fastify.addHook("onRequest", (request, _, done) => {
     if (isTrustedProxyPeer(request.socket.remoteAddress)) {
       done();
+
       return;
     }
 
