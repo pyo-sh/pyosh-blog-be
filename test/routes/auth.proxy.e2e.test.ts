@@ -17,6 +17,7 @@ async function createProductionProxyApp(): Promise<FastifyInstance> {
         ...actual.env,
         NODE_ENV: "production" as const,
         SESSION_COOKIE_DOMAIN: ".pyosh.com",
+        TRUSTED_PROXY_RANGES: "172.18.0.10/32",
       },
     };
   });
@@ -77,6 +78,25 @@ describe("Auth Routes Behind HTTPS Proxy", () => {
       headers: {
         "x-forwarded-proto": "https",
         "x-forwarded-for": "1.2.3.4",
+      },
+      payload: {
+        username: TEST_ADMIN_USERNAME,
+        password: TEST_ADMIN_PASSWORD,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("ignores forwarded headers from private peers outside the configured allowlist", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/admin/login",
+      remoteAddress: "172.18.0.11",
+      headers: {
+        "x-forwarded-proto": "https",
+        "x-forwarded-for": "10.0.0.5",
       },
       payload: {
         username: TEST_ADMIN_USERNAME,

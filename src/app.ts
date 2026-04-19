@@ -60,24 +60,61 @@ import {
   getMemoryUsage,
 } from "@src/services/health.service";
 import { StatsService } from "@src/services/stats.service";
+import { env } from "@src/shared/env";
 
-const trustedProxyPeers = new BlockList();
-trustedProxyPeers.addAddress("127.0.0.1", "ipv4");
-trustedProxyPeers.addAddress("::1", "ipv6");
-trustedProxyPeers.addSubnet("10.0.0.0", 8, "ipv4");
-trustedProxyPeers.addSubnet("172.16.0.0", 12, "ipv4");
-trustedProxyPeers.addSubnet("192.168.0.0", 16, "ipv4");
-trustedProxyPeers.addSubnet("fc00::", 7, "ipv6");
-trustedProxyPeers.addSubnet("fe80::", 10, "ipv6");
-
-function isTrustedProxyPeer(remoteAddress: string | undefined): boolean {
-  if (!remoteAddress) {
-    return false;
+function normalizeIp(address: string | undefined): string | null {
+  if (!address) {
+    return null;
   }
 
-  const normalized = remoteAddress.startsWith("::ffff:")
-    ? remoteAddress.slice(7)
-    : remoteAddress;
+  return address.startsWith("::ffff:") ? address.slice(7) : address;
+}
+
+function buildTrustedProxyPeers(): BlockList {
+  const peers = new BlockList();
+  const entries = env.TRUSTED_PROXY_RANGES?.split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  for (const entry of entries ?? []) {
+    const [address, prefixLength] = entry.split("/");
+    const normalizedAddress = normalizeIp(address);
+
+    if (!normalizedAddress) {
+      continue;
+    }
+
+    const family = isIP(normalizedAddress);
+
+    if (family === 0) {
+      continue;
+    }
+
+    const type = family === 4 ? "ipv4" : "ipv6";
+
+    if (prefixLength === undefined) {
+      peers.addAddress(normalizedAddress, type);
+      continue;
+    }
+
+    const prefix = Number(prefixLength);
+
+    if (Number.isInteger(prefix)) {
+      peers.addSubnet(normalizedAddress, prefix, type);
+    }
+  }
+
+  return peers;
+}
+
+const trustedProxyPeers = buildTrustedProxyPeers();
+
+function isTrustedProxyPeer(remoteAddress: string | undefined): boolean {
+  const normalized = normalizeIp(remoteAddress);
+
+  if (!normalized) {
+    return false;
+  }
   const family = isIP(normalized);
 
   if (family === 0) {
@@ -91,9 +128,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
   const fastify = Fastify({
     ...buildFastifyLoggerConfig(),
-    // Trust forwarded headers only from local/private proxy hops such as the
-    // Cloudflare Tunnel origin connection, not from arbitrary direct clients.
-    trustProxy: true,
+    trustProxy: isTrustedProxyPeer,
   }).withTypeProvider<ZodTypeProvider>();
 
   fastify.addHook("onRequest", (request, _, done) => {
