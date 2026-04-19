@@ -78,7 +78,6 @@ export async function setup(): Promise<void> {
     user: DB_USER,
     password: DB_PSWD,
     database: DB_DTBS,
-    charset: 'utf8mb4_unicode_ci',
   });
 
   try {
