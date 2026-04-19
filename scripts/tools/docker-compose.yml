@@ -1,0 +1,23 @@
+services:
+  tool:
+    image: node:20-slim
+    working_dir: /app
+    env_file:
+      - ../../.env
+    volumes:
+      - ../..:/app
+      - /app/node_modules
+      - tool_pnpm_store:/root/.local/share/pnpm/store
+    networks:
+      - blog_network
+    entrypoint: ["/app/scripts/tools/entrypoint.sh"]
+    command: ["bash"]
+    tty: true
+    stdin_open: true
+
+networks:
+  blog_network:
+    external: true
+
+volumes:
+  tool_pnpm_store:
