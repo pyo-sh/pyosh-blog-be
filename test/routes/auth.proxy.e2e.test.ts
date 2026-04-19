@@ -52,6 +52,7 @@ describe("Auth Routes Behind HTTPS Proxy", () => {
     const response = await app.inject({
       method: "POST",
       url: "/auth/admin/login",
+      remoteAddress: "172.18.0.10",
       headers: {
         "x-forwarded-proto": "https",
         "x-forwarded-host": "api.pyosh.com",
@@ -66,5 +67,24 @@ describe("Auth Routes Behind HTTPS Proxy", () => {
     expect(response.headers["set-cookie"]).toEqual(expect.any(String));
     expect(response.headers["set-cookie"]).toContain("Secure");
     expect(response.headers["set-cookie"]).toContain("Domain=.pyosh.com");
+  });
+
+  it("ignores forwarded headers from untrusted public peers", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/admin/login",
+      remoteAddress: "198.51.100.10",
+      headers: {
+        "x-forwarded-proto": "https",
+        "x-forwarded-for": "1.2.3.4",
+      },
+      payload: {
+        username: TEST_ADMIN_USERNAME,
+        password: TEST_ADMIN_PASSWORD,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["set-cookie"]).toBeUndefined();
   });
 });

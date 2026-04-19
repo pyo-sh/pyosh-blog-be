@@ -1,3 +1,4 @@
+import { BlockList, isIP } from "node:net";
 import Fastify, { FastifyInstance, FastifyError } from "fastify";
 import {
   ZodTypeProvider,
@@ -60,12 +61,54 @@ import {
 } from "@src/services/health.service";
 import { StatsService } from "@src/services/stats.service";
 
+const trustedProxyPeers = new BlockList();
+trustedProxyPeers.addAddress("127.0.0.1", "ipv4");
+trustedProxyPeers.addAddress("::1", "ipv6");
+trustedProxyPeers.addSubnet("10.0.0.0", 8, "ipv4");
+trustedProxyPeers.addSubnet("172.16.0.0", 12, "ipv4");
+trustedProxyPeers.addSubnet("192.168.0.0", 16, "ipv4");
+trustedProxyPeers.addSubnet("fc00::", 7, "ipv6");
+trustedProxyPeers.addSubnet("fe80::", 10, "ipv6");
+
+function isTrustedProxyPeer(remoteAddress: string | undefined): boolean {
+  if (!remoteAddress) {
+    return false;
+  }
+
+  const normalized = remoteAddress.startsWith("::ffff:")
+    ? remoteAddress.slice(7)
+    : remoteAddress;
+  const family = isIP(normalized);
+
+  if (family === 0) {
+    return false;
+  }
+
+  return trustedProxyPeers.check(normalized, family === 4 ? "ipv4" : "ipv6");
+}
+
 export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
   const fastify = Fastify({
     ...buildFastifyLoggerConfig(),
+    // Trust forwarded headers only from local/private proxy hops such as the
+    // Cloudflare Tunnel origin connection, not from arbitrary direct clients.
     trustProxy: true,
   }).withTypeProvider<ZodTypeProvider>();
+
+  fastify.addHook("onRequest", (request, _, done) => {
+    if (isTrustedProxyPeer(request.socket.remoteAddress)) {
+      done();
+      return;
+    }
+
+    delete request.headers.forwarded;
+    delete request.headers["x-forwarded-for"];
+    delete request.headers["x-forwarded-host"];
+    delete request.headers["x-forwarded-port"];
+    delete request.headers["x-forwarded-proto"];
+    done();
+  });
 
   // Zod validator & serializer 설정
   fastify.setValidatorCompiler(validatorCompiler);
