@@ -11,9 +11,9 @@ SET `slug` = (
     WHEN NOT EXISTS (
       SELECT 1
       FROM (SELECT `id`, `slug` FROM `post_tb`) AS `other`
-      WHERE `other`.`slug` = CAST(`target`.`id` AS CHAR)
+      WHERE `other`.`slug` = CAST(`target`.`id` AS CHAR) COLLATE utf8mb4_0900_ai_ci
         AND `other`.`id` <> `target`.`id`
-    ) THEN CAST(`target`.`id` AS CHAR)
+    ) THEN CAST(`target`.`id` AS CHAR) COLLATE utf8mb4_0900_ai_ci
     ELSE CONCAT(
       CAST(`target`.`id` AS CHAR),
       '-legacy-',
