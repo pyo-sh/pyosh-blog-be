@@ -16,6 +16,9 @@ const sessionPlugin: FastifyPluginAsync = async (fastify) => {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
+      ...(env.SESSION_COOKIE_DOMAIN
+        ? { domain: env.SESSION_COOKIE_DOMAIN }
+        : {}),
       secure: isProduction,
       sameSite: "lax", // 'strict'은 OAuth 콜백(외부 리다이렉트) 시 쿠키 누락 발생; CSRF 토큰이 주 방어수단
       path: "/",

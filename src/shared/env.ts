@@ -37,6 +37,7 @@ const envSchema = z
 
     // 세션 설정
     SESSION_SECRET: z.string().min(1),
+    SESSION_COOKIE_DOMAIN: z.string().min(1).optional(),
 
     // OAuth 리다이렉트 경로
     LOGIN_SUCCESS_PATH: z.string().min(1),
