@@ -2,6 +2,66 @@
 
 서버 운영 및 개발에 필요한 CLI 스크립트 모음입니다.
 
+## Tool runner (배포 서버용 docker 실행 환경)
+
+배포 서버 호스트에서 DB 스크립트를 실행하기 위한 일회성 docker 환경입니다.
+
+`mysql_container`는 `blog_network` 안에서만 접근 가능하므로, 호스트 쉘에서 직접 `pnpm db:admin` 을 실행하면 DB 연결에 실패합니다. 이 tool runner 는 동일 네트워크에 합류한 컨테이너에서 스크립트를 실행합니다.
+
+### 언제 사용하나
+
+- 배포 서버 SSH 접속 후 admin 계정을 관리할 때
+- 배포 서버에서 마이그레이션 상태를 확인할 때
+- 호스트 쉘에서 DB 스크립트를 실행해야 하는 모든 경우
+
+### 사전 조건
+
+- 배포 서버에 `blog_network` docker 네트워크가 존재해야 합니다
+- `.env` 파일이 프로젝트 루트에 있어야 합니다
+
+### 사용법
+
+```bash
+# bash 쉘로 진입 (권장)
+pnpm tool
+
+# 진입 후 평소처럼 스크립트 실행
+pnpm db:admin
+pnpm db:migrate:status
+pnpm db:migrate
+
+# 종료
+exit
+```
+
+일회성 실행도 가능합니다:
+
+```bash
+pnpm tool pnpm db:migrate:status
+```
+
+### 동작 방식
+
+1. `node:20-slim` 컨테이너를 `blog_network`에 합류시켜 실행합니다.
+2. 소스 디렉터리를 bind-mount 하고 `pnpm install` 을 실행합니다.
+3. bash 쉘(또는 지정 명령)을 실행합니다.
+4. `--rm` 으로 종료 시 컨테이너와 anonymous volume(`node_modules`) 을 자동 삭제합니다.
+
+### 볼륨 관리
+
+| 볼륨 | 방식 | 설명 |
+|------|------|------|
+| `node_modules` | anonymous | 컨테이너 종료 시 자동 삭제 |
+| `tool_pnpm_store` | named | 패키지 캐시 유지 - 재실행 시 네트워크 재다운로드 방지 |
+
+pnpm store 볼륨을 초기화하려면:
+
+```bash
+docker volume rm backend_tool_pnpm_store
+```
+
+---
+
 ## hash-password.ts
 
 관리자 비밀번호를 Argon2id로 해싱하여 출력합니다.

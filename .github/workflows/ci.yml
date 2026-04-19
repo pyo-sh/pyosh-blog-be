@@ -64,7 +64,7 @@ jobs:
           DB_USER=pyosh
           DB_PSWD=pyosh
           DB_DTBS=pyosh_blog_test
-          SESSION_SECRET=test-session-secret
+          SESSION_SECRET=test-session-secret-at-least-32x
           LOGIN_SUCCESS_PATH=/auth/success
           LOGIN_FAILURE_PATH=/auth/failure
           GOOGLE_CLIENT_ID=
@@ -76,7 +76,6 @@ jobs:
       - name: Align MySQL test collation
         run: |
           docker exec "${{ job.services.mysql.id }}" mysql -uroot -proot <<'EOF'
-          SET GLOBAL init_connect = 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci';
           ALTER DATABASE `pyosh_blog_test`
             CHARACTER SET utf8mb4
             COLLATE utf8mb4_unicode_ci;
