@@ -64,6 +64,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
   const fastify = Fastify({
     ...buildFastifyLoggerConfig(),
+    trustProxy: true,
   }).withTypeProvider<ZodTypeProvider>();
 
   // Zod validator & serializer 설정
