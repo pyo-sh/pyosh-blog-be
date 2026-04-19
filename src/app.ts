@@ -1,3 +1,4 @@
+import { BlockList, isIP } from "node:net";
 import Fastify, { FastifyInstance, FastifyError } from "fastify";
 import {
   ZodTypeProvider,
@@ -59,12 +60,91 @@ import {
   getMemoryUsage,
 } from "@src/services/health.service";
 import { StatsService } from "@src/services/stats.service";
+import { env } from "@src/shared/env";
+
+function normalizeIp(address: string | undefined): string | null {
+  if (!address) {
+    return null;
+  }
+
+  return address.startsWith("::ffff:") ? address.slice(7) : address;
+}
+
+function buildTrustedProxyPeers(): BlockList {
+  const peers = new BlockList();
+  const entries = env.TRUSTED_PROXY_RANGES?.split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  for (const entry of entries ?? []) {
+    const [address, prefixLength] = entry.split("/");
+    const normalizedAddress = normalizeIp(address);
+
+    if (!normalizedAddress) {
+      continue;
+    }
+
+    const family = isIP(normalizedAddress);
+
+    if (family === 0) {
+      continue;
+    }
+
+    const type = family === 4 ? "ipv4" : "ipv6";
+
+    if (prefixLength === undefined) {
+      peers.addAddress(normalizedAddress, type);
+      continue;
+    }
+
+    const prefix = Number(prefixLength);
+
+    if (Number.isInteger(prefix)) {
+      peers.addSubnet(normalizedAddress, prefix, type);
+    }
+  }
+
+  return peers;
+}
+
+const trustedProxyPeers = buildTrustedProxyPeers();
+
+function isTrustedProxyPeer(remoteAddress: string | undefined): boolean {
+  const normalized = normalizeIp(remoteAddress);
+
+  if (!normalized) {
+    return false;
+  }
+  const family = isIP(normalized);
+
+  if (family === 0) {
+    return false;
+  }
+
+  return trustedProxyPeers.check(normalized, family === 4 ? "ipv4" : "ipv6");
+}
 
 export async function buildApp(): Promise<FastifyInstance> {
   // Fastify 인스턴스 생성
   const fastify = Fastify({
     ...buildFastifyLoggerConfig(),
+    trustProxy: isTrustedProxyPeer,
   }).withTypeProvider<ZodTypeProvider>();
+
+  fastify.addHook("onRequest", (request, _, done) => {
+    if (isTrustedProxyPeer(request.socket.remoteAddress)) {
+      done();
+
+      return;
+    }
+
+    delete request.headers.forwarded;
+    delete request.headers["x-forwarded-for"];
+    delete request.headers["x-forwarded-host"];
+    delete request.headers["x-forwarded-port"];
+    delete request.headers["x-forwarded-proto"];
+    done();
+  });
 
   // Zod validator & serializer 설정
   fastify.setValidatorCompiler(validatorCompiler);
