@@ -71,6 +71,13 @@
       "when": 1776124800000,
       "tag": "0009_fix_invalid_post_slugs",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1776560400000,
+      "tag": "0010_site_settings_backfill",
+      "breakpoints": true
     }
   ]
 }
