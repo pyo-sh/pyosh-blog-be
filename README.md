@@ -2,7 +2,24 @@
 
 Fastify API server for pyosh blog.
 
-## Local setup
+## Tech stack
+
+- Fastify 5.7
+- Drizzle ORM 0.45 with `drizzle-kit`
+- MySQL (via `mysql2`)
+- Zod 3.25 (`fastify-type-provider-zod`)
+- Passport (Google and GitHub OAuth) with `@fastify/session` and `@fastify/passport`
+- Pino logger
+- Vitest 2.1
+- TypeScript 5.9
+
+## Requirements
+
+- Node.js 18+
+- pnpm
+- MySQL server reachable with the `DB_*` variables
+
+## Getting started
 
 **1. Install dependencies**
 
@@ -54,11 +71,27 @@ The server starts with `nodemon` + `ts-node`. Swagger UI is available at `/docum
 | `pnpm start` | Run compiled build |
 | `pnpm test` | Run tests once |
 | `pnpm test:watch` | Run tests in watch mode |
+| `pnpm test:ui` | Run tests with the Vitest UI |
 | `pnpm test:coverage` | Run tests with coverage report |
 | `pnpm lint` | Run ESLint |
 | `pnpm compile:types` | Type-check without emitting |
 | `pnpm db:migrate` | Apply pending migrations |
 | `pnpm db:migrate:status` | Show migration status |
+| `pnpm db:admin` | Run the admin user management CLI |
+| `pnpm pw:create` | Hash a password with argon2 |
+| `pnpm tool` | Run the dockerized tools runner (`scripts/tools/docker-compose.yml`) |
+
+## API documentation
+
+- Swagger UI: `GET /documentation` on the running server
+- Endpoint reference: [`api-spec.md`](./api-spec.md)
+
+Route modules live under `src/routes/`:
+
+```
+assets  auth  categories  comments  guestbook
+posts   seo   settings    stats     tags       user
+```
 
 ## Project structure
 
@@ -76,6 +109,9 @@ src/
   errors/          # HttpError helpers
   types/           # Shared TypeScript types
   constants/       # App-wide constants
+scripts/           # DB migration, admin, password, and tool scripts
+drizzle/           # Generated SQL migrations and meta
+test/              # Vitest suites, helpers, and setup
 ```
 
 ## Environment files
@@ -87,5 +123,39 @@ The app loads env files in priority order depending on `NODE_ENV`:
 - `.env.local` - shared local overrides (git-ignored)
 - `.env` - shared defaults
 
-For local development use `.env.development.local`.
-For tests use `.env.test`.
+For local development use `.env.development.local`. For tests use `.env.test`.
+
+## Database migrations
+
+Migration SQL lives in `drizzle/`. The schema source is `src/db/schema/index.ts` and Drizzle Kit is configured in `drizzle.config.ts`.
+
+- Apply pending migrations: `pnpm db:migrate`
+- Check current status: `pnpm db:migrate:status`
+- Generate a new migration after editing the schema: `pnpm drizzle-kit generate`
+
+Migration runner scripts are under `scripts/` (`db-migrate.ts`, `db-migration-status.ts`).
+
+## Testing
+
+- Runner: Vitest, configured in `vitest.config.ts`
+- Environment: tests run with `NODE_ENV=test` and load `.env.test`
+- Layout: suites live under `test/` mirroring `src/` (`routes/`, `services/`, `plugins/`, `scripts/`), with shared `helpers/` and a top-level `setup.ts` and `smoke.test.ts`
+
+Run a single suite by passing a path:
+
+```bash
+pnpm test test/routes/auth
+```
+
+## Deployment
+
+Production images are built from `Dockerfile` and run via `docker-compose.yml`.
+
+- `blog_container` attaches to an external `blog_network` and does not expose ports directly. A Cloudflare Tunnel sidecar (see `cloudflared/`) fronts the service.
+- Host bind mounts: `${HOME}/blog_uploads` -> `/app/uploads`, `${HOME}/blog_logs` -> `/app/logs`
+- Env is loaded from a host-level `.env` referenced by the compose file
+- Entry point: `scripts/entrypoint.sh`; deploy helper: `scripts/deploy.sh`
+
+## License
+
+MIT. See `package.json` for author and repository metadata.
