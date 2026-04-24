@@ -142,6 +142,79 @@ describe("Category Routes", () => {
       expect(body.category.totalPostCount).toBe(0);
     });
 
+    it("한글 이름은 유니코드 slug로 생성 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/categories",
+        headers: { cookie },
+        payload: {
+          name: "일상",
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().category.slug).toBe("일상");
+    });
+
+    it("slug를 만들 수 없는 이름은 생성된 id fallback 사용 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/categories",
+        headers: { cookie },
+        payload: {
+          name: "😀😀😀",
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+
+      const body = response.json();
+      expect(body.category.slug).toBe(String(body.category.id));
+    });
+
+    it("수동 slug override를 정규화해 저장 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/categories",
+        headers: { cookie },
+        payload: {
+          name: "Manual Slug",
+          slug: "  커스텀 Slug!  ",
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().category.slug).toBe("커스텀-slug");
+    });
+
+    it("중복 수동 slug override는 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      await seedCategory({ name: "Existing", slug: "중복-slug" });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/categories",
+        headers: { cookie },
+        payload: {
+          name: "Another",
+          slug: "중복 slug",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toContain("Slug already exists");
+    });
+
     it("비인증 → 403", async () => {
       const response = await app.inject({
         method: "POST",
@@ -187,6 +260,43 @@ describe("Category Routes", () => {
       const body = response.json();
       expect(body.category.name).toBe("Updated Name");
       expect(body.category.id).toBe(category.id);
+    });
+
+    it("legacy 빈 slug 카테고리를 수정하면 slug를 복구 → 200", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory({ name: "Broken", slug: "" });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/categories/${category.id}`,
+        headers: { cookie },
+        payload: {
+          name: "복구된 이름",
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().category.slug).toBe("복구된-이름");
+    });
+
+    it("PATCH 수동 slug override 충돌 시 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      await seedCategory({ name: "Existing", slug: "manual-slug" });
+      const category = await seedCategory({ name: "Target", slug: "target-slug" });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/categories/${category.id}`,
+        headers: { cookie },
+        payload: {
+          slug: "manual slug",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toContain("Slug already exists");
     });
   });
 

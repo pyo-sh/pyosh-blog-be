@@ -8,13 +8,19 @@ import {
 import * as schema from "@src/db/schema/index";
 import { postTable } from "@src/db/schema/posts";
 import { HttpError } from "@src/errors/http-error";
-import { generateSlug, ensureUniqueSlug } from "@src/shared/slug";
+import {
+  ensureUniqueSlug,
+  generateUnicodeSlug,
+  isBlankSlug,
+  needsLegacySlugRepair,
+} from "@src/shared/slug";
 
 /**
  * Category 생성 파라미터
  */
 export interface CategoryCreateArgs {
   name: string;
+  slug?: string;
   parentId?: number | null;
   isVisible?: boolean;
 }
@@ -25,6 +31,7 @@ export interface CategoryCreateArgs {
 export interface CategoryUpdateArgs {
   id: number;
   name?: string;
+  slug?: string;
   parentId?: number | null;
   sortOrder?: number;
   isVisible?: boolean;
@@ -71,75 +78,72 @@ export class CategoryService {
 
   /**
    * 카테고리 생성
-   * - slug 자동 생성 및 중복 체크
+   * - 유니코드 slug 자동 생성 및 중복/legacy 대응
    * - 부모 카테고리 존재 확인
    * - sort_order 자동 부여 (같은 부모 아래 최대값 + 1)
    */
   async createCategory(data: CategoryCreateArgs): Promise<CategoryWithCounts> {
-    // 1. slug 생성
-    let slug = generateSlug(data.name);
+    return await this.db.transaction(async (tx) => {
+      if (data.parentId) {
+        const [parent] = await tx
+          .select()
+          .from(categoryTable)
+          .where(eq(categoryTable.id, data.parentId))
+          .limit(1);
 
-    // 2. slug 중복 체크 및 고유 slug 생성
-    slug = await ensureUniqueSlug(slug, async (checkSlug) => {
-      const [existing] = await this.db
-        .select()
-        .from(categoryTable)
-        .where(eq(categoryTable.slug, checkSlug))
-        .limit(1);
-
-      return Boolean(existing);
-    });
-
-    // 3. parent_id가 있으면 부모 카테고리 존재 확인
-    if (data.parentId) {
-      const [parent] = await this.db
-        .select()
-        .from(categoryTable)
-        .where(eq(categoryTable.id, data.parentId))
-        .limit(1);
-
-      if (!parent) {
-        throw HttpError.badRequest("Parent category not found.");
+        if (!parent) {
+          throw HttpError.badRequest("Parent category not found.");
+        }
       }
-    }
 
-    // 4. 같은 부모 아래 최대 sort_order 조회하여 +1
-    const [maxOrder] = await this.db
-      .select({
-        max: sql<number>`COALESCE(MAX(${categoryTable.sortOrder}), 0)`,
-      })
-      .from(categoryTable)
-      .where(
-        data.parentId
-          ? eq(categoryTable.parentId, data.parentId)
-          : isNull(categoryTable.parentId),
+      const [maxOrder] = await tx
+        .select({
+          max: sql<number>`COALESCE(MAX(${categoryTable.sortOrder}), 0)`,
+        })
+        .from(categoryTable)
+        .where(
+          data.parentId
+            ? eq(categoryTable.parentId, data.parentId)
+            : isNull(categoryTable.parentId),
+        );
+
+      const sortOrder = (maxOrder?.max ?? 0) + 1;
+      const newCategory: NewCategory = {
+        name: data.name,
+        slug: this.buildPendingSlug(),
+        parentId: data.parentId ?? null,
+        sortOrder,
+        isVisible: data.isVisible ?? true,
+      };
+
+      const [result] = await tx.insert(categoryTable).values(newCategory);
+      const categoryId = Number(result.insertId);
+      const resolvedSlug = await this.resolveCategorySlug(
+        tx,
+        data.name,
+        categoryId,
+        data.slug,
       );
 
-    const sortOrder = (maxOrder?.max ?? 0) + 1;
+      if (resolvedSlug !== newCategory.slug) {
+        await tx
+          .update(categoryTable)
+          .set({ slug: resolvedSlug })
+          .where(eq(categoryTable.id, categoryId));
+      }
 
-    // 5. 카테고리 생성
-    const newCategory: NewCategory = {
-      name: data.name,
-      slug,
-      parentId: data.parentId ?? null,
-      sortOrder,
-      isVisible: data.isVisible ?? true,
-    };
+      const [category] = await tx
+        .select()
+        .from(categoryTable)
+        .where(eq(categoryTable.id, categoryId))
+        .limit(1);
 
-    const [result] = await this.db.insert(categoryTable).values(newCategory);
+      if (!category) {
+        throw HttpError.internal("Failed to create category.");
+      }
 
-    // 6. 생성된 카테고리 조회
-    const [category] = await this.db
-      .select()
-      .from(categoryTable)
-      .where(eq(categoryTable.id, Number(result.insertId)))
-      .limit(1);
-
-    if (!category) {
-      throw HttpError.internal("Failed to create category.");
-    }
-
-    return { ...category, publishedPostCount: 0, totalPostCount: 0 };
+      return { ...category, publishedPostCount: 0, totalPostCount: 0 };
+    });
   }
 
   /**
@@ -217,95 +221,164 @@ export class CategoryService {
   /**
    * 카테고리 수정
    * - parent_id 변경 시 순환 참조 방지
-   * - name 변경 시 slug는 그대로 유지 (선택적으로 재생성 가능)
+   * - slug 수동 override 또는 legacy slug 복구 지원
    */
   async updateCategory(args: CategoryUpdateArgs): Promise<CategoryWithCounts> {
-    const { id, name, parentId, sortOrder, isVisible } = args;
+    const { id, name, slug, parentId, sortOrder, isVisible } = args;
 
-    // 1. 카테고리 존재 확인
-    const [existing] = await this.db
-      .select()
-      .from(categoryTable)
-      .where(eq(categoryTable.id, id))
-      .limit(1);
+    return await this.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(categoryTable)
+        .where(eq(categoryTable.id, id))
+        .limit(1);
 
-    if (!existing) {
-      throw HttpError.notFound("Category not found.");
-    }
-
-    // 2. parent_id 변경 시 순환 참조 방지 체크
-    if (parentId !== undefined && parentId !== null) {
-      // 자기 자신을 부모로 설정하는 경우
-      if (parentId === id) {
-        throw HttpError.badRequest("A category cannot be its own parent.");
+      if (!existing) {
+        throw HttpError.notFound("Category not found.");
       }
 
-      // 자신의 하위 카테고리를 부모로 설정하는 경우 체크
-      const isDescendant = await this.isDescendantOf(id, parentId);
-      if (isDescendant) {
-        throw HttpError.badRequest(
-          "Cannot set a descendant category as parent.",
+      if (parentId !== undefined && parentId !== null) {
+        if (parentId === id) {
+          throw HttpError.badRequest("A category cannot be its own parent.");
+        }
+
+        const isDescendant = await this.isDescendantOf(id, parentId);
+        if (isDescendant) {
+          throw HttpError.badRequest(
+            "Cannot set a descendant category as parent.",
+          );
+        }
+
+        const [parent] = await tx
+          .select()
+          .from(categoryTable)
+          .where(eq(categoryTable.id, parentId))
+          .limit(1);
+
+        if (!parent) {
+          throw HttpError.badRequest("Parent category not found.");
+        }
+      }
+
+      const updates: Partial<NewCategory> = {};
+      if (name !== undefined) {
+        updates.name = name;
+      }
+      if (parentId !== undefined) {
+        updates.parentId = parentId;
+      }
+      if (sortOrder !== undefined) {
+        updates.sortOrder = sortOrder;
+      }
+      if (isVisible !== undefined) {
+        updates.isVisible = isVisible;
+      }
+
+      if (slug !== undefined || needsLegacySlugRepair(existing.slug)) {
+        updates.slug = await this.resolveCategorySlug(
+          tx,
+          name ?? existing.name,
+          id,
+          slug,
+          id,
         );
       }
 
-      // 부모 카테고리 존재 확인
-      const [parent] = await this.db
+      await tx.update(categoryTable).set(updates).where(eq(categoryTable.id, id));
+
+      const [updated] = await tx
         .select()
         .from(categoryTable)
-        .where(eq(categoryTable.id, parentId))
+        .where(eq(categoryTable.id, id))
         .limit(1);
 
-      if (!parent) {
-        throw HttpError.badRequest("Parent category not found.");
+      if (!updated) {
+        throw HttpError.internal("Failed to update category.");
       }
+
+      const [counts] = await tx
+        .select({
+          publishedPostCount: sql<number>`SUM(CASE WHEN ${postTable.status} = 'published' AND ${postTable.visibility} = 'public' AND ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
+          totalPostCount: sql<number>`SUM(CASE WHEN ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
+        })
+        .from(postTable)
+        .where(eq(postTable.categoryId, id));
+
+      return {
+        ...updated,
+        publishedPostCount: Number(counts?.publishedPostCount ?? 0),
+        totalPostCount: Number(counts?.totalPostCount ?? 0),
+      };
+    });
+  }
+
+  private buildPendingSlug(): string {
+    return `__pending__${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  private async resolveCategorySlug(
+    tx: MySql2Database<typeof schema>,
+    name: string,
+    categoryId: number,
+    requestedSlug?: string,
+    excludeId?: number,
+  ): Promise<string> {
+    const preferredSlug =
+      requestedSlug !== undefined
+        ? this.normalizeRequestedSlug(requestedSlug)
+        : generateUnicodeSlug(name);
+
+    if (requestedSlug === undefined && isBlankSlug(preferredSlug)) {
+      return await this.resolveFallbackSlug(tx, categoryId, excludeId);
     }
 
-    // 3. 변경사항 적용
-    const updates: Partial<Category> = {};
-    if (name !== undefined) {
-      updates.name = name;
-      // slug는 유지 (필요시 재생성 옵션 추가 가능)
-    }
-    if (parentId !== undefined) {
-      updates.parentId = parentId;
-    }
-    if (sortOrder !== undefined) {
-      updates.sortOrder = sortOrder;
-    }
-    if (isVisible !== undefined) {
-      updates.isVisible = isVisible;
-    }
-
-    await this.db
-      .update(categoryTable)
-      .set(updates)
-      .where(eq(categoryTable.id, id));
-
-    // 4. 업데이트된 카테고리 조회
-    const [updated] = await this.db
-      .select()
+    const existing = await tx
+      .select({ id: categoryTable.id })
       .from(categoryTable)
-      .where(eq(categoryTable.id, id))
+      .where(eq(categoryTable.slug, preferredSlug))
       .limit(1);
 
-    if (!updated) {
-      throw HttpError.internal("Failed to update category.");
+    if (existing.length === 0 || existing[0]?.id === excludeId) {
+      return preferredSlug;
     }
 
-    // 5. 게시글 카운트 조회
-    const [counts] = await this.db
-      .select({
-        publishedPostCount: sql<number>`SUM(CASE WHEN ${postTable.status} = 'published' AND ${postTable.visibility} = 'public' AND ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
-        totalPostCount: sql<number>`SUM(CASE WHEN ${postTable.deletedAt} IS NULL THEN 1 ELSE 0 END)`,
-      })
-      .from(postTable)
-      .where(eq(postTable.categoryId, id));
+    if (requestedSlug !== undefined) {
+      throw HttpError.badRequest("Slug already exists.");
+    }
 
-    return {
-      ...updated,
-      publishedPostCount: Number(counts?.publishedPostCount ?? 0),
-      totalPostCount: Number(counts?.totalPostCount ?? 0),
-    };
+    return await this.resolveFallbackSlug(tx, categoryId, excludeId);
+  }
+
+  private normalizeRequestedSlug(slug: string): string {
+    const normalizedSlug = generateUnicodeSlug(slug);
+
+    if (isBlankSlug(normalizedSlug)) {
+      throw HttpError.badRequest("Slug cannot be blank after normalization.");
+    }
+
+    return normalizedSlug;
+  }
+
+  private async resolveFallbackSlug(
+    tx: MySql2Database<typeof schema>,
+    categoryId: number,
+    excludeId?: number,
+  ): Promise<string> {
+    const baseSlug = String(categoryId);
+
+    return await ensureUniqueSlug(baseSlug, async (checkSlug) => {
+      const existing = await tx
+        .select({ id: categoryTable.id })
+        .from(categoryTable)
+        .where(eq(categoryTable.slug, checkSlug))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return false;
+      }
+
+      return excludeId === undefined || existing[0]?.id !== excludeId;
+    });
   }
 
   /**

@@ -216,6 +216,43 @@ pnpm db:migrate:status -- --pending-only
 
 ---
 
+## repair-taxonomy-slugs.ts
+
+카테고리/태그의 legacy 빈 slug 또는 `-2` 형태 slug 를 유니코드 slug 또는 `id` fallback 으로 일괄 복구합니다.
+
+### 언제 사용하나
+
+- 과거 버그로 생성된 빈 slug 데이터를 정리할 때
+- 공개 `/categories/...`, `/tags/...` 링크 404 원인을 정리할 때
+
+### 사용법
+
+```bash
+# 기본: dry-run
+pnpm slug:repair
+
+# 실제 반영
+pnpm slug:repair -- --apply
+
+# 특정 리소스만 대상 지정
+pnpm slug:repair -- --target=categories
+pnpm slug:repair -- --target=tags
+```
+
+### 동작 방식
+
+1. 현재 category/tag 테이블을 스캔합니다.
+2. 빈 slug 또는 `-숫자` legacy slug 만 추립니다.
+3. 이름 기반 `generateUnicodeSlug()` 결과를 우선 사용합니다.
+4. 결과가 비면 `id` 기반 fallback slug 를 사용합니다.
+5. `--apply` 가 없으면 변경 예정 내용만 출력합니다.
+
+### 필요 환경변수
+
+`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PSWD`, `DB_DTBS`
+
+---
+
 ## db-env.ts (헬퍼 모듈)
 
 직접 실행하는 스크립트가 아닌, `db-migrate.ts`와 `db-migration-status.ts`에서 공통으로 사용하는 내부 모듈입니다.

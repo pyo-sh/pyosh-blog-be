@@ -12,10 +12,16 @@ import { MySql2Database } from "drizzle-orm/mysql2";
 import { z } from "zod";
 import { TagWithPostCountSchema } from "./tag.schema";
 import * as schema from "@src/db/schema/index";
+import { HttpError } from "@src/errors/http-error";
 import { postTagTable } from "@src/db/schema/post-tags";
 import { postTable } from "@src/db/schema/posts";
-import { tagTable, NewTag } from "@src/db/schema/tags";
-import { generateSlug } from "@src/shared/slug";
+import { Tag, tagTable, NewTag } from "@src/db/schema/tags";
+import {
+  ensureUniqueSlug,
+  generateUnicodeSlug,
+  isBlankSlug,
+  needsLegacySlugRepair,
+} from "@src/shared/slug";
 
 /**
  * Tag Service
@@ -48,31 +54,29 @@ export class TagService {
       .from(tagTable)
       .where(inArray(tagTable.name, normalizedNames));
 
+    const repairedExistingTags = await this.repairLegacyTags(existingTags);
+
     // 3. 존재하지 않는 이름들 추출
-    const existingNames = new Set(existingTags.map((tag) => tag.name));
+    const existingNames = new Set(repairedExistingTags.map((tag) => tag.name));
     const newNames = normalizedNames.filter((name) => !existingNames.has(name));
 
     // 4. 새 태그 일괄 생성
     if (newNames.length > 0) {
-      const newTags: NewTag[] = newNames.map((name) => ({
-        name,
-        slug: generateSlug(name),
-      }));
+      const createdTags = await Promise.all(
+        newNames.map(async (name) => await this.createTag(name)),
+      );
 
-      await this.db.insert(tagTable).values(newTags);
+      const tagsByName = new Map(
+        [...repairedExistingTags, ...createdTags].map((tag) => [tag.name, tag]),
+      );
 
-      // 새로 생성된 태그 조회
-      const createdTags = await this.db
-        .select()
-        .from(tagTable)
-        .where(inArray(tagTable.name, newNames));
-
-      // 5. 전체 태그 ID 배열 반환
-      return [...existingTags, ...createdTags].map((tag) => tag.id);
+      return normalizedNames.map((name) => tagsByName.get(name)!.id);
     }
 
     // 기존 태그만 반환
-    return existingTags.map((tag) => tag.id);
+    const tagsByName = new Map(repairedExistingTags.map((tag) => [tag.name, tag]));
+
+    return normalizedNames.map((name) => tagsByName.get(name)!.id);
   }
 
   /**
@@ -147,5 +151,162 @@ export class TagService {
       .filter((name) => name.length > 0);
 
     return [...new Set(normalized)];
+  }
+
+  private async repairLegacyTags(tags: Tag[]): Promise<Tag[]> {
+    const repairedTags: Tag[] = [];
+
+    for (const tag of tags) {
+      if (!needsLegacySlugRepair(tag.slug)) {
+        repairedTags.push(tag);
+        continue;
+      }
+
+      repairedTags.push(await this.repairTagSlug(tag.id, tag.name));
+    }
+
+    return repairedTags;
+  }
+
+  private async createTag(name: string): Promise<Tag> {
+    const [existing] = await this.db
+      .select()
+      .from(tagTable)
+      .where(eq(tagTable.name, name))
+      .limit(1);
+
+    if (existing) {
+      return needsLegacySlugRepair(existing.slug)
+        ? await this.repairTagSlug(existing.id, existing.name)
+        : existing;
+    }
+
+    try {
+      return await this.db.transaction(async (tx) => {
+        const newTag: NewTag = {
+          name,
+          slug: this.buildPendingSlug(),
+        };
+
+        const [result] = await tx.insert(tagTable).values(newTag);
+        const tagId = Number(result.insertId);
+        const resolvedSlug = await this.resolveTagSlug(tx, name, tagId);
+
+        if (resolvedSlug !== newTag.slug) {
+          await tx
+            .update(tagTable)
+            .set({ slug: resolvedSlug })
+            .where(eq(tagTable.id, tagId));
+        }
+
+        const [tag] = await tx
+          .select()
+          .from(tagTable)
+          .where(eq(tagTable.id, tagId))
+          .limit(1);
+
+        if (!tag) {
+          throw HttpError.internal("Failed to create tag.");
+        }
+
+        return tag;
+      });
+    } catch (error) {
+      if (this.isDuplicateEntry(error)) {
+        const [existingTag] = await this.db
+          .select()
+          .from(tagTable)
+          .where(eq(tagTable.name, name))
+          .limit(1);
+
+        if (existingTag) {
+          return needsLegacySlugRepair(existingTag.slug)
+            ? await this.repairTagSlug(existingTag.id, existingTag.name)
+            : existingTag;
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  private async repairTagSlug(id: number, name: string): Promise<Tag> {
+    return await this.db.transaction(async (tx) => {
+      const resolvedSlug = await this.resolveTagSlug(tx, name, id, id);
+
+      await tx.update(tagTable).set({ slug: resolvedSlug }).where(eq(tagTable.id, id));
+
+      const [updated] = await tx
+        .select()
+        .from(tagTable)
+        .where(eq(tagTable.id, id))
+        .limit(1);
+
+      if (!updated) {
+        throw HttpError.internal("Failed to repair tag slug.");
+      }
+
+      return updated;
+    });
+  }
+
+  private buildPendingSlug(): string {
+    return `__pending__${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  private async resolveTagSlug(
+    tx: MySql2Database<typeof schema>,
+    name: string,
+    tagId: number,
+    excludeId?: number,
+  ): Promise<string> {
+    const preferredSlug = generateUnicodeSlug(name);
+
+    if (isBlankSlug(preferredSlug)) {
+      return await this.resolveFallbackSlug(tx, tagId, excludeId);
+    }
+
+    const existing = await tx
+      .select({ id: tagTable.id })
+      .from(tagTable)
+      .where(eq(tagTable.slug, preferredSlug))
+      .limit(1);
+
+    if (existing.length === 0 || existing[0]?.id === excludeId) {
+      return preferredSlug;
+    }
+
+    return await this.resolveFallbackSlug(tx, tagId, excludeId);
+  }
+
+  private async resolveFallbackSlug(
+    tx: MySql2Database<typeof schema>,
+    tagId: number,
+    excludeId?: number,
+  ): Promise<string> {
+    const baseSlug = String(tagId);
+
+    return await ensureUniqueSlug(baseSlug, async (checkSlug) => {
+      const existing = await tx
+        .select({ id: tagTable.id })
+        .from(tagTable)
+        .where(eq(tagTable.slug, checkSlug))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return false;
+      }
+
+      return excludeId === undefined || existing[0]?.id !== excludeId;
+    });
+  }
+
+  private isDuplicateEntry(error: unknown): error is { code: string } {
+    return (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "ER_DUP_ENTRY"
+    );
   }
 }

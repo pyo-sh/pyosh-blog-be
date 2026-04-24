@@ -17,6 +17,7 @@
     "db:migrate": "NODE_ENV=development ts-node ./scripts/db-migrate.ts",
     "db:migrate:status": "NODE_ENV=development ts-node ./scripts/db-migration-status.ts",
     "db:admin": "NODE_ENV=development ts-node ./scripts/admin-manager.ts",
+    "slug:repair": "NODE_ENV=development ts-node ./scripts/repair-taxonomy-slugs.ts",
     "pw:create": "ts-node ./scripts/hash-password.ts",
     "tool": "docker compose -f scripts/tools/docker-compose.yml run --rm tool"
   },

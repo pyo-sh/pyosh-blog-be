@@ -102,9 +102,10 @@ export function createCategoryRoute(
         },
       },
       async (request, reply) => {
-        const { name, parentId, isVisible } = request.body;
+        const { name, slug, parentId, isVisible } = request.body;
         const category = await categoryService.createCategory({
           name,
+          slug,
           parentId,
           isVisible,
         });
@@ -176,11 +177,12 @@ export function createCategoryRoute(
       },
       async (request, reply) => {
         const { id } = request.params;
-        const { name, parentId, sortOrder, isVisible } = request.body;
+        const { name, slug, parentId, sortOrder, isVisible } = request.body;
 
         const category = await categoryService.updateCategory({
           id,
           name,
+          slug,
           parentId,
           sortOrder,
           isVisible,

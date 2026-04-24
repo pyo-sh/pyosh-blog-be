@@ -2,9 +2,9 @@ import { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
-import { seedAdmin, seedCategory, truncateAll } from "@test/helpers/seed";
+import { seedAdmin, seedCategory, seedTag, truncateAll } from "@test/helpers/seed";
 import { db } from "@src/db/client";
-import { postTable } from "@src/db/schema";
+import { postTable, tagTable } from "@src/db/schema";
 
 describe("Tag Routes", () => {
   let app: FastifyInstance;
@@ -161,6 +161,99 @@ describe("Tag Routes", () => {
       expect(body.tags).toEqual([
         { id: expect.any(Number), name: "react", slug: "react", postCount: 1 },
       ]);
+    });
+
+    it("한글 태그는 유니코드 slug로 생성한다", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      await app.inject({
+        method: "POST",
+        url: "/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Korean Tag Post",
+          contentMd: "# Korean",
+          categoryId: category.id,
+          status: "published",
+          visibility: "public",
+          tags: ["한글 태그"],
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/tags",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().tags).toEqual([
+        {
+          id: expect.any(Number),
+          name: "한글 태그",
+          slug: "한글-태그",
+          postCount: 1,
+        },
+      ]);
+    });
+
+    it("slug를 만들 수 없는 태그는 id fallback slug를 사용한다", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      await app.inject({
+        method: "POST",
+        url: "/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Emoji Tag Post",
+          contentMd: "# Emoji",
+          categoryId: category.id,
+          status: "published",
+          visibility: "public",
+          tags: ["😀"],
+        },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/tags",
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const [tag] = response.json().tags;
+      expect(tag.slug).toBe(String(tag.id));
+    });
+
+    it("기존 legacy 빈 slug 태그를 재사용하면 slug를 복구한다", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const brokenTag = await seedTag({ name: "일상", slug: "" });
+
+      await app.inject({
+        method: "POST",
+        url: "/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Repair Tag Post",
+          contentMd: "# Repair",
+          categoryId: category.id,
+          status: "published",
+          visibility: "public",
+          tags: ["일상"],
+        },
+      });
+
+      const [updatedTag] = await db
+        .select()
+        .from(tagTable)
+        .where(eq(tagTable.id, brokenTag.id));
+
+      expect(updatedTag?.slug).toBe("일상");
     });
   });
 });
