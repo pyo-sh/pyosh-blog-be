@@ -1,0 +1,225 @@
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
+import { eq } from "drizzle-orm";
+import { loadEnv, requireDbEnv } from "./db-env";
+import { categoryTable } from "../src/db/schema/categories";
+import * as schema from "../src/db/schema/index";
+import { tagTable } from "../src/db/schema/tags";
+import {
+  ensureUniqueSlug,
+  generateUnicodeSlug,
+  isBlankSlug,
+  needsLegacySlugRepair,
+} from "../src/shared/slug";
+
+type RepairTarget = "categories" | "tags" | "all";
+
+function parseArgs(argv: string[]) {
+  const options = {
+    dryRun: true,
+    target: "all" as RepairTarget,
+  };
+
+  for (const arg of argv) {
+    if (arg === "--apply") {
+      options.dryRun = false;
+      continue;
+    }
+
+    if (arg === "--dry-run") {
+      options.dryRun = true;
+      continue;
+    }
+
+    if (arg.startsWith("--target=")) {
+      const value = arg.slice("--target=".length) as RepairTarget;
+      if (value === "categories" || value === "tags" || value === "all") {
+        options.target = value;
+        continue;
+      }
+    }
+
+    throw new Error(
+      'Usage: pnpm ts-node ./scripts/repair-taxonomy-slugs.ts [--dry-run] [--apply] [--target=categories|tags|all]',
+    );
+  }
+
+  return options;
+}
+
+async function main() {
+  const options = parseArgs(process.argv.slice(2));
+
+  loadEnv();
+  const dbEnv = requireDbEnv("repair-taxonomy-slugs");
+  const pool = mysql.createPool({
+    host: dbEnv.host,
+    port: dbEnv.port,
+    user: dbEnv.user,
+    password: dbEnv.password,
+    database: dbEnv.database,
+  });
+  const db = drizzle(pool, { schema, mode: "default" });
+
+  try {
+    const categoryRows =
+      options.target === "tags"
+        ? []
+        : await db
+            .select({
+              id: categoryTable.id,
+              name: categoryTable.name,
+              slug: categoryTable.slug,
+            })
+            .from(categoryTable);
+
+    const tagRows =
+      options.target === "categories"
+        ? []
+        : await db
+            .select({
+              id: tagTable.id,
+              name: tagTable.name,
+              slug: tagTable.slug,
+            })
+            .from(tagTable);
+
+    const categoryPlans = await buildRepairPlans(
+      categoryRows,
+      resolveCategorySlug,
+    );
+    const tagPlans = await buildRepairPlans(tagRows, resolveTagSlug);
+
+    if (categoryPlans.length === 0 && tagPlans.length === 0) {
+      console.log("[repair-taxonomy-slugs] No legacy slugs found.");
+      return;
+    }
+
+    for (const plan of categoryPlans) {
+      console.log(
+        `[categories] ${plan.id}: "${plan.slug}" -> "${plan.nextSlug}" (${plan.name})`,
+      );
+    }
+
+    for (const plan of tagPlans) {
+      console.log(
+        `[tags] ${plan.id}: "${plan.slug}" -> "${plan.nextSlug}" (${plan.name})`,
+      );
+    }
+
+    if (options.dryRun) {
+      console.log("[repair-taxonomy-slugs] Dry run complete. No changes applied.");
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      for (const plan of categoryPlans) {
+        await tx
+          .update(categoryTable)
+          .set({ slug: plan.nextSlug })
+          .where(eq(categoryTable.id, plan.id));
+      }
+
+      for (const plan of tagPlans) {
+        await tx
+          .update(tagTable)
+          .set({ slug: plan.nextSlug })
+          .where(eq(tagTable.id, plan.id));
+      }
+    });
+
+    console.log(
+      `[repair-taxonomy-slugs] Applied ${categoryPlans.length + tagPlans.length} slug repairs.`,
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
+async function buildRepairPlans(
+  rows: Array<{ id: number; name: string; slug: string }>,
+  resolveSlug: (input: {
+    id: number;
+    name: string;
+    occupiedSlugs: Set<string>;
+  }) => Promise<string>,
+) {
+  const plans: Array<{ id: number; name: string; slug: string; nextSlug: string }> = [];
+  const occupiedSlugs = new Set(
+    rows.filter((row) => !needsLegacySlugRepair(row.slug)).map((row) => row.slug),
+  );
+
+  for (const row of rows) {
+    if (!needsLegacySlugRepair(row.slug)) {
+      continue;
+    }
+
+    const nextSlug = await resolveSlug({
+      id: row.id,
+      name: row.name,
+      occupiedSlugs,
+    });
+    plans.push({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      nextSlug,
+    });
+    occupiedSlugs.add(nextSlug);
+  }
+
+  return plans;
+}
+
+async function resolveCategorySlug(input: {
+  id: number;
+  name: string;
+  occupiedSlugs: Set<string>;
+}) {
+  const preferredSlug = generateUnicodeSlug(input.name);
+
+  if (isBlankSlug(preferredSlug)) {
+    return await ensureUniqueSlug(
+      String(input.id),
+      async (checkSlug) => input.occupiedSlugs.has(checkSlug),
+    );
+  }
+
+  if (!input.occupiedSlugs.has(preferredSlug)) {
+    return preferredSlug;
+  }
+
+  return await ensureUniqueSlug(
+    preferredSlug,
+    async (checkSlug) => input.occupiedSlugs.has(checkSlug),
+  );
+}
+
+async function resolveTagSlug(input: {
+  id: number;
+  name: string;
+  occupiedSlugs: Set<string>;
+}) {
+  const preferredSlug = generateUnicodeSlug(input.name);
+
+  if (isBlankSlug(preferredSlug)) {
+    return await ensureUniqueSlug(
+      String(input.id),
+      async (checkSlug) => input.occupiedSlugs.has(checkSlug),
+    );
+  }
+
+  if (!input.occupiedSlugs.has(preferredSlug)) {
+    return preferredSlug;
+  }
+
+  return await ensureUniqueSlug(
+    String(input.id),
+    async (checkSlug) => input.occupiedSlugs.has(checkSlug),
+  );
+}
+
+void main().catch((error) => {
+  console.error("[repair-taxonomy-slugs]", error);
+  process.exitCode = 1;
+});

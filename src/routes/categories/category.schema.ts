@@ -41,6 +41,12 @@ export const CategoryDeleteQuerySchema = z
  */
 export const CategoryCreateBodySchema = z.object({
   name: z.string().min(1).max(50).describe("카테고리 이름 (최대 50자)"),
+  slug: z
+    .string()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe("카테고리 수동 슬러그 (선택)"),
   parentId: z
     .number()
     .int()
@@ -58,6 +64,12 @@ export const CategoryUpdateBodySchema = z.object({
     .max(50)
     .optional()
     .describe("카테고리 이름 (최대 50자)"),
+  slug: z
+    .string()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe("카테고리 수동 슬러그 (선택)"),
   parentId: z
     .number()
     .int()

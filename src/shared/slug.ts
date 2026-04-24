@@ -27,6 +27,14 @@ export function isBlankSlug(slug: string | null | undefined): boolean {
   return slug === undefined || slug === null || slug.trim().length === 0;
 }
 
+export function needsLegacySlugRepair(slug: string | null | undefined): boolean {
+  if (isBlankSlug(slug)) {
+    return true;
+  }
+
+  return /^-[0-9]+$/.test(slug.trim());
+}
+
 export function generateUnicodeSlug(text: string): string {
   return text
     .normalize("NFKC")

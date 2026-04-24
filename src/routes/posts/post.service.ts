@@ -32,6 +32,7 @@ import {
   ensureUniqueSlug,
   generateUnicodeSlug,
   isBlankSlug,
+  needsLegacySlugRepair,
 } from "@src/shared/slug";
 
 const MAX_PINNED_POSTS = 5;
@@ -73,14 +74,6 @@ function normalizeSummary(summary: string | null | undefined) {
   const trimmed = summary?.trim();
 
   return trimmed ? trimmed : null;
-}
-
-function needsLegacySlugRepair(slug: string | null | undefined) {
-  if (isBlankSlug(slug)) {
-    return true;
-  }
-
-  return /^-[0-9]+$/.test(slug.trim());
 }
 
 function resolvePublishedSummary(input: {
