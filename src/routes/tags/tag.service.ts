@@ -190,14 +190,7 @@ export class TagService {
 
         const [result] = await tx.insert(tagTable).values(newTag);
         const tagId = Number(result.insertId);
-        const resolvedSlug = await this.resolveTagSlug(tx, name, tagId);
-
-        if (resolvedSlug !== newTag.slug) {
-          await tx
-            .update(tagTable)
-            .set({ slug: resolvedSlug })
-            .where(eq(tagTable.id, tagId));
-        }
+        await this.finalizeTagSlug(tx, tagId, name);
 
         const [tag] = await tx
           .select()
@@ -232,9 +225,7 @@ export class TagService {
 
   private async repairTagSlug(id: number, name: string): Promise<Tag> {
     return await this.db.transaction(async (tx) => {
-      const resolvedSlug = await this.resolveTagSlug(tx, name, id, id);
-
-      await tx.update(tagTable).set({ slug: resolvedSlug }).where(eq(tagTable.id, id));
+      await this.finalizeTagSlug(tx, id, name, id);
 
       const [updated] = await tx
         .select()
@@ -299,6 +290,29 @@ export class TagService {
 
       return excludeId === undefined || existing[0]?.id !== excludeId;
     });
+  }
+
+  private async finalizeTagSlug(
+    tx: MySql2Database<typeof schema>,
+    tagId: number,
+    name: string,
+    excludeId?: number,
+  ): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const resolvedSlug = await this.resolveTagSlug(tx, name, tagId, excludeId);
+
+      try {
+        await tx.update(tagTable).set({ slug: resolvedSlug }).where(eq(tagTable.id, tagId));
+
+        return resolvedSlug;
+      } catch (error) {
+        if (!this.isDuplicateEntry(error)) {
+          throw error;
+        }
+      }
+    }
+
+    throw HttpError.internal("Failed to finalize tag slug.");
   }
 
   private isDuplicateEntry(error: unknown): error is { code: string } {

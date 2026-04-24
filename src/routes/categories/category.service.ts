@@ -118,19 +118,12 @@ export class CategoryService {
 
       const [result] = await tx.insert(categoryTable).values(newCategory);
       const categoryId = Number(result.insertId);
-      const resolvedSlug = await this.resolveCategorySlug(
+      await this.finalizeCategorySlug(
         tx,
-        data.name,
         categoryId,
+        data.name,
         data.slug,
       );
-
-      if (resolvedSlug !== newCategory.slug) {
-        await tx
-          .update(categoryTable)
-          .set({ slug: resolvedSlug })
-          .where(eq(categoryTable.id, categoryId));
-      }
 
       const [category] = await tx
         .select()
@@ -275,10 +268,10 @@ export class CategoryService {
       }
 
       if (slug !== undefined || needsLegacySlugRepair(existing.slug)) {
-        updates.slug = await this.resolveCategorySlug(
+        updates.slug = await this.finalizeCategorySlug(
           tx,
-          name ?? existing.name,
           id,
+          name ?? existing.name,
           slug,
           id,
         );
@@ -391,6 +384,52 @@ export class CategoryService {
 
       return excludeId === undefined || existing[0]?.id !== excludeId;
     });
+  }
+
+  private async finalizeCategorySlug(
+    tx: MySql2Database<typeof schema>,
+    categoryId: number,
+    name: string,
+    requestedSlug?: string,
+    excludeId?: number,
+  ): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const resolvedSlug = await this.resolveCategorySlug(
+        tx,
+        name,
+        categoryId,
+        requestedSlug,
+        excludeId,
+      );
+
+      try {
+        await tx
+          .update(categoryTable)
+          .set({ slug: resolvedSlug })
+          .where(eq(categoryTable.id, categoryId));
+
+        return resolvedSlug;
+      } catch (error) {
+        if (!this.isDuplicateEntry(error)) {
+          throw error;
+        }
+
+        if (requestedSlug !== undefined) {
+          throw HttpError.badRequest("Slug already exists.");
+        }
+      }
+    }
+
+    throw HttpError.internal("Failed to finalize category slug.");
+  }
+
+  private isDuplicateEntry(error: unknown): error is { code: string } {
+    return (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "ER_DUP_ENTRY"
+    );
   }
 
   /**
