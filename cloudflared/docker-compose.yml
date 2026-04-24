@@ -6,6 +6,12 @@
 #   3) "Install connector → Docker" 에서 보여주는 명령의 --token 뒤 긴 문자열 복사
 #   4) 이 파일과 같은 폴더에 .env 파일 만들고 한 줄: TUNNEL_TOKEN=<복사한 토큰>
 #   5) chmod 600 .env
+#   6) blog_network를 고정 서브넷으로 생성 (아직 없는 경우):
+#      docker network create --driver bridge --subnet 172.28.0.0/24 blog_network
+#      이미 생성돼 있다면 서브넷 확인:
+#      docker network inspect blog_network --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+#      서브넷이 다르면 컨테이너를 stop 후 network rm → 위 명령으로 재생성.
+#      서버 .env의 TRUSTED_PROXY_RANGES를 해당 서브넷 CIDR로 설정.
 #
 # 운영:
 #   docker compose up -d        # 시작
