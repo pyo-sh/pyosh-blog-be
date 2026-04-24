@@ -158,4 +158,4 @@ Production images are built from `Dockerfile` and run via `docker-compose.yml`.
 
 ## License
 
-MIT. See `package.json` for author and repository metadata.
+MIT. See [`LICENSE`](./LICENSE).
