@@ -15,6 +15,7 @@ services:
     networks:
       - blog_network
     # 외부 포트 노출 없음. cloudflared가 blog_network 내부에서 접근.
+    # blog_network 생성 절차는 cloudflared/docker-compose.yml 주석 참고.
 
 networks:
   blog_network:
