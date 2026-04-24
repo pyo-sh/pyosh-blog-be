@@ -62,9 +62,10 @@ export class TagService {
 
     // 4. 새 태그 일괄 생성
     if (newNames.length > 0) {
-      const createdTags = await Promise.all(
-        newNames.map(async (name) => await this.createTag(name)),
-      );
+      const createdTags: Tag[] = [];
+      for (const name of newNames) {
+        createdTags.push(await this.createTag(name));
+      }
 
       const tagsByName = new Map(
         [...repairedExistingTags, ...createdTags].map((tag) => [tag.name, tag]),

@@ -255,5 +255,42 @@ describe("Tag Routes", () => {
 
       expect(updatedTag?.slug).toBe("일상");
     });
+
+    it("같은 요청의 신규 태그 slug 충돌은 순차 생성으로 처리한다", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/admin/posts",
+        headers: { cookie },
+        payload: {
+          title: "Colliding Tag Post",
+          contentMd: "# Colliding",
+          categoryId: category.id,
+          status: "published",
+          visibility: "public",
+          tags: ["C!", "C?"],
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+
+      const createdTags = await db
+        .select()
+        .from(tagTable)
+        .where(eq(tagTable.name, "c!"));
+      const collidingTags = await db
+        .select()
+        .from(tagTable)
+        .where(eq(tagTable.name, "c?"));
+
+      expect(createdTags).toHaveLength(1);
+      expect(collidingTags).toHaveLength(1);
+      expect(createdTags[0]?.slug).toBe("c");
+      expect(collidingTags[0]?.slug).not.toBe("c");
+      expect(collidingTags[0]?.slug).toBe(String(collidingTags[0]?.id));
+    });
   });
 });
