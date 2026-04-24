@@ -1,4 +1,4 @@
-import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { eq } from "drizzle-orm";
 import { loadEnv, requireDbEnv } from "./db-env";
@@ -62,35 +62,33 @@ async function main() {
   const db = drizzle(pool, { schema, mode: "default" });
 
   try {
-    const categoryPlans =
+    const categoryRows =
       options.target === "tags"
         ? []
-        : await buildRepairPlans({
-            rows: await db
-              .select({
-                id: categoryTable.id,
-                name: categoryTable.name,
-                slug: categoryTable.slug,
-              })
-              .from(categoryTable),
-            resolveSlug: async (id, name) =>
-              await resolveCategorySlug(db, id, name, id),
-          });
+        : await db
+            .select({
+              id: categoryTable.id,
+              name: categoryTable.name,
+              slug: categoryTable.slug,
+            })
+            .from(categoryTable);
 
-    const tagPlans =
+    const tagRows =
       options.target === "categories"
         ? []
-        : await buildRepairPlans({
-            rows: await db
-              .select({
-                id: tagTable.id,
-                name: tagTable.name,
-                slug: tagTable.slug,
-              })
-              .from(tagTable),
-            resolveSlug: async (id, name) =>
-              await resolveTagSlug(db, id, name, id),
-          });
+        : await db
+            .select({
+              id: tagTable.id,
+              name: tagTable.name,
+              slug: tagTable.slug,
+            })
+            .from(tagTable);
+
+    const categoryPlans = await buildRepairPlans(
+      categoryRows,
+      resolveCategorySlug,
+    );
+    const tagPlans = await buildRepairPlans(tagRows, resolveTagSlug);
 
     if (categoryPlans.length === 0 && tagPlans.length === 0) {
       console.log("[repair-taxonomy-slugs] No legacy slugs found.");
@@ -114,16 +112,21 @@ async function main() {
       return;
     }
 
-    for (const plan of categoryPlans) {
-      await db
-        .update(categoryTable)
-        .set({ slug: plan.nextSlug })
-        .where(eq(categoryTable.id, plan.id));
-    }
+    await db.transaction(async (tx) => {
+      for (const plan of categoryPlans) {
+        await tx
+          .update(categoryTable)
+          .set({ slug: plan.nextSlug })
+          .where(eq(categoryTable.id, plan.id));
+      }
 
-    for (const plan of tagPlans) {
-      await db.update(tagTable).set({ slug: plan.nextSlug }).where(eq(tagTable.id, plan.id));
-    }
+      for (const plan of tagPlans) {
+        await tx
+          .update(tagTable)
+          .set({ slug: plan.nextSlug })
+          .where(eq(tagTable.id, plan.id));
+      }
+    });
 
     console.log(
       `[repair-taxonomy-slugs] Applied ${categoryPlans.length + tagPlans.length} slug repairs.`,
@@ -133,124 +136,87 @@ async function main() {
   }
 }
 
-async function buildRepairPlans(input: {
-  rows: Array<{ id: number; name: string; slug: string }>;
-  resolveSlug: (id: number, name: string) => Promise<string>;
-}) {
+async function buildRepairPlans(
+  rows: Array<{ id: number; name: string; slug: string }>,
+  resolveSlug: (input: {
+    id: number;
+    name: string;
+    occupiedSlugs: Set<string>;
+  }) => Promise<string>,
+) {
   const plans: Array<{ id: number; name: string; slug: string; nextSlug: string }> = [];
+  const occupiedSlugs = new Set(
+    rows.filter((row) => !needsLegacySlugRepair(row.slug)).map((row) => row.slug),
+  );
 
-  for (const row of input.rows) {
+  for (const row of rows) {
     if (!needsLegacySlugRepair(row.slug)) {
       continue;
     }
 
+    const nextSlug = await resolveSlug({
+      id: row.id,
+      name: row.name,
+      occupiedSlugs,
+    });
     plans.push({
       id: row.id,
       name: row.name,
       slug: row.slug,
-      nextSlug: await input.resolveSlug(row.id, row.name),
+      nextSlug,
     });
+    occupiedSlugs.add(nextSlug);
   }
 
   return plans;
 }
 
-async function resolveCategorySlug(
-  db: MySql2Database<typeof schema>,
-  categoryId: number,
-  name: string,
-  excludeId?: number,
-) {
-  const preferredSlug = generateUnicodeSlug(name);
+async function resolveCategorySlug(input: {
+  id: number;
+  name: string;
+  occupiedSlugs: Set<string>;
+}) {
+  const preferredSlug = generateUnicodeSlug(input.name);
 
   if (isBlankSlug(preferredSlug)) {
-    return await ensureUniqueSlug(String(categoryId), async (checkSlug) => {
-      const [existing] = await db
-        .select({ id: categoryTable.id })
-        .from(categoryTable)
-        .where(eq(categoryTable.slug, checkSlug))
-        .limit(1);
-
-      if (!existing) {
-        return false;
-      }
-
-      return excludeId === undefined || existing.id !== excludeId;
-    });
+    return await ensureUniqueSlug(
+      String(input.id),
+      async (checkSlug) => input.occupiedSlugs.has(checkSlug),
+    );
   }
 
-  const [existing] = await db
-    .select({ id: categoryTable.id })
-    .from(categoryTable)
-    .where(eq(categoryTable.slug, preferredSlug))
-    .limit(1);
-
-  if (!existing || existing.id === excludeId) {
+  if (!input.occupiedSlugs.has(preferredSlug)) {
     return preferredSlug;
   }
 
-  return await ensureUniqueSlug(String(categoryId), async (checkSlug) => {
-    const [duplicate] = await db
-      .select({ id: categoryTable.id })
-      .from(categoryTable)
-      .where(eq(categoryTable.slug, checkSlug))
-      .limit(1);
-
-    if (!duplicate) {
-      return false;
-    }
-
-    return excludeId === undefined || duplicate.id !== excludeId;
-  });
+  return await ensureUniqueSlug(
+    preferredSlug,
+    async (checkSlug) => input.occupiedSlugs.has(checkSlug),
+  );
 }
 
-async function resolveTagSlug(
-  db: MySql2Database<typeof schema>,
-  tagId: number,
-  name: string,
-  excludeId?: number,
-) {
-  const preferredSlug = generateUnicodeSlug(name);
+async function resolveTagSlug(input: {
+  id: number;
+  name: string;
+  occupiedSlugs: Set<string>;
+}) {
+  const preferredSlug = generateUnicodeSlug(input.name);
 
   if (isBlankSlug(preferredSlug)) {
-    return await ensureUniqueSlug(String(tagId), async (checkSlug) => {
-      const [existing] = await db
-        .select({ id: tagTable.id })
-        .from(tagTable)
-        .where(eq(tagTable.slug, checkSlug))
-        .limit(1);
-
-      if (!existing) {
-        return false;
-      }
-
-      return excludeId === undefined || existing.id !== excludeId;
-    });
+    return await ensureUniqueSlug(
+      String(input.id),
+      async (checkSlug) => input.occupiedSlugs.has(checkSlug),
+    );
   }
 
-  const [existing] = await db
-    .select({ id: tagTable.id })
-    .from(tagTable)
-    .where(eq(tagTable.slug, preferredSlug))
-    .limit(1);
-
-  if (!existing || existing.id === excludeId) {
+  if (!input.occupiedSlugs.has(preferredSlug)) {
     return preferredSlug;
   }
 
-  return await ensureUniqueSlug(String(tagId), async (checkSlug) => {
-    const [duplicate] = await db
-      .select({ id: tagTable.id })
-      .from(tagTable)
-      .where(eq(tagTable.slug, checkSlug))
-      .limit(1);
-
-    if (!duplicate) {
-      return false;
-    }
-
-    return excludeId === undefined || duplicate.id !== excludeId;
-  });
+  return await ensureUniqueSlug(
+    String(input.id),
+    async (checkSlug) => input.occupiedSlugs.has(checkSlug),
+  );
 }
 
 void main().catch((error) => {

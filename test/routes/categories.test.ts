@@ -159,6 +159,34 @@ describe("Category Routes", () => {
       expect(response.json().category.slug).toBe("일상");
     });
 
+    it("자동 생성 slug 충돌 시 readable suffix를 유지 → 201", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+
+      const first = await app.inject({
+        method: "POST",
+        url: "/categories",
+        headers: { cookie },
+        payload: {
+          name: "일상",
+        },
+      });
+
+      const second = await app.inject({
+        method: "POST",
+        url: "/categories",
+        headers: { cookie },
+        payload: {
+          name: "일상",
+        },
+      });
+
+      expect(first.statusCode).toBe(201);
+      expect(second.statusCode).toBe(201);
+      expect(first.json().category.slug).toBe("일상");
+      expect(second.json().category.slug).toBe("일상-2");
+    });
+
     it("slug를 만들 수 없는 이름은 생성된 id fallback 사용 → 201", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);

@@ -346,7 +346,19 @@ export class CategoryService {
       throw HttpError.badRequest("Slug already exists.");
     }
 
-    return await this.resolveFallbackSlug(tx, categoryId, excludeId);
+    return await ensureUniqueSlug(preferredSlug, async (checkSlug) => {
+      const duplicate = await tx
+        .select({ id: categoryTable.id })
+        .from(categoryTable)
+        .where(eq(categoryTable.slug, checkSlug))
+        .limit(1);
+
+      if (duplicate.length === 0) {
+        return false;
+      }
+
+      return excludeId === undefined || duplicate[0]?.id !== excludeId;
+    });
   }
 
   private normalizeRequestedSlug(slug: string): string {
