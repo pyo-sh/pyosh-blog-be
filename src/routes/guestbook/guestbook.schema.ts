@@ -68,6 +68,7 @@ export const CreateGuestbookGuestBodySchema =
       .string()
       .email("유효한 이메일 주소를 입력하세요")
       .max(100, "이메일은 100자를 초과할 수 없습니다")
+      .optional()
       .describe("게스트 이메일"),
     guestPassword: z
       .string()

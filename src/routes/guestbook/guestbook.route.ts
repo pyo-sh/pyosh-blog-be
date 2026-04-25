@@ -87,7 +87,7 @@ export function createGuestbookRoute(
           tags: ["guestbook"],
           summary: "방명록 작성",
           description:
-            "OAuth 로그인 사용자 또는 게스트가 방명록을 작성합니다. 게스트는 이름, 이메일, 비밀번호를 함께 전달해야 합니다.\n\n" +
+            "OAuth 로그인 사용자 또는 게스트가 방명록을 작성합니다. 게스트는 이름과 비밀번호를 전달해야 하며, 이메일은 선택입니다.\n\n" +
             "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
             "`x-csrf-token` 헤더에 포함해야 합니다.\n\n" +
             "**Rate limit**: 10회/분",
