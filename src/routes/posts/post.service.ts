@@ -187,7 +187,7 @@ interface PostAggregates {
  */
 export type PostListItem = Omit<Post, "contentMd"> &
   PostAggregates & {
-    category: PostListCategory;
+    category: PostListCategory | null;
     tags: PostTag[];
   };
 
@@ -196,7 +196,7 @@ export type PostListItem = Omit<Post, "contentMd"> &
  */
 export type PostDetail = Post &
   PostAggregates & {
-    category: PostDetailCategory;
+    category: PostDetailCategory | null;
     tags: PostTag[];
   };
 
@@ -778,6 +778,12 @@ export class PostService {
         throw HttpError.notFound("게시글을 찾을 수 없습니다");
       }
 
+      if (currentPost.categoryId === null) {
+        throw HttpError.badRequest(
+          "카테고리가 없는 게시글은 복원할 수 없습니다. 먼저 카테고리를 다시 지정하세요.",
+        );
+      }
+
       if (currentPost.isPinned && currentPost.deletedAt !== null) {
         const pinnedCount = await this.countPinnedPosts(this.db);
 
@@ -859,6 +865,7 @@ export class PostService {
         const found = await tx
           .select({
             id: postTable.id,
+            categoryId: postTable.categoryId,
             isPinned: postTable.isPinned,
             deletedAt: postTable.deletedAt,
           })
@@ -902,6 +909,16 @@ export class PostService {
             .set({ deletedAt: new Date() })
             .where(inArray(postTable.id, uniqueIds));
         } else if (action === "restore") {
+          const uncategorizedPostsToRestore = found.filter(
+            (post) => post.deletedAt !== null && post.categoryId === null,
+          );
+
+          if (uncategorizedPostsToRestore.length > 0) {
+            throw HttpError.badRequest(
+              "카테고리가 없는 게시글은 복원할 수 없습니다. 먼저 카테고리를 다시 지정하세요.",
+            );
+          }
+
           const pinnedPostsToRestore = found.filter(
             (post) => post.isPinned && post.deletedAt !== null,
           ).length;
@@ -995,18 +1012,26 @@ export class PostService {
     if (posts.length === 0) return [];
 
     const postIds = posts.map((p) => p.id);
-    const categoryIds = [...new Set(posts.map((p) => p.categoryId))];
+    const categoryIds = [
+      ...new Set(
+        posts
+          .map((p) => p.categoryId)
+          .filter((categoryId): categoryId is number => categoryId !== null),
+      ),
+    ];
 
     const [categories, allPostTags, statsRows, commentRows] = await Promise.all(
       [
-        this.db
-          .select({
-            id: categoryTable.id,
-            name: categoryTable.name,
-            slug: categoryTable.slug,
-          })
-          .from(categoryTable)
-          .where(inArray(categoryTable.id, categoryIds)),
+        categoryIds.length === 0
+          ? Promise.resolve([])
+          : this.db
+              .select({
+                id: categoryTable.id,
+                name: categoryTable.name,
+                slug: categoryTable.slug,
+              })
+              .from(categoryTable)
+              .where(inArray(categoryTable.id, categoryIds)),
         this.db
           .select({
             postId: postTagTable.postId,
@@ -1049,8 +1074,9 @@ export class PostService {
     );
 
     return posts.map(({ contentMd: _c, ...post }) => {
-      const category = catMap.get(post.categoryId);
-      if (!category)
+      const category =
+        post.categoryId === null ? null : catMap.get(post.categoryId);
+      if (post.categoryId !== null && !category)
         throw HttpError.notFound(
           `Category ${post.categoryId} not found for post ${post.id}`,
         );
@@ -1120,6 +1146,38 @@ export class PostService {
    * 게시글 상세 정보 조회 (category ancestors + 집계 포함)
    */
   private async enrichPostWithDetails(post: Post): Promise<PostDetail> {
+    if (post.categoryId === null) {
+      const [postTags, totalPageviews, commentCount] = await Promise.all([
+        this.db
+          .select({ id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
+          .from(postTagTable)
+          .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
+          .where(eq(postTagTable.postId, post.id)),
+        this.db
+          .select({
+            total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`,
+          })
+          .from(statsDailyTable)
+          .where(eq(statsDailyTable.postId, post.id))
+          .then((rows) => Number(rows[0]?.total ?? 0)),
+        this.db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(commentTable)
+          .where(
+            this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)),
+          )
+          .then((rows) => Number(rows[0]?.count ?? 0)),
+      ]);
+
+      return {
+        ...post,
+        category: null,
+        tags: postTags,
+        totalPageviews,
+        commentCount,
+      };
+    }
+
     const [category, postTags, totalPageviews, commentCount, ancestors] =
       await Promise.all([
         this.db
@@ -1225,6 +1283,38 @@ export class PostService {
 
     if (!post) {
       throw HttpError.notFound("게시글을 찾을 수 없습니다");
+    }
+
+    if (post.categoryId === null) {
+      const [postTags, totalPageviews, commentCount] = await Promise.all([
+        tx
+          .select({ id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
+          .from(postTagTable)
+          .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
+          .where(eq(postTagTable.postId, post.id)),
+        tx
+          .select({
+            total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`,
+          })
+          .from(statsDailyTable)
+          .where(eq(statsDailyTable.postId, post.id))
+          .then((rows) => Number(rows[0]?.total ?? 0)),
+        tx
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(commentTable)
+          .where(
+            this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)),
+          )
+          .then((rows) => Number(rows[0]?.count ?? 0)),
+      ]);
+
+      return {
+        ...post,
+        category: null,
+        tags: postTags,
+        totalPageviews,
+        commentCount,
+      };
     }
 
     const [category, postTags, totalPageviews, commentCount, ancestors] =
