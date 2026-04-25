@@ -118,12 +118,7 @@ export class CategoryService {
 
       const [result] = await tx.insert(categoryTable).values(newCategory);
       const categoryId = Number(result.insertId);
-      await this.finalizeCategorySlug(
-        tx,
-        categoryId,
-        data.name,
-        data.slug,
-      );
+      await this.finalizeCategorySlug(tx, categoryId, data.name, data.slug);
 
       const [category] = await tx
         .select()
@@ -277,7 +272,10 @@ export class CategoryService {
         );
       }
 
-      await tx.update(categoryTable).set(updates).where(eq(categoryTable.id, id));
+      await tx
+        .update(categoryTable)
+        .set(updates)
+        .where(eq(categoryTable.id, id));
 
       const [updated] = await tx
         .select()
@@ -303,133 +301,6 @@ export class CategoryService {
         totalPostCount: Number(counts?.totalPostCount ?? 0),
       };
     });
-  }
-
-  private buildPendingSlug(): string {
-    return `__pending__${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  }
-
-  private async resolveCategorySlug(
-    tx: MySql2Database<typeof schema>,
-    name: string,
-    categoryId: number,
-    requestedSlug?: string,
-    excludeId?: number,
-  ): Promise<string> {
-    const preferredSlug =
-      requestedSlug !== undefined
-        ? this.normalizeRequestedSlug(requestedSlug)
-        : generateUnicodeSlug(name);
-
-    if (requestedSlug === undefined && isBlankSlug(preferredSlug)) {
-      return await this.resolveFallbackSlug(tx, categoryId, excludeId);
-    }
-
-    const existing = await tx
-      .select({ id: categoryTable.id })
-      .from(categoryTable)
-      .where(eq(categoryTable.slug, preferredSlug))
-      .limit(1);
-
-    if (existing.length === 0 || existing[0]?.id === excludeId) {
-      return preferredSlug;
-    }
-
-    if (requestedSlug !== undefined) {
-      throw HttpError.badRequest("Slug already exists.");
-    }
-
-    return await ensureUniqueSlug(preferredSlug, async (checkSlug) => {
-      const duplicate = await tx
-        .select({ id: categoryTable.id })
-        .from(categoryTable)
-        .where(eq(categoryTable.slug, checkSlug))
-        .limit(1);
-
-      if (duplicate.length === 0) {
-        return false;
-      }
-
-      return excludeId === undefined || duplicate[0]?.id !== excludeId;
-    });
-  }
-
-  private normalizeRequestedSlug(slug: string): string {
-    const normalizedSlug = generateUnicodeSlug(slug);
-
-    if (isBlankSlug(normalizedSlug)) {
-      throw HttpError.badRequest("Slug cannot be blank after normalization.");
-    }
-
-    return normalizedSlug;
-  }
-
-  private async resolveFallbackSlug(
-    tx: MySql2Database<typeof schema>,
-    categoryId: number,
-    excludeId?: number,
-  ): Promise<string> {
-    const baseSlug = String(categoryId);
-
-    return await ensureUniqueSlug(baseSlug, async (checkSlug) => {
-      const existing = await tx
-        .select({ id: categoryTable.id })
-        .from(categoryTable)
-        .where(eq(categoryTable.slug, checkSlug))
-        .limit(1);
-
-      if (existing.length === 0) {
-        return false;
-      }
-
-      return excludeId === undefined || existing[0]?.id !== excludeId;
-    });
-  }
-
-  private async finalizeCategorySlug(
-    tx: MySql2Database<typeof schema>,
-    categoryId: number,
-    name: string,
-    requestedSlug?: string,
-    excludeId?: number,
-  ): Promise<string> {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const resolvedSlug = await this.resolveCategorySlug(
-        tx,
-        name,
-        categoryId,
-        requestedSlug,
-        excludeId,
-      );
-
-      try {
-        await tx
-          .update(categoryTable)
-          .set({ slug: resolvedSlug })
-          .where(eq(categoryTable.id, categoryId));
-
-        return resolvedSlug;
-      } catch (error) {
-        if (!this.isDuplicateEntry(error)) {
-          throw error;
-        }
-
-        if (requestedSlug !== undefined) {
-          throw HttpError.badRequest("Slug already exists.");
-        }
-      }
-    }
-
-    throw HttpError.internal("Failed to finalize category slug.");
-  }
-
-  private isDuplicateEntry(error: unknown): error is { code: string } {
-    return (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code?: string }).code === "ER_DUP_ENTRY"
-    );
   }
 
   /**
@@ -619,6 +490,133 @@ export class CategoryService {
       // 카테고리 삭제
       await tx.delete(categoryTable).where(eq(categoryTable.id, id));
     });
+  }
+
+  private buildPendingSlug(): string {
+    return `__pending__${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  private async resolveCategorySlug(
+    tx: MySql2Database<typeof schema>,
+    name: string,
+    categoryId: number,
+    requestedSlug?: string,
+    excludeId?: number,
+  ): Promise<string> {
+    const preferredSlug =
+      requestedSlug !== undefined
+        ? this.normalizeRequestedSlug(requestedSlug)
+        : generateUnicodeSlug(name);
+
+    if (requestedSlug === undefined && isBlankSlug(preferredSlug)) {
+      return await this.resolveFallbackSlug(tx, categoryId, excludeId);
+    }
+
+    const existing = await tx
+      .select({ id: categoryTable.id })
+      .from(categoryTable)
+      .where(eq(categoryTable.slug, preferredSlug))
+      .limit(1);
+
+    if (existing.length === 0 || existing[0]?.id === excludeId) {
+      return preferredSlug;
+    }
+
+    if (requestedSlug !== undefined) {
+      throw HttpError.badRequest("Slug already exists.");
+    }
+
+    return await ensureUniqueSlug(preferredSlug, async (checkSlug) => {
+      const duplicate = await tx
+        .select({ id: categoryTable.id })
+        .from(categoryTable)
+        .where(eq(categoryTable.slug, checkSlug))
+        .limit(1);
+
+      if (duplicate.length === 0) {
+        return false;
+      }
+
+      return excludeId === undefined || duplicate[0]?.id !== excludeId;
+    });
+  }
+
+  private normalizeRequestedSlug(slug: string): string {
+    const normalizedSlug = generateUnicodeSlug(slug);
+
+    if (isBlankSlug(normalizedSlug)) {
+      throw HttpError.badRequest("Slug cannot be blank after normalization.");
+    }
+
+    return normalizedSlug;
+  }
+
+  private async resolveFallbackSlug(
+    tx: MySql2Database<typeof schema>,
+    categoryId: number,
+    excludeId?: number,
+  ): Promise<string> {
+    const baseSlug = String(categoryId);
+
+    return await ensureUniqueSlug(baseSlug, async (checkSlug) => {
+      const existing = await tx
+        .select({ id: categoryTable.id })
+        .from(categoryTable)
+        .where(eq(categoryTable.slug, checkSlug))
+        .limit(1);
+
+      if (existing.length === 0) {
+        return false;
+      }
+
+      return excludeId === undefined || existing[0]?.id !== excludeId;
+    });
+  }
+
+  private async finalizeCategorySlug(
+    tx: MySql2Database<typeof schema>,
+    categoryId: number,
+    name: string,
+    requestedSlug?: string,
+    excludeId?: number,
+  ): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const resolvedSlug = await this.resolveCategorySlug(
+        tx,
+        name,
+        categoryId,
+        requestedSlug,
+        excludeId,
+      );
+
+      try {
+        await tx
+          .update(categoryTable)
+          .set({ slug: resolvedSlug })
+          .where(eq(categoryTable.id, categoryId));
+
+        return resolvedSlug;
+      } catch (error) {
+        if (!this.isDuplicateEntry(error)) {
+          throw error;
+        }
+
+        if (requestedSlug !== undefined) {
+          throw HttpError.badRequest("Slug already exists.");
+        }
+      }
+    }
+
+    throw HttpError.internal("Failed to finalize category slug.");
+  }
+
+  private isDuplicateEntry(error: unknown): error is { code: string } {
+    return (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: string }).code === "ER_DUP_ENTRY"
+    );
   }
 
   /**

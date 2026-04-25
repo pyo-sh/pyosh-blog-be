@@ -12,10 +12,10 @@ import { MySql2Database } from "drizzle-orm/mysql2";
 import { z } from "zod";
 import { TagWithPostCountSchema } from "./tag.schema";
 import * as schema from "@src/db/schema/index";
-import { HttpError } from "@src/errors/http-error";
 import { postTagTable } from "@src/db/schema/post-tags";
 import { postTable } from "@src/db/schema/posts";
 import { Tag, tagTable, NewTag } from "@src/db/schema/tags";
+import { HttpError } from "@src/errors/http-error";
 import {
   ensureUniqueSlug,
   generateUnicodeSlug,
@@ -75,7 +75,9 @@ export class TagService {
     }
 
     // 기존 태그만 반환
-    const tagsByName = new Map(repairedExistingTags.map((tag) => [tag.name, tag]));
+    const tagsByName = new Map(
+      repairedExistingTags.map((tag) => [tag.name, tag]),
+    );
 
     return normalizedNames.map((name) => tagsByName.get(name)!.id);
   }
@@ -300,10 +302,18 @@ export class TagService {
     excludeId?: number,
   ): Promise<string> {
     for (let attempt = 0; attempt < 5; attempt++) {
-      const resolvedSlug = await this.resolveTagSlug(tx, name, tagId, excludeId);
+      const resolvedSlug = await this.resolveTagSlug(
+        tx,
+        name,
+        tagId,
+        excludeId,
+      );
 
       try {
-        await tx.update(tagTable).set({ slug: resolvedSlug }).where(eq(tagTable.id, tagId));
+        await tx
+          .update(tagTable)
+          .set({ slug: resolvedSlug })
+          .where(eq(tagTable.id, tagId));
 
         return resolvedSlug;
       } catch (error) {
