@@ -27,7 +27,9 @@ export function isBlankSlug(slug: string | null | undefined): boolean {
   return slug === undefined || slug === null || slug.trim().length === 0;
 }
 
-export function needsLegacySlugRepair(slug: string | null | undefined): boolean {
+export function needsLegacySlugRepair(
+  slug: string | null | undefined,
+): boolean {
   if (isBlankSlug(slug)) {
     return true;
   }
