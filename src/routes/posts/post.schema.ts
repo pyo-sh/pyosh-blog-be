@@ -300,7 +300,7 @@ export const PostDetailCategorySchema = PostCategorySchema.extend({
 
 const PostBaseFields = {
   id: z.number().describe("게시글 ID"),
-  categoryId: z.number().describe("카테고리 ID"),
+  categoryId: z.number().nullable().describe("카테고리 ID"),
   title: z.string().describe("게시글 제목"),
   slug: z.string().describe("게시글 슬러그"),
   summary: z.string().nullable().describe("게시글 요약"),
@@ -328,12 +328,12 @@ const PostBaseFields = {
 export const PostDetailSchema = z.object({
   ...PostBaseFields,
   contentMd: z.string().describe("마크다운 본문"),
-  category: PostDetailCategorySchema,
+  category: PostDetailCategorySchema.nullable(),
 });
 
 export const PostListItemSchema = z.object({
   ...PostBaseFields,
-  category: PostCategorySchema,
+  category: PostCategorySchema.nullable(),
 });
 
 export const PostNavigationSchema = z.object({

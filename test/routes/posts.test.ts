@@ -10,7 +10,7 @@ import {
   truncateAll,
 } from "@test/helpers/seed";
 import { db } from "@src/db/client";
-import { statsDailyTable, tagTable } from "@src/db/schema";
+import { postTable, statsDailyTable, tagTable } from "@src/db/schema";
 
 describe("Post Routes", () => {
   let app: FastifyInstance;
@@ -916,6 +916,30 @@ describe("Post Routes", () => {
       expect(body.post.category.ancestors[0].name).toBe("Parent");
     });
 
+    it("category 삭제(trash)된 글 상세도 200으로 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      const deleteCategoryResponse = await app.inject({
+        method: "DELETE",
+        url: `/categories/${category.id}?action=trash`,
+        headers: { cookie },
+      });
+      expect(deleteCategoryResponse.statusCode).toBe(204);
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/admin/posts/${post.id}`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().post.categoryId).toBeNull();
+      expect(response.json().post.category).toBeNull();
+    });
+
     it("존재하지 않는 ID → 404", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -1080,6 +1104,34 @@ describe("Post Routes", () => {
 
       expect(withoutDeleted.json().data).toHaveLength(0);
       expect(withDeleted.json().data).toHaveLength(1);
+    });
+
+    it("includeDeleted=true + category 삭제(trash)된 글도 200으로 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      const deleteCategoryResponse = await app.inject({
+        method: "DELETE",
+        url: `/categories/${category.id}?action=trash`,
+        headers: { cookie },
+      });
+      expect(deleteCategoryResponse.statusCode).toBe(204);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/admin/posts?includeDeleted=true",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const deletedPost = response
+        .json()
+        .data.find((item: { id: number }) => item.id === post.id);
+      expect(deletedPost).toBeDefined();
+      expect(deletedPost.categoryId).toBeNull();
+      expect(deletedPost.category).toBeNull();
     });
 
     it("includeDeleted=false 쿼리스트링 → 삭제된 글 제외 (회귀 방지)", async () => {
@@ -1851,6 +1903,31 @@ describe("Post Routes", () => {
       expect(response.statusCode).toBe(409);
       expect(response.json().message).toContain("Pinned post limit exceeded");
     });
+
+    it("카테고리가 null인 글 복원 시 400 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      const deleteCategoryResponse = await app.inject({
+        method: "DELETE",
+        url: `/categories/${category.id}?action=trash`,
+        headers: { cookie },
+      });
+      expect(deleteCategoryResponse.statusCode).toBe(204);
+
+      const response = await app.inject({
+        method: "PUT",
+        url: `/admin/posts/${post.id}/restore`,
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toContain(
+        "카테고리가 없는 게시글은 복원할 수 없습니다",
+      );
+    });
   });
 
   // ===== PATCH /admin/posts/bulk =====
@@ -2002,6 +2079,38 @@ describe("Post Routes", () => {
         headers: { cookie },
       });
       expect(getRes.json().post.deletedAt).toBeNull();
+    });
+
+    it("action=restore: categoryId=null 글 포함 시 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id);
+
+      const deleteCategoryResponse = await app.inject({
+        method: "DELETE",
+        url: `/categories/${category.id}?action=trash`,
+        headers: { cookie },
+      });
+      expect(deleteCategoryResponse.statusCode).toBe(204);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/admin/posts/bulk",
+        headers: { cookie },
+        payload: { ids: [post.id], action: "restore" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toContain(
+        "카테고리가 없는 게시글은 복원할 수 없습니다",
+      );
+
+      const [row] = await db
+        .select()
+        .from(postTable)
+        .where(eq(postTable.id, post.id));
+      expect(row?.deletedAt).not.toBeNull();
     });
 
     it("action=restore: pinned 복원으로 6개가 되면 409", async () => {
