@@ -71,6 +71,27 @@ describe("Guestbook Routes", () => {
       expect(body.data.author.name).toBe("방문자");
     });
 
+    it("게스트 이메일 없이 방명록 작성 → 201", async () => {
+      const csrfHeaders = await getCsrfHeaders();
+      const response = await app.inject({
+        method: "POST",
+        url: "/guestbook",
+        headers: csrfHeaders,
+        payload: {
+          body: "이메일 없이 작성한 방명록입니다.",
+          guestName: "익명 방문자",
+          guestPassword: "pass1234",
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+
+      const body = response.json();
+      expect(body.data.author.type).toBe("guest");
+      expect(body.data.author.name).toBe("익명 방문자");
+      expect(body.data.author.email).toBeUndefined();
+    });
+
     it("OAuth 사용자 방명록 작성 → 201", async () => {
       const user = await seedOAuthUser({ displayName: "OAuth Visitor" });
       const cookie = await injectOAuthUser(user.id);
