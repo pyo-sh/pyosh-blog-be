@@ -108,6 +108,31 @@ export const CategoryTreeUpdateBodySchema = z.object({
     .describe("변경할 카테고리 목록 (최대 200개)"),
 });
 
+export const CategoryBulkDeleteBodySchema = z
+  .object({
+    ids: z
+      .array(z.number().int().positive())
+      .min(1, "At least one category ID is required")
+      .max(100, "Too many categories in a single request")
+      .refine((ids) => new Set(ids).size === ids.length, {
+        message: "Duplicate category IDs are not allowed",
+      })
+      .describe("삭제할 카테고리 ID 목록 (최대 100개)"),
+    action: z
+      .enum(["move", "trash"])
+      .describe("삭제 방식 (move: 게시글 이동, trash: 게시글 휴지통)"),
+    moveTo: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("게시글을 이동할 카테고리 ID (action=move 시 필수)"),
+  })
+  .refine((data) => data.action !== "move" || data.moveTo != null, {
+    message: "moveTo is required when action is move",
+    path: ["moveTo"],
+  });
+
 /**
  * Response Schemas
  */
@@ -178,3 +203,6 @@ export type CategoryTreeUpdateBody = z.infer<
   typeof CategoryTreeUpdateBodySchema
 >;
 export type CategoryDeleteQuery = z.infer<typeof CategoryDeleteQuerySchema>;
+export type CategoryBulkDeleteBody = z.infer<
+  typeof CategoryBulkDeleteBodySchema
+>;

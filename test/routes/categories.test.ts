@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
 import {
   seedAdmin,
@@ -9,7 +9,7 @@ import {
   truncateAll,
 } from "@test/helpers/seed";
 import { db } from "@src/db/client";
-import { postTable } from "@src/db/schema";
+import { categoryTable, postTable } from "@src/db/schema";
 
 function expectRouteHasOnRequestHook(
   tree: string,
@@ -434,6 +434,274 @@ describe("Category Routes", () => {
       });
 
       expect(response.statusCode).toBe(400);
+    });
+  });
+
+  // ===== DELETE /categories/bulk =====
+
+  describe("DELETE /categories/bulk", () => {
+    it("route에 CSRF onRequest hook 등록", () => {
+      const routes = app.printRoutes({
+        commonPrefix: false,
+        includeHooks: true,
+        method: "DELETE",
+      });
+
+      expectRouteHasOnRequestHook(routes, "/categories/bulk", "DELETE");
+    });
+
+    it("비인증 → 403", async () => {
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/categories/bulk",
+        payload: {
+          ids: [1],
+          action: "trash",
+        },
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("빈 ids → 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/categories/bulk",
+        headers: { cookie },
+        payload: {
+          ids: [],
+          action: "trash",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("중복 ids → 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory({ name: "Duplicate Target" });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/categories/bulk",
+        headers: { cookie },
+        payload: {
+          ids: [category.id, category.id],
+          action: "trash",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("존재하지 않는 ids 포함 → 404 + 기존 카테고리 유지", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory({ name: "Existing Category" });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/categories/bulk",
+        headers: { cookie },
+        payload: {
+          ids: [category.id, 999999],
+          action: "trash",
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+
+      const [row] = await db
+        .select()
+        .from(categoryTable)
+        .where(eq(categoryTable.id, category.id));
+      expect(row).toBeDefined();
+    });
+
+    it("하위 카테고리 포함 시 → 409", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const parent = await seedCategory({ name: "Parent" });
+      await seedCategory({ name: "Child", parentId: parent.id });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/categories/bulk",
+        headers: { cookie },
+        payload: {
+          ids: [parent.id],
+          action: "trash",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+    });
+
+    it("action=move moveTo 없으면 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory({ name: "Move Source" });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/categories/bulk",
+        headers: { cookie },
+        payload: {
+          ids: [category.id],
+          action: "move",
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("action=move moveTo가 존재하지 않는 카테고리면 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory({ name: "Move Source" });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/categories/bulk",
+        headers: { cookie },
+        payload: {
+          ids: [category.id],
+          action: "move",
+          moveTo: 999999,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("action=move moveTo가 삭제 대상에 포함되면 400", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const source = await seedCategory({ name: "Move Source" });
+      const target = await seedCategory({ name: "Move Target" });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/categories/bulk",
+        headers: { cookie },
+        payload: {
+          ids: [source.id, target.id],
+          action: "move",
+          moveTo: target.id,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("action=trash: 게시글 휴지통 이동 후 삭제 → 204 + DB 검증", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const categoryA = await seedCategory({ name: "Trash Source A" });
+      const categoryB = await seedCategory({ name: "Trash Source B" });
+      const activePostA = await seedPost(categoryA.id);
+      const activePostB = await seedPost(categoryB.id);
+      const deletedPost = await seedPost(categoryB.id, {
+        deletedAt: new Date(),
+      });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/categories/bulk",
+        headers: { cookie },
+        payload: {
+          ids: [categoryA.id, categoryB.id],
+          action: "trash",
+        },
+      });
+
+      expect(response.statusCode).toBe(204);
+
+      const posts = await db
+        .select()
+        .from(postTable)
+        .where(
+          inArray(postTable.id, [
+            activePostA.id,
+            activePostB.id,
+            deletedPost.id,
+          ]),
+        );
+      const postById = new Map(posts.map((post) => [post.id, post]));
+
+      expect(postById.get(activePostA.id)?.deletedAt).not.toBeNull();
+      expect(postById.get(activePostA.id)?.categoryId).toBeNull();
+      expect(postById.get(activePostB.id)?.deletedAt).not.toBeNull();
+      expect(postById.get(activePostB.id)?.categoryId).toBeNull();
+      expect(postById.get(deletedPost.id)?.deletedAt).not.toBeNull();
+      expect(postById.get(deletedPost.id)?.categoryId).toBeNull();
+
+      const categories = await db
+        .select()
+        .from(categoryTable)
+        .where(inArray(categoryTable.id, [categoryA.id, categoryB.id]));
+      expect(categories).toHaveLength(0);
+    });
+
+    it("action=move: 게시글 이동 후 삭제 → 204 + DB 검증", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const target = await seedCategory({ name: "Move Target" });
+      const categoryA = await seedCategory({ name: "Move Source A" });
+      const categoryB = await seedCategory({ name: "Move Source B" });
+      const activePostA = await seedPost(categoryA.id);
+      const activePostB = await seedPost(categoryB.id);
+      const deletedPost = await seedPost(categoryB.id, {
+        deletedAt: new Date(),
+      });
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/categories/bulk",
+        headers: { cookie },
+        payload: {
+          ids: [categoryA.id, categoryB.id],
+          action: "move",
+          moveTo: target.id,
+        },
+      });
+
+      expect(response.statusCode).toBe(204);
+
+      const posts = await db
+        .select()
+        .from(postTable)
+        .where(
+          inArray(postTable.id, [
+            activePostA.id,
+            activePostB.id,
+            deletedPost.id,
+          ]),
+        );
+      const postById = new Map(posts.map((post) => [post.id, post]));
+
+      expect(postById.get(activePostA.id)?.categoryId).toBe(target.id);
+      expect(postById.get(activePostA.id)?.deletedAt).toBeNull();
+      expect(postById.get(activePostB.id)?.categoryId).toBe(target.id);
+      expect(postById.get(activePostB.id)?.deletedAt).toBeNull();
+      expect(postById.get(deletedPost.id)?.categoryId).toBeNull();
+      expect(postById.get(deletedPost.id)?.deletedAt).not.toBeNull();
+
+      const deletedCategories = await db
+        .select()
+        .from(categoryTable)
+        .where(inArray(categoryTable.id, [categoryA.id, categoryB.id]));
+      expect(deletedCategories).toHaveLength(0);
+
+      const [targetCategory] = await db
+        .select()
+        .from(categoryTable)
+        .where(eq(categoryTable.id, target.id));
+      expect(targetCategory).toBeDefined();
     });
   });
 

@@ -5,6 +5,7 @@ import {
   CategoryIdParamSchema,
   CategoryListQuerySchema,
   CategoryDeleteQuerySchema,
+  CategoryBulkDeleteBodySchema,
   CategoryCreateBodySchema,
   CategoryUpdateBodySchema,
   CategoryTreeUpdateBodySchema,
@@ -195,6 +196,40 @@ export function createCategoryRoute(
             updatedAt: category.updatedAt.toISOString(),
           },
         });
+      },
+    );
+
+    // DELETE /categories/bulk - 카테고리 벌크 삭제 (Admin)
+    // 반드시 /:id 앞에 등록해야 정적 경로 우선 매칭 보장
+    typedFastify.delete(
+      "/bulk",
+      {
+        onRequest: fastify.csrfProtection,
+        preHandler: requireAdmin(adminService),
+        schema: {
+          tags: ["categories"],
+          summary: "Bulk delete categories",
+          description:
+            "여러 카테고리를 단일 트랜잭션으로 삭제합니다. action=move면 미삭제 게시글을 지정 카테고리로 이동하고, action=trash면 미삭제 게시글을 휴지통으로 이동합니다. 하위 카테고리가 있으면 삭제할 수 없습니다. Admin 권한이 필요합니다.\n\n" +
+            "**CSRF 토큰 필요**: `GET /auth/csrf-token`으로 토큰을 발급받아 " +
+            "`x-csrf-token` 헤더에 포함해야 합니다.",
+          security: [{ cookieAuth: [] }],
+          body: CategoryBulkDeleteBodySchema,
+          response: {
+            204: z.void(),
+            400: ErrorResponseSchema,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema,
+            409: ErrorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const { ids, action, moveTo } = request.body;
+
+        await categoryService.deleteCategories({ ids, action, moveTo });
+
+        return reply.status(204).send();
       },
     );
 
