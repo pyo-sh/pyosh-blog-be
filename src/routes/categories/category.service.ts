@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import {
   Category,
@@ -54,6 +54,17 @@ export interface CategoryDeleteArgs {
   action: "move" | "trash";
   moveTo?: number;
 }
+
+/**
+ * Category 벌크 삭제 파라미터
+ */
+export interface CategoryBulkDeleteArgs {
+  ids: number[];
+  action: "move" | "trash";
+  moveTo?: number;
+}
+
+const MAX_BULK_DELETE_CATEGORIES = 100;
 
 /**
  * 게시글 카운트가 포함된 Category
@@ -396,6 +407,121 @@ export class CategoryService {
           .set({ parentId: item.parentId, sortOrder: item.sortOrder })
           .where(eq(categoryTable.id, item.id));
       }
+    });
+  }
+
+  /**
+   * 카테고리 벌크 삭제
+   * - 전체 대상 존재 여부와 하위 카테고리 여부를 먼저 검증
+   * - action=move: 미삭제 게시글은 moveTo로 이동, soft-deleted 게시글은 categoryId 초기화
+   * - action=trash: 미삭제 게시글은 soft delete + categoryId 초기화, soft-deleted 게시글은 categoryId 초기화
+   * - 검증/게시글 처리/카테고리 삭제를 단일 트랜잭션으로 수행
+   */
+  async deleteCategories(args: CategoryBulkDeleteArgs): Promise<void> {
+    const { ids, action, moveTo } = args;
+
+    if (ids.length === 0) {
+      throw HttpError.badRequest("At least one category ID is required.");
+    }
+
+    if (ids.length > MAX_BULK_DELETE_CATEGORIES) {
+      throw HttpError.badRequest(
+        `Cannot delete more than ${MAX_BULK_DELETE_CATEGORIES} categories at once.`,
+      );
+    }
+
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length !== ids.length) {
+      throw HttpError.badRequest("Duplicate category IDs are not allowed.");
+    }
+
+    if (action === "move" && moveTo == null) {
+      throw HttpError.badRequest("moveTo is required when action is move.");
+    }
+
+    if (action === "move" && uniqueIds.includes(moveTo!)) {
+      throw HttpError.badRequest(
+        "moveTo cannot be one of the categories being deleted.",
+      );
+    }
+
+    await this.db.transaction(async (tx) => {
+      const categories = await tx
+        .select({ id: categoryTable.id })
+        .from(categoryTable)
+        .where(inArray(categoryTable.id, uniqueIds))
+        .for("update");
+
+      if (categories.length !== uniqueIds.length) {
+        throw HttpError.notFound("One or more categories not found.");
+      }
+
+      const [childCategory] = await tx
+        .select({ id: categoryTable.id })
+        .from(categoryTable)
+        .where(inArray(categoryTable.parentId, uniqueIds))
+        .limit(1);
+
+      if (childCategory) {
+        throw HttpError.conflict("Cannot delete category with subcategories.");
+      }
+
+      if (action === "move") {
+        const [targetCategory] = await tx
+          .select({ id: categoryTable.id })
+          .from(categoryTable)
+          .where(eq(categoryTable.id, moveTo!))
+          .limit(1)
+          .for("share");
+
+        if (!targetCategory) {
+          throw HttpError.badRequest("Target category not found.");
+        }
+
+        await tx
+          .update(postTable)
+          .set({ categoryId: moveTo! })
+          .where(
+            and(
+              inArray(postTable.categoryId, uniqueIds),
+              isNull(postTable.deletedAt),
+            ),
+          );
+
+        await tx
+          .update(postTable)
+          .set({ categoryId: null })
+          .where(
+            and(
+              inArray(postTable.categoryId, uniqueIds),
+              isNotNull(postTable.deletedAt),
+            ),
+          );
+      } else {
+        await tx
+          .update(postTable)
+          .set({ deletedAt: sql`NOW()`, categoryId: null })
+          .where(
+            and(
+              inArray(postTable.categoryId, uniqueIds),
+              isNull(postTable.deletedAt),
+            ),
+          );
+
+        await tx
+          .update(postTable)
+          .set({ categoryId: null })
+          .where(
+            and(
+              inArray(postTable.categoryId, uniqueIds),
+              isNotNull(postTable.deletedAt),
+            ),
+          );
+      }
+
+      await tx
+        .delete(categoryTable)
+        .where(inArray(categoryTable.id, uniqueIds));
     });
   }
 
