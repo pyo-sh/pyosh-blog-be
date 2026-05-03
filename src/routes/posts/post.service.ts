@@ -11,6 +11,7 @@ import {
   asc,
   like,
   or,
+  isNotNull,
 } from "drizzle-orm";
 import { MySql2Database } from "drizzle-orm/mysql2";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
@@ -153,6 +154,7 @@ export interface GetPostListQuery {
   sort?: "published_at" | "created_at" | "totalPageviews" | "commentCount";
   order?: "asc" | "desc";
   includeDeleted?: boolean;
+  deletedState?: "active" | "deleted" | "all";
 }
 
 /**
@@ -453,8 +455,12 @@ export class PostService {
     // WHERE 조건 동적 조합
     const conditions = [];
 
-    // 기본: deleted_at IS NULL
-    if (!query.includeDeleted) {
+    const deletedState =
+      query.deletedState ?? (query.includeDeleted ? "all" : "active");
+
+    if (deletedState === "deleted") {
+      conditions.push(isNotNull(postTable.deletedAt));
+    } else if (deletedState === "active") {
       conditions.push(isNull(postTable.deletedAt));
     }
 

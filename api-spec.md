@@ -8,18 +8,19 @@ Auth: `requireAdmin`
 
 Query Parameters:
 
-| Param          | Type    | Default      | Description                            |
-|----------------|---------|--------------|----------------------------------------|
-| page           | number  | 1            | 페이지 번호                             |
-| limit          | number  | 20           | 페이지당 개수 (max 100)                 |
-| status         | string  | -            | `draft` \| `published` \| `archived`   |
-| visibility     | string  | -            | `public` \| `private`                  |
-| categoryId     | number  | -            | 카테고리 필터                            |
-| tagSlug        | string  | -            | 태그 slug 필터                          |
-| q              | string  | -            | 키워드 검색 (title, contentMd)          |
-| includeDeleted | boolean | false        | 소프트 삭제된 글 포함 여부                |
-| sort           | string  | created_at   | 정렬 기준 (`created_at` \| `published_at`) |
-| order          | string  | desc         | 정렬 방향 (`asc` \| `desc`)             |
+| Param          | Type    | Default    | Description                                   |
+| -------------- | ------- | ---------- | --------------------------------------------- |
+| page           | number  | 1          | 페이지 번호                                   |
+| limit          | number  | 20         | 페이지당 개수 (max 100)                       |
+| status         | string  | -          | `draft` \| `published` \| `archived`          |
+| visibility     | string  | -          | `public` \| `private`                         |
+| categoryId     | number  | -          | 카테고리 필터                                 |
+| tagSlug        | string  | -          | 태그 slug 필터                                |
+| q              | string  | -          | 키워드 검색 (title, contentMd)                |
+| deletedState   | string  | active     | 삭제 상태 (`active` \| `deleted` \| `all`)    |
+| includeDeleted | boolean | false      | 하위 호환용 전체 조회 플래그 (`true` = `all`) |
+| sort           | string  | created_at | 정렬 기준 (`created_at` \| `published_at`)    |
+| order          | string  | desc       | 정렬 방향 (`asc` \| `desc`)                   |
 
 Response `200`:
 

@@ -186,13 +186,21 @@ describe("Post Routes", () => {
         method: "POST",
         url: "/admin/posts",
         headers: { cookie },
-        payload: { title: "Duplicate Title", contentMd: "# A", categoryId: category.id },
+        payload: {
+          title: "Duplicate Title",
+          contentMd: "# A",
+          categoryId: category.id,
+        },
       });
       const second = await app.inject({
         method: "POST",
         url: "/admin/posts",
         headers: { cookie },
-        payload: { title: "Duplicate Title", contentMd: "# B", categoryId: category.id },
+        payload: {
+          title: "Duplicate Title",
+          contentMd: "# B",
+          categoryId: category.id,
+        },
       });
 
       expect(first.statusCode).toBe(201);
@@ -757,7 +765,9 @@ describe("Post Routes", () => {
 
       const body = response.json();
       expect(body.post.title).toBe("Updated Title");
-      expect(body.post.thumbnailUrl).toBe("https://cdn.example.com/updated.jpg");
+      expect(body.post.thumbnailUrl).toBe(
+        "https://cdn.example.com/updated.jpg",
+      );
       expect(body.post.tags).toHaveLength(1);
       expect(body.post.tags[0].name).toBe("updated-tag");
     });
@@ -1007,7 +1017,11 @@ describe("Post Routes", () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
       const parent = await seedCategory({ name: "Parent", slug: "parent-cat" });
-      const child = await seedCategory({ name: "Child", slug: "child-cat", parentId: parent.id });
+      const child = await seedCategory({
+        name: "Child",
+        slug: "child-cat",
+        parentId: parent.id,
+      });
       const post = await seedPost(child.id);
 
       const response = await app.inject({
@@ -1213,6 +1227,100 @@ describe("Post Routes", () => {
       expect(withDeleted.json().data).toHaveLength(1);
     });
 
+    it("deletedState=deleted → 삭제된 글만 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const activePost = await seedPost(category.id);
+      const deletedPost = await seedPost(category.id);
+
+      await app.inject({
+        method: "DELETE",
+        url: `/admin/posts/${deletedPost.id}`,
+        headers: { cookie },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/admin/posts?deletedState=deleted",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const data = response.json().data as {
+        id: number;
+        deletedAt: string | null;
+      }[];
+
+      expect(data).toHaveLength(1);
+      expect(data[0].id).toBe(deletedPost.id);
+      expect(data[0].id).not.toBe(activePost.id);
+      expect(data[0].deletedAt).not.toBeNull();
+    });
+
+    it("deletedState=all → 삭제되지 않은 글과 삭제된 글을 함께 반환", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const activePost = await seedPost(category.id);
+      const deletedPost = await seedPost(category.id);
+
+      await app.inject({
+        method: "DELETE",
+        url: `/admin/posts/${deletedPost.id}`,
+        headers: { cookie },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/admin/posts?deletedState=all",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const ids = (response.json().data as { id: number }[]).map(
+        (post) => post.id,
+      );
+
+      expect(ids).toEqual(
+        expect.arrayContaining([activePost.id, deletedPost.id]),
+      );
+    });
+
+    it("deletedState=active가 있으면 includeDeleted=true보다 우선한다", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const activePost = await seedPost(category.id);
+      const deletedPost = await seedPost(category.id);
+
+      await app.inject({
+        method: "DELETE",
+        url: `/admin/posts/${deletedPost.id}`,
+        headers: { cookie },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/admin/posts?deletedState=active&includeDeleted=true",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const data = response.json().data as {
+        id: number;
+        deletedAt: string | null;
+      }[];
+
+      expect(data).toHaveLength(1);
+      expect(data[0].id).toBe(activePost.id);
+      expect(data[0].id).not.toBe(deletedPost.id);
+      expect(data[0].deletedAt).toBeNull();
+    });
+
     it("includeDeleted=true + category 삭제(trash)된 글도 200으로 반환", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
@@ -1296,15 +1404,41 @@ describe("Post Routes", () => {
       const cookie = await injectAuth(app);
       const category = await seedCategory();
 
-      const lowViewsPost = await seedPost(category.id, { title: "Low Views Post" });
-      const highViewsPost = await seedPost(category.id, { title: "High Views Post" });
-      const midViewsPost = await seedPost(category.id, { title: "Mid Views Post" });
+      const lowViewsPost = await seedPost(category.id, {
+        title: "Low Views Post",
+      });
+      const highViewsPost = await seedPost(category.id, {
+        title: "High Views Post",
+      });
+      const midViewsPost = await seedPost(category.id, {
+        title: "Mid Views Post",
+      });
 
       await db.insert(statsDailyTable).values([
-        { postId: lowViewsPost.id, date: new Date("2026-03-01"), pageviews: 5, uniques: 3 },
-        { postId: highViewsPost.id, date: new Date("2026-03-01"), pageviews: 20, uniques: 10 },
-        { postId: highViewsPost.id, date: new Date("2026-03-02"), pageviews: 3, uniques: 2 },
-        { postId: midViewsPost.id, date: new Date("2026-03-01"), pageviews: 11, uniques: 5 },
+        {
+          postId: lowViewsPost.id,
+          date: new Date("2026-03-01"),
+          pageviews: 5,
+          uniques: 3,
+        },
+        {
+          postId: highViewsPost.id,
+          date: new Date("2026-03-01"),
+          pageviews: 20,
+          uniques: 10,
+        },
+        {
+          postId: highViewsPost.id,
+          date: new Date("2026-03-02"),
+          pageviews: 3,
+          uniques: 2,
+        },
+        {
+          postId: midViewsPost.id,
+          date: new Date("2026-03-01"),
+          pageviews: 11,
+          uniques: 5,
+        },
       ]);
 
       const response = await app.inject({
@@ -1321,7 +1455,11 @@ describe("Post Routes", () => {
         "Mid Views Post",
         "Low Views Post",
       ]);
-      expect(body.data.map((post: { totalPageviews: number }) => post.totalPageviews)).toEqual([23, 11, 5]);
+      expect(
+        body.data.map(
+          (post: { totalPageviews: number }) => post.totalPageviews,
+        ),
+      ).toEqual([23, 11, 5]);
     });
 
     it("sort=totalPageviews&order=asc → 조회수 합계 낮은 순으로 반환", async () => {
@@ -1329,13 +1467,29 @@ describe("Post Routes", () => {
       const cookie = await injectAuth(app);
       const category = await seedCategory();
 
-      const zeroViewsPost = await seedPost(category.id, { title: "Zero Views Post" });
-      const lowViewsPost = await seedPost(category.id, { title: "Low Views Post" });
-      const highViewsPost = await seedPost(category.id, { title: "High Views Post" });
+      const zeroViewsPost = await seedPost(category.id, {
+        title: "Zero Views Post",
+      });
+      const lowViewsPost = await seedPost(category.id, {
+        title: "Low Views Post",
+      });
+      const highViewsPost = await seedPost(category.id, {
+        title: "High Views Post",
+      });
 
       await db.insert(statsDailyTable).values([
-        { postId: lowViewsPost.id, date: new Date("2026-03-03"), pageviews: 2, uniques: 1 },
-        { postId: highViewsPost.id, date: new Date("2026-03-03"), pageviews: 9, uniques: 4 },
+        {
+          postId: lowViewsPost.id,
+          date: new Date("2026-03-03"),
+          pageviews: 2,
+          uniques: 1,
+        },
+        {
+          postId: highViewsPost.id,
+          date: new Date("2026-03-03"),
+          pageviews: 9,
+          uniques: 4,
+        },
       ]);
 
       const response = await app.inject({
@@ -1352,7 +1506,11 @@ describe("Post Routes", () => {
         "Low Views Post",
         "High Views Post",
       ]);
-      expect(body.data.map((post: { totalPageviews: number }) => post.totalPageviews)).toEqual([0, 2, 9]);
+      expect(
+        body.data.map(
+          (post: { totalPageviews: number }) => post.totalPageviews,
+        ),
+      ).toEqual([0, 2, 9]);
     });
 
     it("sort=commentCount&order=desc → 댓글 수 높은 순으로 반환", async () => {
@@ -1360,9 +1518,15 @@ describe("Post Routes", () => {
       const cookie = await injectAuth(app);
       const category = await seedCategory();
 
-      const noCommentPost = await seedPost(category.id, { title: "No Comment Post" });
-      const oneCommentPost = await seedPost(category.id, { title: "One Comment Post" });
-      const threeCommentPost = await seedPost(category.id, { title: "Three Comment Post" });
+      const noCommentPost = await seedPost(category.id, {
+        title: "No Comment Post",
+      });
+      const oneCommentPost = await seedPost(category.id, {
+        title: "One Comment Post",
+      });
+      const threeCommentPost = await seedPost(category.id, {
+        title: "Three Comment Post",
+      });
 
       await seedComment(oneCommentPost.id);
       await seedComment(threeCommentPost.id);
@@ -1383,7 +1547,9 @@ describe("Post Routes", () => {
         "One Comment Post",
         "No Comment Post",
       ]);
-      expect(body.data.map((post: { commentCount: number }) => post.commentCount)).toEqual([3, 1, 0]);
+      expect(
+        body.data.map((post: { commentCount: number }) => post.commentCount),
+      ).toEqual([3, 1, 0]);
     });
 
     it("sort=commentCount&order=asc → 필터/페이지네이션과 함께 댓글 수 낮은 순으로 반환", async () => {
@@ -1591,7 +1757,10 @@ describe("Post Routes", () => {
 
     it("filter=tag, 매칭 태그 없음 → 빈 배열", async () => {
       const category = await seedCategory();
-      await seedPost(category.id, { status: "published", visibility: "public" });
+      await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
 
       const response = await app.inject({
         method: "GET",
@@ -1607,7 +1776,10 @@ describe("Post Routes", () => {
       const frontend = await seedCategory({ name: "Frontend Development" });
 
       await seedPost(backend.id, { status: "published", visibility: "public" });
-      await seedPost(frontend.id, { status: "published", visibility: "public" });
+      await seedPost(frontend.id, {
+        status: "published",
+        visibility: "public",
+      });
 
       const response = await app.inject({
         method: "GET",
@@ -1622,7 +1794,10 @@ describe("Post Routes", () => {
 
     it("filter=category, 매칭 카테고리 없음 → 빈 배열", async () => {
       const category = await seedCategory({ name: "Existing Category" });
-      await seedPost(category.id, { status: "published", visibility: "public" });
+      await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
 
       const response = await app.inject({
         method: "GET",
@@ -1682,7 +1857,10 @@ describe("Post Routes", () => {
 
     it("filter=comment, 매칭 댓글 없음 → 빈 배열", async () => {
       const category = await seedCategory();
-      await seedPost(category.id, { status: "published", visibility: "public" });
+      await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+      });
 
       const response = await app.inject({
         method: "GET",
@@ -1760,7 +1938,10 @@ describe("Post Routes", () => {
       const cookie = await injectAuth(app);
 
       const parent = await seedCategory({ name: "Programming" });
-      const child = await seedCategory({ name: "TypeScript", parentId: parent.id });
+      const child = await seedCategory({
+        name: "TypeScript",
+        parentId: parent.id,
+      });
 
       const createRes = await app.inject({
         method: "POST",
@@ -2079,7 +2260,11 @@ describe("Post Routes", () => {
         method: "PATCH",
         url: "/admin/posts/bulk",
         headers: { cookie },
-        payload: { ids: [post1.id, post2.id], action: "update", categoryId: cat2.id },
+        payload: {
+          ids: [post1.id, post2.id],
+          action: "update",
+          categoryId: cat2.id,
+        },
       });
 
       expect(response.statusCode).toBe(204);
@@ -2104,7 +2289,11 @@ describe("Post Routes", () => {
         method: "PATCH",
         url: "/admin/posts/bulk",
         headers: { cookie },
-        payload: { ids: [post1.id, post2.id], action: "update", commentStatus: "locked" },
+        payload: {
+          ids: [post1.id, post2.id],
+          action: "update",
+          commentStatus: "locked",
+        },
       });
 
       expect(response.statusCode).toBe(204);
@@ -2435,5 +2624,4 @@ describe("Post Routes", () => {
       expect(response.statusCode).toBe(403);
     });
   });
-
 });

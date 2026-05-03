@@ -142,7 +142,13 @@ export const AdminPostListQuerySchema = z.object({
     .describe("정렬 방향"),
   includeDeleted: BooleanQueryParam.optional()
     .default(false)
-    .describe("삭제된 게시글 포함 여부"),
+    .describe("삭제된 게시글 포함 여부 (하위 호환: true면 전체 조회)"),
+  deletedState: z
+    .enum(["active", "deleted", "all"])
+    .optional()
+    .describe(
+      "삭제 상태 필터: active=삭제되지 않은 글, deleted=삭제된 글, all=전체",
+    ),
 });
 
 /**

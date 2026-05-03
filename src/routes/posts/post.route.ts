@@ -161,7 +161,7 @@ export function createAdminPostRoute(
           tags: ["posts", "admin"],
           summary: "Get all posts (Admin)",
           description:
-            "모든 게시글 목록을 조회합니다. status, visibility, deleted 상태와 무관하게 조회 가능합니다.",
+            "관리자 게시글 목록을 조회합니다. deletedState=active|deleted|all로 삭제 상태를 명시해 필터링할 수 있습니다.",
           security: [{ cookieAuth: [] }],
           querystring: AdminPostListQuerySchema,
           response: {
