@@ -1,10 +1,24 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { FastifyInstance } from "fastify";
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  vi,
+} from "vitest";
 import { getUploadDir } from "@src/shared/uploads";
 import { createTestApp, cleanup, injectAuth } from "@test/helpers/app";
-import { seedAdmin, seedAsset, truncateAll } from "@test/helpers/seed";
+import {
+  seedAdmin,
+  seedAsset,
+  seedAssetCategory,
+  truncateAll,
+} from "@test/helpers/seed";
 
 /** 1x1 PNG (base64) */
 const TINY_PNG_BASE64 =
@@ -37,8 +51,16 @@ function buildMultipart(
     mimeType: string;
   }>,
   boundary: string,
+  fields: Array<{ name: string; value: string }> = [],
 ): Buffer {
   const parts: Buffer[] = [];
+  for (const field of fields) {
+    parts.push(
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${field.name}"\r\n\r\n${field.value}\r\n`,
+      ),
+    );
+  }
   for (const file of files) {
     parts.push(
       Buffer.from(
@@ -122,6 +144,147 @@ describe("Asset Routes", () => {
         totalPages: 2,
       });
     });
+
+    it("categoryId와 q로 목록 필터링", async () => {
+      const thumbnail = await seedAssetCategory({
+        name: "Thumbnails",
+        key: "thumbnail-test",
+        isProtected: true,
+      });
+      const article = await seedAssetCategory({ name: "Article Images" });
+      await seedAsset({
+        categoryId: thumbnail.id,
+        displayName: "Hero Thumbnail",
+        storageKey: "2026/01/hero-thumb.png",
+      });
+      await seedAsset({
+        categoryId: article.id,
+        displayName: "본문 이미지",
+        storageKey: "2026/01/body-image.png",
+      });
+
+      const res = await app.inject({
+        method: "GET",
+        url: `/assets?categoryId=${thumbnail.id}&q=Hero`,
+        headers: { cookie: authCookie },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0]).toMatchObject({
+        displayName: "Hero Thumbnail",
+        category: { id: thumbnail.id, name: "Thumbnails" },
+      });
+    });
+  });
+
+  // ===== /assets/categories =====
+
+  describe("/assets/categories", () => {
+    it("기본 보호 카테고리 3개를 보장한다", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/assets/categories",
+        headers: { cookie: authCookie },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            key: "thumbnail",
+            name: "썸네일",
+            isProtected: true,
+          }),
+          expect.objectContaining({
+            key: "default",
+            name: "기본",
+            isProtected: true,
+          }),
+          expect.objectContaining({
+            key: "uncategorized",
+            name: "미분류",
+            isProtected: true,
+          }),
+        ]),
+      );
+    });
+
+    it("사용자 카테고리 생성/수정 → 201/200", async () => {
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/assets/categories",
+        headers: { cookie: authCookie },
+        payload: { name: "본문" },
+      });
+
+      expect(createRes.statusCode).toBe(201);
+      const created = createRes.json();
+      expect(created).toMatchObject({
+        key: null,
+        name: "본문",
+        isProtected: false,
+      });
+
+      const updateRes = await app.inject({
+        method: "PATCH",
+        url: `/assets/categories/${created.id}`,
+        headers: { cookie: authCookie },
+        payload: { name: "본문 이미지", sortOrder: 10 },
+      });
+
+      expect(updateRes.statusCode).toBe(200);
+      expect(updateRes.json()).toMatchObject({
+        id: created.id,
+        name: "본문 이미지",
+        sortOrder: 10,
+      });
+    });
+
+    it("보호 카테고리는 삭제할 수 없다", async () => {
+      const listRes = await app.inject({
+        method: "GET",
+        url: "/assets/categories",
+        headers: { cookie: authCookie },
+      });
+      const thumbnail = listRes
+        .json()
+        .data.find((category: { key: string }) => category.key === "thumbnail");
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/assets/categories/${thumbnail.id}`,
+        headers: { cookie: authCookie },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("사용자 카테고리 삭제 시 연결 에셋은 미분류로 이동한다", async () => {
+      const category = await seedAssetCategory({ name: "Delete Me" });
+      const asset = await seedAsset({ categoryId: category.id });
+
+      const res = await app.inject({
+        method: "DELETE",
+        url: `/assets/categories/${category.id}`,
+        headers: { cookie: authCookie },
+      });
+
+      expect(res.statusCode).toBe(204);
+
+      const assetRes = await app.inject({
+        method: "GET",
+        url: `/assets/${asset.id}`,
+        headers: { cookie: authCookie },
+      });
+      expect(assetRes.statusCode).toBe(200);
+      expect(assetRes.json().category).toMatchObject({
+        key: "uncategorized",
+        name: "미분류",
+      });
+    });
   });
 
   // ===== POST /assets/upload =====
@@ -150,13 +313,22 @@ describe("Asset Routes", () => {
     it("인증 없이 → 403", async () => {
       const boundary = "testboundary";
       const payload = buildMultipart(
-        [{ fieldName: "files", fileName: "a.png", content: TINY_PNG, mimeType: "image/png" }],
+        [
+          {
+            fieldName: "files",
+            fileName: "a.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+        ],
         boundary,
       );
       const res = await app.inject({
         method: "POST",
         url: "/assets/upload",
-        headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+        headers: {
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
         payload,
       });
       expect(res.statusCode).toBe(403);
@@ -165,7 +337,14 @@ describe("Asset Routes", () => {
     it("PNG 업로드 → 201 + width/height 추출", async () => {
       const boundary = "testboundary";
       const payload = buildMultipart(
-        [{ fieldName: "files", fileName: "test.png", content: TINY_PNG, mimeType: "image/png" }],
+        [
+          {
+            fieldName: "files",
+            fileName: "test.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+        ],
         boundary,
       );
       const res = await app.inject({
@@ -185,12 +364,175 @@ describe("Asset Routes", () => {
       expect(asset.url).toMatch(/^\/uploads\/\d{4}\/\d{2}\//);
       expect(asset.width).toBe(1);
       expect(asset.height).toBe(1);
+      expect(asset.displayName).toBeNull();
+      expect(asset.category).toMatchObject({ key: "default", name: "기본" });
+    });
+
+    it("파일별 displayName/categoryId 메타데이터를 저장한다", async () => {
+      const category = await seedAssetCategory({ name: "Upload Target" });
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [
+          {
+            fieldName: "files",
+            fileName: "named.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+        ],
+        boundary,
+        [
+          {
+            name: "metadata",
+            value: JSON.stringify([
+              { displayName: "대표 이미지", categoryId: category.id },
+            ]),
+          },
+        ],
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+
+      expect(res.statusCode).toBe(201);
+      const asset = res.json().assets[0];
+      expect(asset).toMatchObject({
+        displayName: "대표 이미지",
+        category: { id: category.id, name: "Upload Target" },
+      });
+    });
+
+    it("displayName이 200자를 초과하면 업로드를 거부한다", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [
+          {
+            fieldName: "files",
+            fileName: "too-long-name.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+        ],
+        boundary,
+        [{ name: "displayName", value: "a".repeat(201) }],
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("다중 업로드 메타데이터가 유효하지 않으면 일부 에셋도 생성하지 않는다", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [
+          {
+            fieldName: "files",
+            fileName: "valid-name.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+          {
+            fieldName: "files",
+            fileName: "invalid-name.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+        ],
+        boundary,
+        [
+          {
+            name: "metadata",
+            value: JSON.stringify([
+              { displayName: "valid" },
+              { displayName: "b".repeat(201) },
+            ]),
+          },
+        ],
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+
+      expect(res.statusCode).toBe(400);
+
+      const listRes = await app.inject({
+        method: "GET",
+        url: "/assets",
+        headers: { cookie: authCookie },
+      });
+      expect(listRes.json().meta.total).toBe(0);
+    });
+
+    it("다중 업로드 중 뒤 파일 검증이 실패하면 앞 파일 에셋도 정리한다", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [
+          {
+            fieldName: "files",
+            fileName: "valid.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+          {
+            fieldName: "files",
+            fileName: "invalid.png",
+            content: Buffer.from("not actually a png"),
+            mimeType: "image/png",
+          },
+        ],
+        boundary,
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+
+      expect(res.statusCode).toBe(400);
+
+      const listRes = await app.inject({
+        method: "GET",
+        url: "/assets",
+        headers: { cookie: authCookie },
+      });
+      expect(listRes.json().meta.total).toBe(0);
     });
 
     it("업로드 후 반환된 /uploads URL로 정적 접근 가능", async () => {
       const boundary = "testboundary";
       const payload = buildMultipart(
-        [{ fieldName: "files", fileName: "served.png", content: TINY_PNG, mimeType: "image/png" }],
+        [
+          {
+            fieldName: "files",
+            fileName: "served.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+        ],
         boundary,
       );
       const uploadRes = await app.inject({
@@ -224,7 +566,14 @@ describe("Asset Routes", () => {
     it("안전한 SVG 업로드 → 201", async () => {
       const boundary = "testboundary";
       const payload = buildMultipart(
-        [{ fieldName: "files", fileName: "safe.svg", content: SAFE_SVG, mimeType: "image/svg+xml" }],
+        [
+          {
+            fieldName: "files",
+            fileName: "safe.svg",
+            content: SAFE_SVG,
+            mimeType: "image/svg+xml",
+          },
+        ],
         boundary,
       );
       const res = await app.inject({
@@ -245,7 +594,14 @@ describe("Asset Routes", () => {
     it("active content가 포함된 SVG → 400", async () => {
       const boundary = "testboundary";
       const payload = buildMultipart(
-        [{ fieldName: "files", fileName: "unsafe.svg", content: UNSAFE_SVG, mimeType: "image/svg+xml" }],
+        [
+          {
+            fieldName: "files",
+            fileName: "unsafe.svg",
+            content: UNSAFE_SVG,
+            mimeType: "image/svg+xml",
+          },
+        ],
         boundary,
       );
       const res = await app.inject({
@@ -263,7 +619,14 @@ describe("Asset Routes", () => {
     it("엔티티 인코딩된 scriptable URL이 있는 SVG → 400", async () => {
       const boundary = "testboundary";
       const payload = buildMultipart(
-        [{ fieldName: "files", fileName: "encoded-unsafe.svg", content: ENCODED_UNSAFE_SVG, mimeType: "image/svg+xml" }],
+        [
+          {
+            fieldName: "files",
+            fileName: "encoded-unsafe.svg",
+            content: ENCODED_UNSAFE_SVG,
+            mimeType: "image/svg+xml",
+          },
+        ],
         boundary,
       );
       const res = await app.inject({
@@ -281,7 +644,14 @@ describe("Asset Routes", () => {
     it("RIFF 기반 비-WebP 파일을 WebP로 위장하면 → 400", async () => {
       const boundary = "testboundary";
       const payload = buildMultipart(
-        [{ fieldName: "files", fileName: "fake.webp", content: FAKE_WEBP, mimeType: "image/webp" }],
+        [
+          {
+            fieldName: "files",
+            fileName: "fake.webp",
+            content: FAKE_WEBP,
+            mimeType: "image/webp",
+          },
+        ],
         boundary,
       );
       const res = await app.inject({
@@ -299,7 +669,14 @@ describe("Asset Routes", () => {
     it("허용되지 않은 MIME → 400", async () => {
       const boundary = "testboundary";
       const payload = buildMultipart(
-        [{ fieldName: "files", fileName: "test.txt", content: Buffer.from("hello"), mimeType: "text/plain" }],
+        [
+          {
+            fieldName: "files",
+            fileName: "test.txt",
+            content: Buffer.from("hello"),
+            mimeType: "text/plain",
+          },
+        ],
         boundary,
       );
       const res = await app.inject({
@@ -333,7 +710,14 @@ describe("Asset Routes", () => {
       const boundary = "testboundary";
       const largeBuffer = Buffer.alloc(11 * 1024 * 1024); // 11MB
       const payload = buildMultipart(
-        [{ fieldName: "files", fileName: "big.png", content: largeBuffer, mimeType: "image/png" }],
+        [
+          {
+            fieldName: "files",
+            fileName: "big.png",
+            content: largeBuffer,
+            mimeType: "image/png",
+          },
+        ],
         boundary,
       );
       const res = await app.inject({
@@ -352,11 +736,22 @@ describe("Asset Routes", () => {
   // ===== GET /assets/:id =====
 
   describe("GET /assets/:id", () => {
+    it("인증 없이 → 403", async () => {
+      const asset = await seedAsset();
+      const res = await app.inject({
+        method: "GET",
+        url: `/assets/${asset.id}`,
+      });
+
+      expect(res.statusCode).toBe(403);
+    });
+
     it("존재하는 asset → 200", async () => {
       const asset = await seedAsset({ width: 800, height: 600 });
       const res = await app.inject({
         method: "GET",
         url: `/assets/${asset.id}`,
+        headers: { cookie: authCookie },
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
@@ -364,14 +759,81 @@ describe("Asset Routes", () => {
       expect(body.url).toBe(`/uploads/${asset.storageKey}`);
       expect(body.width).toBe(800);
       expect(body.height).toBe(600);
+      expect(body.category.id).toBe(asset.categoryId);
     });
 
     it("없는 id → 404", async () => {
       const res = await app.inject({
         method: "GET",
         url: "/assets/999999",
+        headers: { cookie: authCookie },
       });
       expect(res.statusCode).toBe(404);
+    });
+  });
+
+  // ===== PATCH /assets/:id =====
+
+  describe("PATCH /assets/:id", () => {
+    it("별명과 카테고리 수정 → 200", async () => {
+      const category = await seedAssetCategory({ name: "Updated Category" });
+      const asset = await seedAsset();
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/assets/${asset.id}`,
+        headers: { cookie: authCookie },
+        payload: { displayName: "수정된 별명", categoryId: category.id },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({
+        id: asset.id,
+        displayName: "수정된 별명",
+        category: { id: category.id, name: "Updated Category" },
+      });
+    });
+
+    it("없는 카테고리로 수정하면 → 400", async () => {
+      const asset = await seedAsset();
+      const res = await app.inject({
+        method: "PATCH",
+        url: `/assets/${asset.id}`,
+        headers: { cookie: authCookie },
+        payload: { categoryId: 999999 },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+  });
+
+  // ===== PATCH /assets/bulk/category =====
+
+  describe("PATCH /assets/bulk/category", () => {
+    it("벌크 카테고리 변경 → 204", async () => {
+      const category = await seedAssetCategory({ name: "Bulk Target" });
+      const [a1, a2] = await Promise.all([seedAsset(), seedAsset()]);
+
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/assets/bulk/category",
+        headers: { cookie: authCookie },
+        payload: { ids: [a1.id, a2.id], categoryId: category.id },
+      });
+
+      expect(res.statusCode).toBe(204);
+
+      const check = await app.inject({
+        method: "GET",
+        url: `/assets?categoryId=${category.id}`,
+        headers: { cookie: authCookie },
+      });
+      expect(
+        check
+          .json()
+          .data.map((asset: { id: number }) => asset.id)
+          .sort(),
+      ).toEqual([a1.id, a2.id].sort());
     });
   });
 
@@ -410,6 +872,7 @@ describe("Asset Routes", () => {
       const check = await app.inject({
         method: "GET",
         url: `/assets/${asset.id}`,
+        headers: { cookie: authCookie },
       });
       expect(check.statusCode).toBe(404);
     });
@@ -462,13 +925,25 @@ describe("Asset Routes", () => {
       expect(res.statusCode).toBe(204);
 
       // 삭제된 id 조회 → 404
-      const check1 = await app.inject({ method: "GET", url: `/assets/${a1.id}` });
-      const check2 = await app.inject({ method: "GET", url: `/assets/${a2.id}` });
+      const check1 = await app.inject({
+        method: "GET",
+        url: `/assets/${a1.id}`,
+        headers: { cookie: authCookie },
+      });
+      const check2 = await app.inject({
+        method: "GET",
+        url: `/assets/${a2.id}`,
+        headers: { cookie: authCookie },
+      });
       expect(check1.statusCode).toBe(404);
       expect(check2.statusCode).toBe(404);
 
       // 삭제 안 된 id는 유지
-      const check3 = await app.inject({ method: "GET", url: `/assets/${a3.id}` });
+      const check3 = await app.inject({
+        method: "GET",
+        url: `/assets/${a3.id}`,
+        headers: { cookie: authCookie },
+      });
       expect(check3.statusCode).toBe(200);
     });
 
