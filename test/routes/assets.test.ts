@@ -407,6 +407,33 @@ describe("Asset Routes", () => {
       });
     });
 
+    it("displayName이 200자를 초과하면 업로드를 거부한다", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [
+          {
+            fieldName: "files",
+            fileName: "too-long-name.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+        ],
+        boundary,
+        [{ name: "displayName", value: "a".repeat(201) }],
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
     it("업로드 후 반환된 /uploads URL로 정적 접근 가능", async () => {
       const boundary = "testboundary";
       const payload = buildMultipart(

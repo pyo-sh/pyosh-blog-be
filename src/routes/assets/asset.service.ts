@@ -117,6 +117,7 @@ export class AssetService {
   ): Promise<UploadedAsset> {
     const categoryId =
       metadata.categoryId ?? (await this.getDefaultCategoryId("default"));
+    const displayName = this.normalizeDisplayName(metadata.displayName);
 
     await this.assertAssetCategoryExists(categoryId);
 
@@ -129,7 +130,7 @@ export class AssetService {
       .insert(assetTable)
       .values({
         categoryId,
-        displayName: this.normalizeDisplayName(metadata.displayName),
+        displayName,
         storageProvider: "local",
         storageKey,
         mimeType,
@@ -601,6 +602,11 @@ export class AssetService {
     }
 
     const trimmed = value.trim();
+    if (trimmed.length > 200) {
+      throw HttpError.badRequest(
+        "Asset displayName cannot exceed 200 characters.",
+      );
+    }
 
     return trimmed.length > 0 ? trimmed : null;
   }
