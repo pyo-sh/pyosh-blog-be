@@ -141,8 +141,26 @@ export class AssetService {
     );
     const assets: UploadedAsset[] = [];
 
-    for (const [index, file] of files.entries()) {
-      assets.push(await this.savePreparedAsset(file, preparedMetadata[index]!));
+    try {
+      for (const [index, file] of files.entries()) {
+        assets.push(
+          await this.savePreparedAsset(file, preparedMetadata[index]!),
+        );
+      }
+    } catch (error) {
+      await Promise.all(
+        assets.map(async (asset) => {
+          try {
+            await this.deleteAsset(asset.id);
+          } catch (cleanupError) {
+            console.error(
+              `Failed to clean up asset after upload failure: ${asset.id}`,
+              cleanupError,
+            );
+          }
+        }),
+      );
+      throw error;
     }
 
     return assets;
@@ -449,25 +467,37 @@ export class AssetService {
     const { storageKey, mimeType, sizeBytes, width, height } =
       await this.fileStorage.saveFile(buffered);
 
-    // 2. DB 레코드 생성
-    const [asset] = await this.db
-      .insert(assetTable)
-      .values({
-        categoryId: metadata.categoryId,
-        displayName: metadata.displayName,
-        storageProvider: "local",
-        storageKey,
-        mimeType,
-        sizeBytes,
-        width: width ?? null,
-        height: height ?? null,
-      })
-      .$returningId();
+    try {
+      // 2. DB 레코드 생성
+      const [asset] = await this.db
+        .insert(assetTable)
+        .values({
+          categoryId: metadata.categoryId,
+          displayName: metadata.displayName,
+          storageProvider: "local",
+          storageKey,
+          mimeType,
+          sizeBytes,
+          width: width ?? null,
+          height: height ?? null,
+        })
+        .$returningId();
 
-    // 3. 생성된 asset 조회 (전체 정보)
-    const createdAsset = await this.getAssetById(asset.id);
+      // 3. 생성된 asset 조회 (전체 정보)
+      const createdAsset = await this.getAssetById(asset.id);
 
-    return createdAsset;
+      return createdAsset;
+    } catch (error) {
+      try {
+        await this.fileStorage.deleteFile(storageKey);
+      } catch (cleanupError) {
+        console.error(
+          `Failed to clean up uploaded file after DB failure: ${storageKey}`,
+          cleanupError,
+        );
+      }
+      throw error;
+    }
   }
 
   private async getAssetCategoryById(

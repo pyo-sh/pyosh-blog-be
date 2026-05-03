@@ -483,6 +483,45 @@ describe("Asset Routes", () => {
       expect(listRes.json().meta.total).toBe(0);
     });
 
+    it("다중 업로드 중 뒤 파일 검증이 실패하면 앞 파일 에셋도 정리한다", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [
+          {
+            fieldName: "files",
+            fileName: "valid.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+          {
+            fieldName: "files",
+            fileName: "invalid.png",
+            content: Buffer.from("not actually a png"),
+            mimeType: "image/png",
+          },
+        ],
+        boundary,
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+
+      expect(res.statusCode).toBe(400);
+
+      const listRes = await app.inject({
+        method: "GET",
+        url: "/assets",
+        headers: { cookie: authCookie },
+      });
+      expect(listRes.json().meta.total).toBe(0);
+    });
+
     it("업로드 후 반환된 /uploads URL로 정적 접근 가능", async () => {
       const boundary = "testboundary";
       const payload = buildMultipart(
