@@ -5,6 +5,7 @@ import * as schema from "@src/db/schema/index";
 import { postTable } from "@src/db/schema/posts";
 import { statsDailyTable } from "@src/db/schema/stats";
 import { HttpError } from "@src/errors/http-error";
+import { buildPublicReadablePostWhere } from "@src/routes/posts/post.visibility";
 
 export interface PopularPostStat {
   postId: number;
@@ -50,14 +51,7 @@ export class StatsService {
       const [post] = await this.db
         .select({ id: postTable.id })
         .from(postTable)
-        .where(
-          and(
-            eq(postTable.id, postId),
-            eq(postTable.status, "published"),
-            eq(postTable.visibility, "public"),
-            isNull(postTable.deletedAt),
-          ),
-        )
+        .where(buildPublicReadablePostWhere(eq(postTable.id, postId)))
         .limit(1);
 
       if (!post) {
@@ -155,9 +149,7 @@ export class StatsService {
       .where(
         and(
           gte(statsDailyTable.date, fromDate),
-          eq(postTable.status, "published"),
-          eq(postTable.visibility, "public"),
-          isNull(postTable.deletedAt),
+          buildPublicReadablePostWhere(),
         ),
       )
       .groupBy(postTable.id, postTable.slug, postTable.title)

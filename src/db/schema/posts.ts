@@ -26,6 +26,7 @@ export const postTable = mysqlTable(
     visibility: mysqlEnum("visibility", ["public", "private"])
       .default("public")
       .notNull(),
+    searchIndexable: boolean("search_indexable").default(true).notNull(),
     status: mysqlEnum("status", ["draft", "published", "archived"])
       .default("draft")
       .notNull(),

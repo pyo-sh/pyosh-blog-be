@@ -50,6 +50,7 @@ export function createCommentRoute(
           response: {
             200: CommentsResponseSchema,
             400: ErrorResponseSchema,
+            404: ErrorResponseSchema,
           },
         },
         preHandler: optionalAuth,
@@ -100,6 +101,7 @@ export function createCommentRoute(
           response: {
             201: CreateCommentResponseSchema,
             400: ErrorResponseSchema,
+            404: ErrorResponseSchema,
             429: ErrorResponseSchema,
           },
         },
