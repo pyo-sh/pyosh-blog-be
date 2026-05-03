@@ -122,6 +122,46 @@ describe("Comment Routes", () => {
       expect(body.data.depth).toBe(0);
     });
 
+    it("private 게시글에는 댓글을 작성할 수 없다 → 404", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "private",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/posts/${post.id}/comments`,
+        payload: {
+          body: "비공개 글 댓글",
+          guestName: "홍길동",
+          guestPassword: "pass1234",
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("draft 게시글에는 댓글을 작성할 수 없다 → 404", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "draft",
+        visibility: "public",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/posts/${post.id}/comments`,
+        payload: {
+          body: "초안 글 댓글",
+          guestName: "홍길동",
+          guestPassword: "pass1234",
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
     it("대댓글 (depth=1) 작성 → 201", async () => {
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -316,6 +356,38 @@ describe("Comment Routes", () => {
       expect(page2.statusCode).toBe(200);
       const page2Body = page2.json();
       expect(page2Body.data).toHaveLength(1);
+    });
+
+    it("private 게시글 댓글 목록은 조회할 수 없다 → 404", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "private",
+      });
+      await seedComment(post.id, { body: "숨겨진 댓글" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/posts/${post.id}/comments`,
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("archived 게시글 댓글 목록은 조회할 수 없다 → 404", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "archived",
+        visibility: "public",
+      });
+      await seedComment(post.id, { body: "보관 글 댓글" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/posts/${post.id}/comments`,
+      });
+
+      expect(response.statusCode).toBe(404);
     });
 
     it("비밀 댓글 마스킹 확인", async () => {

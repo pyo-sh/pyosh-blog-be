@@ -75,6 +75,20 @@ describe("SEO Routes", () => {
       expect(response.body).not.toContain(`/posts/${post.slug}`);
     });
 
+    it("searchIndexable=false 공개 글은 포함되지 않는다", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        slug: "noindex-post",
+        status: "published",
+        visibility: "public",
+        searchIndexable: false,
+      });
+
+      const response = await app.inject({ method: "GET", url: "/sitemap.xml" });
+
+      expect(response.body).not.toContain(`/posts/${post.slug}`);
+    });
+
     it("유효한 XML 구조를 반환한다", async () => {
       const response = await app.inject({ method: "GET", url: "/sitemap.xml" });
 
@@ -145,6 +159,23 @@ describe("SEO Routes", () => {
       const response = await app.inject({ method: "GET", url: "/rss.xml" });
 
       expect(response.body).not.toContain(`/posts/${post.slug}`);
+    });
+
+    it("searchIndexable=false 공개 글도 피드에 포함된다", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        title: "Noindex RSS Post",
+        slug: "noindex-rss-post",
+        status: "published",
+        visibility: "public",
+        searchIndexable: false,
+      });
+
+      const response = await app.inject({ method: "GET", url: "/rss.xml" });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toContain(post.title);
+      expect(response.body).toContain(`/posts/${post.slug}`);
     });
 
     it("RSS 2.0 구조를 반환한다", async () => {

@@ -21,6 +21,7 @@ import * as schema from "@src/db/schema/index";
 import { oauthAccountTable } from "@src/db/schema/oauth-accounts";
 import { postTable } from "@src/db/schema/posts";
 import { HttpError } from "@src/errors/http-error";
+import { buildPublicReadablePostWhere } from "@src/routes/posts/post.visibility";
 import {
   Author,
   buildHierarchy,
@@ -105,9 +106,9 @@ export class CommentService {
     return await this.db.transaction(async (tx) => {
       // 1. 게시글 존재 확인 (삭제되지 않은 것)
       const [post] = await tx
-        .select()
+        .select({ id: postTable.id })
         .from(postTable)
-        .where(and(eq(postTable.id, postId), isNull(postTable.deletedAt)))
+        .where(buildPublicReadablePostWhere(eq(postTable.id, postId)))
         .limit(1);
 
       if (!post) {
@@ -267,6 +268,8 @@ export class CommentService {
       throw HttpError.notFound("Comment not found.");
     }
 
+    await this.assertPublicReadablePost(comment.postId);
+
     if (comment.status !== "active" || comment.deletedAt !== null) {
       throw HttpError.notFound("Comment not found.");
     }
@@ -307,6 +310,8 @@ export class CommentService {
     const offset = calculateOffset(page, limit);
     const viewerUserId = options?.viewerUserId ?? null;
     const isAdmin = options?.viewerIsAdmin ?? false;
+
+    await this.assertPublicReadablePost(postId);
 
     const activeCondition = and(
       eq(commentTable.postId, postId),
@@ -710,6 +715,18 @@ export class CommentService {
         }
         await tx.delete(commentTable).where(inArray(commentTable.id, ids));
       });
+    }
+  }
+
+  private async assertPublicReadablePost(postId: number): Promise<void> {
+    const [post] = await this.db
+      .select({ id: postTable.id })
+      .from(postTable)
+      .where(buildPublicReadablePostWhere(eq(postTable.id, postId)))
+      .limit(1);
+
+    if (!post) {
+      throw HttpError.notFound("Post not found.");
     }
   }
 

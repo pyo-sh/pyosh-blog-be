@@ -109,6 +109,26 @@ describe("Stats Routes", () => {
       expect(response.statusCode).toBe(404);
     });
 
+    it("searchIndexable=false 공개 게시글 postId → 200", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+        searchIndexable: false,
+      });
+      const csrfHeaders = await getCsrfHeaders();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/stats/view",
+        headers: csrfHeaders,
+        remoteAddress: "10.0.0.40",
+        payload: { postId: post.id },
+      });
+
+      expect(response.statusCode).toBe(200);
+    });
+
     it("같은 IP 5분 내 동일 대상 재요청 → deduplicated: true", async () => {
       const category = await seedCategory();
       const post = await seedPost(category.id, {
@@ -228,6 +248,30 @@ describe("Stats Routes", () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json().data).toHaveLength(0);
+    });
+
+    it("searchIndexable=false 공개 글은 인기글에 포함된다", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        title: "Noindex Popular",
+        status: "published",
+        visibility: "public",
+        searchIndexable: false,
+      });
+
+      const today = new Date();
+      await db
+        .insert(statsDailyTable)
+        .values({ postId: post.id, date: today, pageviews: 100, uniques: 50 });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/stats/popular",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(1);
+      expect(response.json().data[0].postId).toBe(post.id);
     });
 
     it("limit 파라미터 동작", async () => {
