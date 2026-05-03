@@ -146,7 +146,6 @@ export const AdminPostListQuerySchema = z.object({
   deletedState: z
     .enum(["active", "deleted", "all"])
     .optional()
-    .default("active")
     .describe(
       "삭제 상태 필터: active=삭제되지 않은 글, deleted=삭제된 글, all=전체",
     ),

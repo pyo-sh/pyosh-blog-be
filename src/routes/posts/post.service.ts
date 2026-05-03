@@ -448,11 +448,12 @@ export class PostService {
     // WHERE 조건 동적 조합
     const conditions = [];
 
-    const deletedState = query.deletedState ?? "active";
+    const deletedState =
+      query.deletedState ?? (query.includeDeleted ? "all" : "active");
 
     if (deletedState === "deleted") {
       conditions.push(isNotNull(postTable.deletedAt));
-    } else if (deletedState === "active" && !query.includeDeleted) {
+    } else if (deletedState === "active") {
       conditions.push(isNull(postTable.deletedAt));
     }
 

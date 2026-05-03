@@ -1182,6 +1182,38 @@ describe("Post Routes", () => {
       );
     });
 
+    it("deletedState=active가 있으면 includeDeleted=true보다 우선한다", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+
+      const activePost = await seedPost(category.id);
+      const deletedPost = await seedPost(category.id);
+
+      await app.inject({
+        method: "DELETE",
+        url: `/admin/posts/${deletedPost.id}`,
+        headers: { cookie },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/admin/posts?deletedState=active&includeDeleted=true",
+        headers: { cookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const data = response.json().data as {
+        id: number;
+        deletedAt: string | null;
+      }[];
+
+      expect(data).toHaveLength(1);
+      expect(data[0].id).toBe(activePost.id);
+      expect(data[0].id).not.toBe(deletedPost.id);
+      expect(data[0].deletedAt).toBeNull();
+    });
+
     it("includeDeleted=true + category 삭제(trash)된 글도 200으로 반환", async () => {
       await seedAdmin();
       const cookie = await injectAuth(app);
