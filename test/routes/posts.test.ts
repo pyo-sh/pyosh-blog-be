@@ -395,6 +395,28 @@ describe("Post Routes", () => {
       expect(body.meta).toBeDefined();
     });
 
+    it("searchIndexable=false 공개 글도 목록에 포함된다", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        title: "Noindex Public Post",
+        status: "published",
+        visibility: "public",
+        searchIndexable: false,
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/posts",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().data).toHaveLength(1);
+      expect(response.json().data[0]).toMatchObject({
+        id: post.id,
+        searchIndexable: false,
+      });
+    });
+
     it("페이지네이션 동작 — limit=2, 총 3개 → 2개 반환", async () => {
       const category = await seedCategory();
 
@@ -611,6 +633,91 @@ describe("Post Routes", () => {
       expect(body.prevPost.slug).toBe(past.slug);
       expect(body.nextPost).not.toBeNull();
       expect(body.nextPost.slug).toBe(future.slug);
+    });
+
+    it("searchIndexable=false 공개 글도 상세 조회된다", async () => {
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "public",
+        searchIndexable: false,
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/posts/${post.slug}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().post.searchIndexable).toBe(false);
+    });
+
+    it("private published 글은 관리자 쿠키가 있어도 404", async () => {
+      await seedAdmin();
+      const cookie = await injectAuth(app);
+      const category = await seedCategory();
+      const post = await seedPost(category.id, {
+        status: "published",
+        visibility: "private",
+      });
+
+      const anonymousResponse = await app.inject({
+        method: "GET",
+        url: `/posts/${post.slug}`,
+      });
+      const adminResponse = await app.inject({
+        method: "GET",
+        url: `/posts/${post.slug}`,
+        headers: { cookie },
+      });
+
+      expect(anonymousResponse.statusCode).toBe(404);
+      expect(adminResponse.statusCode).toBe(404);
+    });
+
+    it("이전/다음 글은 public readable 글만 반환한다", async () => {
+      const category = await seedCategory();
+      const now = Date.now();
+
+      await seedPost(category.id, {
+        title: "Private Past",
+        status: "published",
+        visibility: "private",
+        publishedAt: new Date(now - 7200000),
+      });
+      const publicPast = await seedPost(category.id, {
+        title: "Public Past",
+        status: "published",
+        visibility: "public",
+        publishedAt: new Date(now - 5400000),
+      });
+      const current = await seedPost(category.id, {
+        title: "Current Post",
+        status: "published",
+        visibility: "public",
+        publishedAt: new Date(now - 3600000),
+      });
+      await seedPost(category.id, {
+        title: "Draft Future",
+        status: "draft",
+        visibility: "public",
+        publishedAt: new Date(now - 1800000),
+      });
+      const publicFuture = await seedPost(category.id, {
+        title: "Public Future",
+        status: "published",
+        visibility: "public",
+        publishedAt: new Date(now),
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/posts/${current.slug}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().prevPost.slug).toBe(publicPast.slug);
+      expect(response.json().nextPost.slug).toBe(publicFuture.slug);
     });
 
     it("존재하지 않는 slug → 404", async () => {
@@ -1396,6 +1503,32 @@ describe("Post Routes", () => {
       expect(body.slugs).toHaveLength(1);
       expect(body.slugs[0].slug).toBe(published.slug);
       expect(body.slugs[0].updatedAt).toBeDefined();
+    });
+
+    it("searchIndexable=false 공개 글은 slug 목록에서 제외된다", async () => {
+      const category = await seedCategory();
+      const visible = await seedPost(category.id, {
+        slug: "indexable-slug",
+        status: "published",
+        visibility: "public",
+        searchIndexable: true,
+      });
+      const noindex = await seedPost(category.id, {
+        slug: "noindex-slug",
+        status: "published",
+        visibility: "public",
+        searchIndexable: false,
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/posts/slugs",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const slugs = response.json().slugs.map((item: { slug: string }) => item.slug);
+      expect(slugs).toContain(visible.slug);
+      expect(slugs).not.toContain(noindex.slug);
     });
 
     it("발행된 글이 없으면 빈 배열 반환", async () => {

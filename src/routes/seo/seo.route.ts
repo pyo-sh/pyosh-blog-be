@@ -1,8 +1,12 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { categoryTable } from "@src/db/schema/categories";
 import { postTable } from "@src/db/schema/posts";
+import {
+  buildPublicReadablePostWhere,
+  buildSearchIndexablePostWhere,
+} from "@src/routes/posts/post.visibility";
 import { env } from "@src/shared/env";
 
 const SITEMAP_CACHE_CONTROL = "public, max-age=3600";
@@ -63,13 +67,7 @@ export function createSeoRoute(): FastifyPluginAsync {
             updatedAt: postTable.updatedAt,
           })
           .from(postTable)
-          .where(
-            and(
-              eq(postTable.status, "published"),
-              eq(postTable.visibility, "public"),
-              isNull(postTable.deletedAt),
-            ),
-          )
+          .where(buildSearchIndexablePostWhere())
           .orderBy(desc(postTable.updatedAt));
 
         const categories = await fastify.db
@@ -137,13 +135,7 @@ export function createSeoRoute(): FastifyPluginAsync {
           })
           .from(postTable)
           .innerJoin(categoryTable, eq(postTable.categoryId, categoryTable.id))
-          .where(
-            and(
-              eq(postTable.status, "published"),
-              eq(postTable.visibility, "public"),
-              isNull(postTable.deletedAt),
-            ),
-          )
+          .where(buildPublicReadablePostWhere())
           .orderBy(desc(postTable.publishedAt), desc(postTable.updatedAt))
           .limit(RSS_LIMIT);
 

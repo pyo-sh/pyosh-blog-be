@@ -288,6 +288,7 @@ export function createAdminPostRoute(
           description: body.description,
           thumbnailUrl: body.thumbnailUrl,
           visibility: body.visibility,
+          searchIndexable: body.searchIndexable,
           status: body.status,
           commentStatus: body.commentStatus,
           isPinned: body.isPinned,
