@@ -3,10 +3,12 @@ import { TEST_ADMIN_PASSWORD, TEST_ADMIN_USERNAME } from "./app";
 import { db } from "@src/db/client";
 import {
   adminTable,
+  assetCategoryTable,
   assetTable,
   categoryTable,
   commentTable,
   NewAsset,
+  NewAssetCategory,
   NewCategory,
   NewComment,
   NewOAuthAccount,
@@ -27,6 +29,7 @@ const ALL_TABLES = [
   "stats_daily_tb",
   "post_tb",
   "asset_tb",
+  "asset_category_tb",
   "tag_tb",
   "category_tb",
   "oauth_account_tb",
@@ -198,8 +201,11 @@ export async function seedComment(
 export async function seedAsset(
   overrides?: Partial<NewAsset>,
 ): Promise<typeof assetTable.$inferSelect> {
+  const categoryId =
+    overrides?.categoryId ?? (await seedAssetCategory({ key: null })).id;
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const values: NewAsset = {
+    categoryId,
     storageProvider: "local",
     storageKey: `2026/01/test-${suffix}.png`,
     mimeType: "image/png",
@@ -216,4 +222,28 @@ export async function seedAsset(
     .where(eq(assetTable.id, Number(result.insertId)));
 
   return asset!;
+}
+
+/**
+ * 테스트 Asset Category 생성
+ */
+export async function seedAssetCategory(
+  overrides?: Partial<NewAssetCategory>,
+): Promise<typeof assetCategoryTable.$inferSelect> {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const values: NewAssetCategory = {
+    key: null,
+    name: `Test Asset Category ${suffix}`,
+    sortOrder: 0,
+    isProtected: false,
+    ...overrides,
+  };
+
+  const [result] = await db.insert(assetCategoryTable).values(values);
+  const [category] = await db
+    .select()
+    .from(assetCategoryTable)
+    .where(eq(assetCategoryTable.id, Number(result.insertId)));
+
+  return category!;
 }
