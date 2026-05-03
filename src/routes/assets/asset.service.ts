@@ -65,6 +65,11 @@ export interface AssetUploadMetadata {
   categoryId?: number;
 }
 
+interface PreparedAssetUploadMetadata {
+  displayName: string | null;
+  categoryId: number;
+}
+
 /**
  * 업로드된 Asset 응답
  */
@@ -115,35 +120,9 @@ export class AssetService {
     buffered: BufferedFile,
     metadata: AssetUploadMetadata = {},
   ): Promise<UploadedAsset> {
-    const categoryId =
-      metadata.categoryId ?? (await this.getDefaultCategoryId("default"));
-    const displayName = this.normalizeDisplayName(metadata.displayName);
+    const [preparedMetadata] = await this.prepareUploadMetadata(1, [metadata]);
 
-    await this.assertAssetCategoryExists(categoryId);
-
-    // 1. 파일 저장 (크기/타입 검증 포함, 이미지 크기 추출)
-    const { storageKey, mimeType, sizeBytes, width, height } =
-      await this.fileStorage.saveFile(buffered);
-
-    // 2. DB 레코드 생성
-    const [asset] = await this.db
-      .insert(assetTable)
-      .values({
-        categoryId,
-        displayName,
-        storageProvider: "local",
-        storageKey,
-        mimeType,
-        sizeBytes,
-        width: width ?? null,
-        height: height ?? null,
-      })
-      .$returningId();
-
-    // 3. 생성된 asset 조회 (전체 정보)
-    const createdAsset = await this.getAssetById(asset.id);
-
-    return createdAsset;
+    return await this.savePreparedAsset(buffered, preparedMetadata);
   }
 
   /**
@@ -156,9 +135,17 @@ export class AssetService {
     files: BufferedFile[],
     metadata: AssetUploadMetadata[] = [],
   ): Promise<UploadedAsset[]> {
-    return Promise.all(
-      files.map((file, index) => this.uploadAsset(file, metadata[index])),
+    const preparedMetadata = await this.prepareUploadMetadata(
+      files.length,
+      metadata,
     );
+    const assets: UploadedAsset[] = [];
+
+    for (const [index, file] of files.entries()) {
+      assets.push(await this.savePreparedAsset(file, preparedMetadata[index]!));
+    }
+
+    return assets;
   }
 
   /**
@@ -454,6 +441,35 @@ export class AssetService {
       .where(inArray(assetTable.id, uniqueIds));
   }
 
+  private async savePreparedAsset(
+    buffered: BufferedFile,
+    metadata: PreparedAssetUploadMetadata,
+  ): Promise<UploadedAsset> {
+    // 1. 파일 저장 (크기/타입 검증 포함, 이미지 크기 추출)
+    const { storageKey, mimeType, sizeBytes, width, height } =
+      await this.fileStorage.saveFile(buffered);
+
+    // 2. DB 레코드 생성
+    const [asset] = await this.db
+      .insert(assetTable)
+      .values({
+        categoryId: metadata.categoryId,
+        displayName: metadata.displayName,
+        storageProvider: "local",
+        storageKey,
+        mimeType,
+        sizeBytes,
+        width: width ?? null,
+        height: height ?? null,
+      })
+      .$returningId();
+
+    // 3. 생성된 asset 조회 (전체 정보)
+    const createdAsset = await this.getAssetById(asset.id);
+
+    return createdAsset;
+  }
+
   private async getAssetCategoryById(
     id: number,
   ): Promise<AssetCategoryResponse> {
@@ -527,6 +543,41 @@ export class AssetService {
     if (!category) {
       throw HttpError.badRequest("Asset category not found.");
     }
+  }
+
+  private async assertAssetCategoriesExist(
+    categoryIds: number[],
+  ): Promise<void> {
+    const uniqueIds = [...new Set(categoryIds)];
+    if (uniqueIds.length === 0) {
+      return;
+    }
+
+    const categories = await this.db
+      .select({ id: assetCategoryTable.id })
+      .from(assetCategoryTable)
+      .where(inArray(assetCategoryTable.id, uniqueIds));
+
+    if (categories.length !== uniqueIds.length) {
+      throw HttpError.badRequest("Asset category not found.");
+    }
+  }
+
+  private async prepareUploadMetadata(
+    fileCount: number,
+    metadata: AssetUploadMetadata[],
+  ): Promise<PreparedAssetUploadMetadata[]> {
+    const defaultCategoryId = await this.getDefaultCategoryId("default");
+    const preparedMetadata = Array.from({ length: fileCount }, (_, index) => ({
+      displayName: this.normalizeDisplayName(metadata[index]?.displayName),
+      categoryId: metadata[index]?.categoryId ?? defaultCategoryId,
+    }));
+
+    await this.assertAssetCategoriesExist(
+      preparedMetadata.map((entry) => entry.categoryId),
+    );
+
+    return preparedMetadata;
   }
 
   private buildAssetListWhere(query: GetAssetListQuery): SQL | undefined {

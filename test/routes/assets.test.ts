@@ -277,6 +277,7 @@ describe("Asset Routes", () => {
       const assetRes = await app.inject({
         method: "GET",
         url: `/assets/${asset.id}`,
+        headers: { cookie: authCookie },
       });
       expect(assetRes.statusCode).toBe(200);
       expect(assetRes.json().category).toMatchObject({
@@ -432,6 +433,54 @@ describe("Asset Routes", () => {
       });
 
       expect(res.statusCode).toBe(400);
+    });
+
+    it("다중 업로드 메타데이터가 유효하지 않으면 일부 에셋도 생성하지 않는다", async () => {
+      const boundary = "testboundary";
+      const payload = buildMultipart(
+        [
+          {
+            fieldName: "files",
+            fileName: "valid-name.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+          {
+            fieldName: "files",
+            fileName: "invalid-name.png",
+            content: TINY_PNG,
+            mimeType: "image/png",
+          },
+        ],
+        boundary,
+        [
+          {
+            name: "metadata",
+            value: JSON.stringify([
+              { displayName: "valid" },
+              { displayName: "b".repeat(201) },
+            ]),
+          },
+        ],
+      );
+      const res = await app.inject({
+        method: "POST",
+        url: "/assets/upload",
+        headers: {
+          cookie: authCookie,
+          "content-type": `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+
+      expect(res.statusCode).toBe(400);
+
+      const listRes = await app.inject({
+        method: "GET",
+        url: "/assets",
+        headers: { cookie: authCookie },
+      });
+      expect(listRes.json().meta.total).toBe(0);
     });
 
     it("업로드 후 반환된 /uploads URL로 정적 접근 가능", async () => {
@@ -648,11 +697,22 @@ describe("Asset Routes", () => {
   // ===== GET /assets/:id =====
 
   describe("GET /assets/:id", () => {
+    it("인증 없이 → 403", async () => {
+      const asset = await seedAsset();
+      const res = await app.inject({
+        method: "GET",
+        url: `/assets/${asset.id}`,
+      });
+
+      expect(res.statusCode).toBe(403);
+    });
+
     it("존재하는 asset → 200", async () => {
       const asset = await seedAsset({ width: 800, height: 600 });
       const res = await app.inject({
         method: "GET",
         url: `/assets/${asset.id}`,
+        headers: { cookie: authCookie },
       });
       expect(res.statusCode).toBe(200);
       const body = res.json();
@@ -667,6 +727,7 @@ describe("Asset Routes", () => {
       const res = await app.inject({
         method: "GET",
         url: "/assets/999999",
+        headers: { cookie: authCookie },
       });
       expect(res.statusCode).toBe(404);
     });
@@ -772,6 +833,7 @@ describe("Asset Routes", () => {
       const check = await app.inject({
         method: "GET",
         url: `/assets/${asset.id}`,
+        headers: { cookie: authCookie },
       });
       expect(check.statusCode).toBe(404);
     });
@@ -827,10 +889,12 @@ describe("Asset Routes", () => {
       const check1 = await app.inject({
         method: "GET",
         url: `/assets/${a1.id}`,
+        headers: { cookie: authCookie },
       });
       const check2 = await app.inject({
         method: "GET",
         url: `/assets/${a2.id}`,
+        headers: { cookie: authCookie },
       });
       expect(check1.statusCode).toBe(404);
       expect(check2.statusCode).toBe(404);
@@ -839,6 +903,7 @@ describe("Asset Routes", () => {
       const check3 = await app.inject({
         method: "GET",
         url: `/assets/${a3.id}`,
+        headers: { cookie: authCookie },
       });
       expect(check3.statusCode).toBe(200);
     });

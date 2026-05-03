@@ -335,17 +335,21 @@ export function createAssetRoute(
       },
     );
 
-    // GET /assets/:id - Asset 메타데이터 조회 (Public, 선택)
+    // GET /assets/:id - Asset 메타데이터 조회 (Admin)
     typedFastify.get(
       "/:id",
       {
+        preHandler: requireAdmin(adminService),
         schema: {
           tags: ["assets"],
           summary: "Get asset metadata",
-          description: "Asset의 메타데이터를 조회합니다. (URL, 크기, 타입 등)",
+          description:
+            "Asset의 메타데이터를 조회합니다. Admin 권한이 필요합니다.",
+          security: [{ cookieAuth: [] }],
           params: assetIdParamSchema,
           response: {
             200: assetResponseSchema,
+            403: errorResponseSchema,
             404: errorResponseSchema,
           },
         },
