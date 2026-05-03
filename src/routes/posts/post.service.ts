@@ -23,6 +23,10 @@ import { Post, postTable, NewPost } from "@src/db/schema/posts";
 import { statsDailyTable } from "@src/db/schema/stats";
 import { tagTable } from "@src/db/schema/tags";
 import { HttpError } from "@src/errors/http-error";
+import {
+  buildPublicReadablePostWhere,
+  buildSearchIndexablePostWhere,
+} from "@src/routes/posts/post.visibility";
 import { TagService } from "@src/routes/tags/tag.service";
 import {
   buildPaginatedResponse,
@@ -101,6 +105,7 @@ export interface CreatePostInput {
   description?: string;
   thumbnailUrl?: string | null;
   visibility?: "public" | "private";
+  searchIndexable?: boolean;
   status?: "draft" | "published" | "archived";
   commentStatus?: "open" | "locked" | "disabled";
   isPinned?: boolean;
@@ -119,6 +124,7 @@ export interface UpdatePostInput {
   description?: string | null;
   thumbnailUrl?: string | null;
   visibility?: "public" | "private";
+  searchIndexable?: boolean;
   status?: "draft" | "published" | "archived";
   commentStatus?: "open" | "locked" | "disabled";
   isPinned?: boolean;
@@ -270,6 +276,7 @@ export class PostService {
           description: input.description ?? null,
           thumbnailUrl: input.thumbnailUrl ?? null,
           visibility: input.visibility ?? "public",
+          searchIndexable: input.searchIndexable ?? true,
           status: input.status ?? "draft",
           commentStatus: input.commentStatus ?? "open",
           isPinned: input.isPinned ?? false,
@@ -636,7 +643,7 @@ export class PostService {
     const [post] = await this.db
       .select()
       .from(postTable)
-      .where(and(eq(postTable.slug, slug), isNull(postTable.deletedAt)))
+      .where(buildPublicReadablePostWhere(eq(postTable.slug, slug)))
       .limit(1);
 
     if (!post) {
@@ -655,8 +662,7 @@ export class PostService {
       .where(
         and(
           lt(postTable.publishedAt, post.publishedAt),
-          eq(postTable.status, "published"),
-          isNull(postTable.deletedAt),
+          buildPublicReadablePostWhere(),
         ),
       )
       .orderBy(desc(postTable.publishedAt))
@@ -672,8 +678,7 @@ export class PostService {
       .where(
         and(
           gt(postTable.publishedAt, post.publishedAt),
-          eq(postTable.status, "published"),
-          isNull(postTable.deletedAt),
+          buildPublicReadablePostWhere(),
         ),
       )
       .orderBy(asc(postTable.publishedAt))
@@ -694,13 +699,7 @@ export class PostService {
       // Google Sitemap 50,000 URLs/file 제한에 맞춰 현재는 상한을 둔다.
       .select({ slug: postTable.slug, updatedAt: postTable.updatedAt })
       .from(postTable)
-      .where(
-        and(
-          eq(postTable.status, "published"),
-          eq(postTable.visibility, "public"),
-          isNull(postTable.deletedAt),
-        ),
-      )
+      .where(buildSearchIndexablePostWhere())
       .orderBy(desc(postTable.updatedAt))
       .limit(50000);
 
@@ -1286,27 +1285,23 @@ export class PostService {
     }
 
     if (post.categoryId === null) {
-      const [postTags, totalPageviews, commentCount] = await Promise.all([
-        tx
-          .select({ id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
-          .from(postTagTable)
-          .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
-          .where(eq(postTagTable.postId, post.id)),
-        tx
-          .select({
-            total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`,
-          })
-          .from(statsDailyTable)
-          .where(eq(statsDailyTable.postId, post.id))
-          .then((rows) => Number(rows[0]?.total ?? 0)),
-        tx
-          .select({ count: sql<number>`COUNT(*)` })
-          .from(commentTable)
-          .where(
-            this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)),
-          )
-          .then((rows) => Number(rows[0]?.count ?? 0)),
-      ]);
+      const postTags = await tx
+        .select({ id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
+        .from(postTagTable)
+        .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
+        .where(eq(postTagTable.postId, post.id));
+      const [pageviewRow] = await tx
+        .select({
+          total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`,
+        })
+        .from(statsDailyTable)
+        .where(eq(statsDailyTable.postId, post.id));
+      const [commentRow] = await tx
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(commentTable)
+        .where(this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)));
+      const totalPageviews = Number(pageviewRow?.total ?? 0);
+      const commentCount = Number(commentRow?.count ?? 0);
 
       return {
         ...post,
@@ -1317,39 +1312,33 @@ export class PostService {
       };
     }
 
-    const [category, postTags, totalPageviews, commentCount, ancestors] =
-      await Promise.all([
-        tx
-          .select({
-            id: categoryTable.id,
-            name: categoryTable.name,
-            slug: categoryTable.slug,
-          })
-          .from(categoryTable)
-          .where(eq(categoryTable.id, post.categoryId))
-          .limit(1)
-          .then((rows) => rows[0]),
-        tx
-          .select({ id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
-          .from(postTagTable)
-          .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
-          .where(eq(postTagTable.postId, post.id)),
-        tx
-          .select({
-            total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`,
-          })
-          .from(statsDailyTable)
-          .where(eq(statsDailyTable.postId, post.id))
-          .then((rows) => Number(rows[0]?.total ?? 0)),
-        tx
-          .select({ count: sql<number>`COUNT(*)` })
-          .from(commentTable)
-          .where(
-            this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)),
-          )
-          .then((rows) => Number(rows[0]?.count ?? 0)),
-        this.fetchCategoryAncestors(post.categoryId, tx),
-      ]);
+    const [category] = await tx
+      .select({
+        id: categoryTable.id,
+        name: categoryTable.name,
+        slug: categoryTable.slug,
+      })
+      .from(categoryTable)
+      .where(eq(categoryTable.id, post.categoryId))
+      .limit(1);
+    const postTags = await tx
+      .select({ id: tagTable.id, name: tagTable.name, slug: tagTable.slug })
+      .from(postTagTable)
+      .innerJoin(tagTable, eq(postTagTable.tagId, tagTable.id))
+      .where(eq(postTagTable.postId, post.id));
+    const [pageviewRow] = await tx
+      .select({
+        total: sql<number>`COALESCE(SUM(${statsDailyTable.pageviews}), 0)`,
+      })
+      .from(statsDailyTable)
+      .where(eq(statsDailyTable.postId, post.id));
+    const [commentRow] = await tx
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(commentTable)
+      .where(this.buildVisibleCommentWhere(eq(commentTable.postId, post.id)));
+    const ancestors = await this.fetchCategoryAncestors(post.categoryId, tx);
+    const totalPageviews = Number(pageviewRow?.total ?? 0);
+    const commentCount = Number(commentRow?.count ?? 0);
 
     if (!category)
       throw HttpError.notFound(

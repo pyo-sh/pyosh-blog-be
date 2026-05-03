@@ -176,6 +176,11 @@ export const CreatePostBodySchema = z.object({
     .optional()
     .default("public")
     .describe("공개 범위"),
+  searchIndexable: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("검색엔진 색인 허용 여부"),
   status: z
     .enum(["draft", "published", "archived"])
     .optional()
@@ -216,6 +221,7 @@ export const UpdatePostBodySchema = z.object({
     .describe("SEO 메타 설명"),
   thumbnailUrl: ThumbnailUrlInputSchema.optional().describe("썸네일 URL"),
   visibility: z.enum(["public", "private"]).optional().describe("공개 범위"),
+  searchIndexable: z.boolean().optional().describe("검색엔진 색인 허용 여부"),
   status: z
     .enum(["draft", "published", "archived"])
     .optional()
@@ -307,6 +313,7 @@ const PostBaseFields = {
   description: z.string().nullable().describe("SEO 메타 설명"),
   thumbnailUrl: z.string().nullable().describe("썸네일 URL"),
   visibility: z.enum(["public", "private"]).describe("공개 범위"),
+  searchIndexable: z.boolean().describe("검색엔진 색인 허용 여부"),
   status: z.enum(["draft", "published", "archived"]).describe("게시 상태"),
   commentStatus: z
     .enum(["open", "locked", "disabled"])
